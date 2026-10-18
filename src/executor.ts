@@ -1,54 +1,202 @@
-import type {Item,Recipe} from './contracts.js';
+import type { Item, Recipe, Step } from "./contracts.js";
+export interface ExecutionResult {
+  affiliateUrl?: string;
+  error?: string;
+  needsLogin?: boolean;
+}
 
-// Serializada pelo Chrome e executada no mundo isolado da aba.
-// Valores extraídos da sessão ficam neste escopo; somente o link final retorna.
-export async function executeRecipe(recipe:Recipe,item:Item):Promise<{affiliateUrl?:string;error?:string;needsLogin?:boolean}> {
- try {
-  const variables:Record<string,string>=Object.create(null) as Record<string,string>;
-  variables.originalUrl=item.originalUrl;
-  if(!recipe.allowedOrigins.includes(location.origin))throw new Error('A aba saiu dos domínios autorizados.');
-  const original=new URL(item.originalUrl);if(!recipe.allowedOrigins.includes(original.origin)||original.username||original.password)throw new Error('Origem do produto não autorizada.');
-  const render=(value:string)=>value.replace(/\{\{([a-zA-Z][a-zA-Z0-9_]*)(\|urlencode)?\}\}/g,(_all,key:string,encoded:string)=>{
-   if(!Object.hasOwn(variables,key))throw new Error('Variável necessária não encontrada.');
-   return encoded?encodeURIComponent(variables[key]):variables[key];
-  });
-  let affiliateUrl='';
-  for(const step of recipe.steps){
-   if(step.type==='extract'){
-    let value:string|null|undefined;
-    if(step.source==='dom'){const element=document.querySelector(step.selector??'');value=step.attribute?element?.getAttribute(step.attribute):element?.textContent;}
-    else if(step.source==='localStorage')value=localStorage.getItem(step.key??'');
-    else if(step.source==='sessionStorage')value=sessionStorage.getItem(step.key??'');
-    else if(step.source==='cookie')value=document.cookie.split('; ').find(v=>v.startsWith(`${step.key}=`))?.split('=').slice(1).join('=');
-    if(!value) return {error:'Abra o marketplace, confirme o login e tente novamente.',needsLogin:true};
-    variables[step.name]=value.trim();
-   }else if(step.type==='fill'){
-    const input=document.querySelector<HTMLInputElement>(step.selector);if(!input)throw new Error('Campo configurado não encontrado.');
-    input.value=render(step.value);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
-   }else if(step.type==='click'){
-    const element=document.querySelector<HTMLElement>(step.selector);if(!element)throw new Error('Botão configurado não encontrado.');element.click();
-   }else if(step.type==='request'){
-    const url=new URL(render(step.url));
-    if(url.origin!==location.origin||!recipe.allowedOrigins.includes(url.origin)||url.username||url.password)throw new Error('Destino da conversão não autorizado.');
-    const headers:Record<string,string>={};
-    for(const [key,value] of Object.entries(step.headers??{})){
-     if(/^(cookie|host|origin|referer|proxy-|sec-)/i.test(key))throw new Error('Header não suportado.');
-     headers[key]=render(value);
+// A função inteira é serializada pelo Chrome. Os helpers e valores de sessão
+// permanecem no mundo isolado da aba; apenas o resultado final sai desse contexto.
+export async function executeRecipe(
+  recipe: Recipe,
+  item: Item,
+): Promise<ExecutionResult> {
+  const variables: Record<string, string> = Object.create(null) as Record<
+    string,
+    string
+  >;
+  variables.originalUrl = item.originalUrl;
+  class LoginRequired extends Error {}
+
+  function validateOrigin() {
+    const original = new URL(item.originalUrl);
+    if (
+      !recipe.allowedOrigins.includes(location.origin) ||
+      !recipe.allowedOrigins.includes(original.origin) ||
+      original.username ||
+      original.password
+    ) {
+      throw new Error("Origem não autorizada.");
     }
-    const body=Object.fromEntries(Object.entries(step.body??{}).map(([key,value])=>[key,render(value)]));
-    const response=await fetch(url.href,{method:step.method,headers,body:step.method==='GET'?undefined:step.bodyEncoding==='form'?new URLSearchParams(body):JSON.stringify(body),credentials:'include',redirect:'error',signal:AbortSignal.timeout(12000)});
-    if(response.status===401||response.status===403)return {error:'Marketplace exige login ou confirmação da sessão.',needsLogin:true};
-    if(!response.ok)throw new Error('O marketplace recusou a conversão.');
-    const text=await response.text();if(text.length>262144)throw new Error('Resposta excedeu o limite.');
-    let value:unknown=JSON.parse(text);
-    for(const key of step.responsePath.split('.')){
-     if(['__proto__','constructor','prototype'].includes(key)||!value||typeof value!=='object'||!Object.hasOwn(value,key))throw new Error('Link não encontrado na resposta.');
-     value=(value as Record<string,unknown>)[key];
-    }
-    if(typeof value!=='string'||value.length>2000)throw new Error('Link retornado inválido.');affiliateUrl=value;
-   }
   }
-  const link=new URL(affiliateUrl);if(!recipe.affiliateOrigins.includes(link.origin)||link.username||link.password)throw new Error('Origem do link gerado não autorizada.');
-  return {affiliateUrl:link.href};
- }catch{return {error:'Conversão não concluída. Confira os seletores e a configuração da resposta.'};}
+  function render(value: string): string {
+    return value.replace(
+      /\{\{([a-zA-Z]\w*)(\|urlencode)?\}\}/g,
+      (_all, key: string, encoded: string) => {
+        if (!Object.hasOwn(variables, key)) {
+          throw new Error("Variável não encontrada.");
+        }
+        return encoded ? encodeURIComponent(variables[key]) : variables[key];
+      },
+    );
+  }
+  function readValue(step: Extract<Step, { type: "extract" }>) {
+    switch (step.source) {
+      case "localStorage":
+        return localStorage.getItem(step.key ?? "");
+      case "sessionStorage":
+        return sessionStorage.getItem(step.key ?? "");
+      case "cookie":
+        return document.cookie
+          .split("; ")
+          .find((value) => value.startsWith(`${step.key}=`))
+          ?.split("=")
+          .slice(1)
+          .join("=");
+      case "dom": {
+        const element = document.querySelector(step.selector ?? "");
+        return step.attribute
+          ? element?.getAttribute(step.attribute)
+          : element?.textContent;
+      }
+    }
+  }
+  function extract(step: Extract<Step, { type: "extract" }>) {
+    const value = readValue(step);
+    if (!value) {
+      throw new LoginRequired();
+    }
+    variables[step.name] = value.trim();
+  }
+  function fill(step: Extract<Step, { type: "fill" }>) {
+    const input = document.querySelector<HTMLInputElement>(step.selector);
+    if (!input) {
+      throw new Error("Campo não encontrado.");
+    }
+    input.value = render(step.value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  function click(step: Extract<Step, { type: "click" }>) {
+    const element = document.querySelector<HTMLElement>(step.selector);
+    if (!element) {
+      throw new Error("Botão não encontrado.");
+    }
+    element.click();
+  }
+  function requestHeaders(step: Extract<Step, { type: "request" }>) {
+    const headers: Record<string, string> = {};
+    for (const [key, value] of Object.entries(step.headers ?? {})) {
+      if (/^(cookie|host|origin|referer|proxy-|sec-)/i.test(key)) {
+        throw new Error("Header reservado.");
+      }
+      headers[key] = render(value);
+    }
+    return headers;
+  }
+  function requestBody(step: Extract<Step, { type: "request" }>) {
+    if (step.method === "GET") {
+      return undefined;
+    }
+    const body = Object.fromEntries(
+      Object.entries(step.body ?? {}).map(([key, value]) => [
+        key,
+        render(value),
+      ]),
+    );
+    if (step.bodyEncoding === "form") {
+      return new URLSearchParams(body);
+    }
+    return JSON.stringify(body);
+  }
+  function responseLink(text: string, path: string) {
+    if (text.length > 262144) {
+      throw new Error("Resposta excedeu o limite.");
+    }
+    let value: unknown = JSON.parse(text);
+    for (const key of path.split(".")) {
+      if (
+        ["__proto__", "constructor", "prototype"].includes(key) ||
+        !value ||
+        typeof value !== "object" ||
+        !Object.hasOwn(value, key)
+      ) {
+        throw new Error("Link não encontrado.");
+      }
+      value = (value as Record<string, unknown>)[key];
+    }
+    if (typeof value !== "string" || value.length > 2000) {
+      throw new Error("Link inválido.");
+    }
+    return value;
+  }
+  async function request(step: Extract<Step, { type: "request" }>) {
+    const url = new URL(render(step.url));
+    if (
+      url.origin !== location.origin ||
+      !recipe.allowedOrigins.includes(url.origin) ||
+      url.username ||
+      url.password
+    ) {
+      throw new Error("Destino não autorizado.");
+    }
+    const response = await fetch(url.href, {
+      method: step.method,
+      headers: requestHeaders(step),
+      body: requestBody(step),
+      credentials: "include",
+      redirect: "error",
+      signal: AbortSignal.timeout(12000),
+    });
+    if (response.status === 401 || response.status === 403) {
+      throw new LoginRequired();
+    }
+    if (!response.ok) {
+      throw new Error("Conversão recusada.");
+    }
+    return responseLink(await response.text(), step.responsePath);
+  }
+  async function runSteps() {
+    let link = "";
+    for (const step of recipe.steps) {
+      switch (step.type) {
+        case "extract":
+          extract(step);
+          break;
+        case "fill":
+          fill(step);
+          break;
+        case "click":
+          click(step);
+          break;
+        case "request":
+          link = await request(step);
+          break;
+      }
+    }
+    return link;
+  }
+  try {
+    validateOrigin();
+    const link = new URL(await runSteps());
+    if (
+      !recipe.affiliateOrigins.includes(link.origin) ||
+      link.username ||
+      link.password
+    ) {
+      throw new Error("Origem do link não autorizada.");
+    }
+    return { affiliateUrl: link.href };
+  } catch (error) {
+    if (error instanceof LoginRequired) {
+      return {
+        error: "Abra o marketplace, confirme o login e tente novamente.",
+        needsLogin: true,
+      };
+    }
+    return {
+      error:
+        "Conversão não concluída. Confira os seletores e a configuração da resposta.",
+    };
+  }
 }

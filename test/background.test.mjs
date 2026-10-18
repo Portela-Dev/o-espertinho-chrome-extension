@@ -1,0 +1,29 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { fixture } from "./fixtures.mjs";
+
+test("eventos do Chrome aceitam somente paginas internas e encaminham erros", async () => {
+  const f = fixture({ auth: undefined });
+  globalThis.chrome = f.browser;
+  await import("../dist/background.js");
+  const call = (message, sender) =>
+    new Promise((resolve) => {
+      f.listeners.message(message, sender, resolve);
+    });
+  const valid = {
+    id: f.browser.runtime.id,
+    url: `chrome-extension://${f.browser.runtime.id}/popup.html`,
+  };
+  assert.equal(
+    (await call({ type: "STATE" }, { id: "other", url: "https://evil.test" }))
+      .error,
+    "Origem não autorizada.",
+  );
+  assert.equal((await call({ type: "STATE" }, valid)).value.version, "0.2.0");
+  assert.ok((await call({ type: "UNKNOWN" }, valid)).error);
+  f.listeners.installed();
+  f.listeners.startup();
+  f.listeners.alarm({ name: "other" });
+  f.listeners.alarm({ name: "worker" });
+  await new Promise((resolve) => setImmediate(resolve));
+});
