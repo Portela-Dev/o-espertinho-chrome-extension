@@ -37,7 +37,7 @@ export class ExtensionRuntime {
   private initialization?: Promise<void>;
   private pumping = false;
   private generation = 0;
-  constructor(private browser: typeof chrome = chrome) {}
+  constructor(private readonly browser: typeof chrome = chrome) {}
   async init() {
     this.initialization ??= this.load();
     return this.initialization;

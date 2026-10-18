@@ -11,6 +11,8 @@ export async function executeRecipe(
   recipe: Recipe,
   item: Item,
 ): Promise<ExecutionResult> {
+  // Capture the page document inside the function serialized into the isolated tab.
+  const pageDocument = document;
   const variables: Record<string, string> = Object.create(null) as Record<
     string,
     string
@@ -47,14 +49,14 @@ export async function executeRecipe(
       case "sessionStorage":
         return sessionStorage.getItem(step.key ?? "");
       case "cookie":
-        return document.cookie
+        return pageDocument.cookie
           .split("; ")
           .find((value) => value.startsWith(`${step.key}=`))
           ?.split("=")
           .slice(1)
           .join("=");
       case "dom": {
-        const element = document.querySelector(step.selector ?? "");
+        const element = pageDocument.querySelector(step.selector ?? "");
         return step.attribute
           ? element?.getAttribute(step.attribute)
           : element?.textContent;
@@ -69,7 +71,7 @@ export async function executeRecipe(
     variables[step.name] = value.trim();
   }
   function fill(step: Extract<Step, { type: "fill" }>) {
-    const input = document.querySelector<HTMLInputElement>(step.selector);
+    const input = pageDocument.querySelector<HTMLInputElement>(step.selector);
     if (!input) {
       throw new Error("Campo não encontrado.");
     }
@@ -78,7 +80,7 @@ export async function executeRecipe(
     input.dispatchEvent(new Event("change", { bubbles: true }));
   }
   function click(step: Extract<Step, { type: "click" }>) {
-    const element = document.querySelector<HTMLElement>(step.selector);
+    const element = pageDocument.querySelector<HTMLElement>(step.selector);
     if (!element) {
       throw new Error("Botão não encontrado.");
     }

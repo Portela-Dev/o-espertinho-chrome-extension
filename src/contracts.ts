@@ -183,7 +183,7 @@ function validateStep(step: Step) {
       break;
     case "fill":
       if (typeof step.value !== "string") {
-        throw new Error("Preenchimento inválido.");
+        throw new TypeError("Preenchimento inválido.");
       }
       validateSelector(step.selector);
       break;
