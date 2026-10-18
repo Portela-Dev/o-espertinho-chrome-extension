@@ -1,10 +1,12 @@
 {
   "name": "o-espertinho-chrome-extension",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Boilerplate da extensão Chrome do O Espertinho.",
+  "description": "Extensão genérica do O Espertinho para geração de links por configuração.",
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "validate:html": "html-validate extension/popup.html",

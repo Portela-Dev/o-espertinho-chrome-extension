@@ -17,11 +17,44 @@
           <h1>O Espertinho</h1>
         </div>
       </header>
+      <p id="error" class="error" role="alert" hidden></p>
       <section aria-labelledby="status-title">
-        <span class="badge">Em preparação</span>
-        <h2 id="status-title">Estamos preparando seus próximos achados.</h2>
-        <p>A extensão ainda não possui funcionalidades de conexão ou geração de links.</p>
+        <span class="badge" id="mode">Conexão local</span>
+        <h2 id="status-title">Gerar links de afiliados</h2>
+        <p id="account">Conta desconectada</p>
+        <p id="status" role="status" aria-live="polite">Conectando ao serviço da extensão…</p>
+        <div class="actions">
+          <button type="button" id="login">Entrar no O Espertinho</button>
+          <button type="button" id="logout" class="secondary" hidden>Sair</button>
+        </div>
       </section>
+      <section id="workspace" aria-labelledby="workspace-title" hidden>
+        <h2 id="workspace-title">Links pendentes</h2>
+        <label for="marketplace">Marketplace</label>
+        <select id="marketplace"></select>
+        <div class="actions">
+          <button type="button" id="open" class="secondary">Abrir marketplace</button>
+          <button type="button" id="refresh" class="secondary">Atualizar fila</button>
+        </div>
+        <progress id="progress" max="1" value="0" aria-label="Progresso da geração"></progress>
+        <p id="counts"></p>
+        <p id="current"></p>
+        <div class="actions">
+          <button type="button" id="start">Gerar links pendentes</button>
+          <button type="button" id="pause" class="secondary" disabled>Pausar</button>
+        </div>
+        <ul id="results" aria-label="Resultados dos links"></ul>
+        <button type="button" id="reset" class="secondary" hidden>Reiniciar demonstração</button>
+      </section>
+      <details>
+        <summary>Configurações</summary>
+        <form id="settings">
+          <label for="backend">URL do backend</label>
+          <input id="backend" name="backend" type="url" required>
+          <button type="submit" class="secondary" id="save-backend">Salvar endereço</button>
+          <p class="hint">O endereço padrão vem de BACKEND_URL. Saia da conta para alterá-lo.</p>
+        </form>
+      </details>
       <footer>Versão <span id="version">—</span></footer>
     </main>
   </body>

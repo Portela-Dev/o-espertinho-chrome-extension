@@ -5,6 +5,7 @@ coverage/
 reports/
 .env
 .env.*
+!.env.example
 *.pem
 *.crx
 *.log

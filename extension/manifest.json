@@ -1,9 +1,21 @@
 {
   "manifest_version": 3,
   "name": "O Espertinho",
-  "description": "Extensão administrativa do O Espertinho. Estrutura inicial, sem integrações habilitadas.",
-  "version": "0.1.0",
+  "description": "Geração de links de afiliados por configuração, com autenticação e processamento em lotes.",
+  "version": "0.2.0",
   "minimum_chrome_version": "120",
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://127.0.0.1/*"
+  ],
   "icons": {
     "32": "icons/icon-32.png",
     "128": "icons/icon-128.png"
@@ -21,6 +33,6 @@
     "type": "module"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'; base-uri 'none'; frame-ancestors 'none';"
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; frame-ancestors 'none';"
   }
 }

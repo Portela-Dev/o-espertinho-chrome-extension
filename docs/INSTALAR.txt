@@ -12,5 +12,8 @@ Mantenha a pasta no computador: o Chrome carrega os arquivos a partir dela.
 Para atualizar, substitua os arquivos e clique em "Recarregar" em chrome://extensions.
 Para remover, use "Remover" na mesma página.
 
-Este pacote é um boilerplate. Não há login, coleta de dados ou geração de links.
+Após carregar, abra a extensão, conecte a conta do O Espertinho e autorize no site.
+O perfil precisa de permissão para gerar links de afiliados.
+BACKEND_URL padrão: http://localhost:3000. Backend precisa da migration 019.
+Nesta versão a fila e a conversão são demonstrativas, sem anúncios reais.
 Não é um instalador automático .exe/.crx nem uma publicação na Chrome Web Store.
