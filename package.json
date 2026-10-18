@@ -2,7 +2,7 @@
   "name": "o-espertinho-chrome-extension",
   "version": "0.2.0",
   "private": true,
-  "description": "Extensão genérica do O Espertinho para geração de links por configuração.",
+  "description": "Extens\u00c3\u00a3o gen\u00c3\u00a9rica do O Espertinho para gera\u00c3\u00a7\u00c3\u00a3o de links por configura\u00c3\u00a7\u00c3\u00a3o.",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -12,12 +12,16 @@
     "validate:html": "html-validate extension/popup.html",
     "build": "node scripts/build.mjs",
     "package": "npm run build && node scripts/package.mjs",
-    "test": "node --test test/*.test.mjs",
-    "check": "npm run typecheck && npm run validate:html && npm test"
+    "test": "npm run build:coverage && node --test test/*.test.mjs",
+    "check": "npm run typecheck && npm run validate:html && npm run test:coverage",
+    "build:coverage": "node scripts/build.mjs --coverage",
+    "test:coverage": "c8 node scripts/test-suite.mjs"
   },
   "devDependencies": {
     "@types/chrome": "0.3.5",
+    "c8": "12.0.0",
     "fflate": "0.8.3",
+    "happy-dom": "21.0.3",
     "html-validate": "11.16.4",
     "typescript": "7.0.2"
   }

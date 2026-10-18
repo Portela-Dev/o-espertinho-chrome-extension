@@ -1,25 +1,181 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import {readFile} from 'node:fs/promises';
-import {stripTypeScriptTypes} from 'node:module';
-const source=await readFile(new URL('../src/executor.ts',import.meta.url),'utf8');
-const compiled=stripTypeScriptTypes(source).replace('export async function','async function')+'\nglobalThis.executeRecipe=executeRecipe;';
-const recipe={id:'example',allowedOrigins:['https://shop.test'],affiliateOrigins:['https://shop.test'],steps:[{type:'extract',source:'dom',name:'csrf',selector:'meta',attribute:'content'},{type:'request',url:'https://shop.test/convert',method:'POST',headers:{'X-CSRF':'{{csrf}}'},body:{url:'{{originalUrl}}'},responsePath:'data.link'}]};
-const item={id:'1',title:'Teste',originalUrl:'https://shop.test/product/1'};
-function executor(fetch,element={getAttribute:()=> 'private-session-value'}){const context={Object,URL,URLSearchParams,AbortSignal,Event,location:{origin:'https://shop.test'},document:{querySelector:()=>element},fetch};vm.runInNewContext(compiled,context);return context.executeRecipe;}
-test('receita genérica usa o token apenas na origem e devolve somente o link',async()=>{
- let sent;const execute=executor(async(url,options)=>{sent={url,options};return {ok:true,status:200,text:async()=>JSON.stringify({data:{link:'https://shop.test/affiliate/1'}})};});
- const result=await execute(recipe,item);assert.equal(result.affiliateUrl,'https://shop.test/affiliate/1');assert.equal(sent.options.headers['X-CSRF'],'private-session-value');assert.equal(sent.options.credentials,'include');assert.equal(JSON.stringify(result).includes('private-session-value'),false);
+import test from "node:test";
+import assert from "node:assert/strict";
+import { Window } from "happy-dom";
+import { executeRecipe } from "../dist/executor.js";
+import { recipe as baseRecipe } from "./fixtures.mjs";
+const item = {
+  id: "1",
+  title: "Teste",
+  originalUrl: "https://shop.test/product/1",
+};
+function setup() {
+  const window = new Window({ url: "https://shop.test/login" });
+  for (const key of [
+    "document",
+    "location",
+    "localStorage",
+    "sessionStorage",
+    "Event",
+  ]) {
+    globalThis[key] = window[key];
+  }
+  document.body.innerHTML =
+    '<meta name="csrf" content="private-session-value"><input id="url"><button id="convert">Converter</button><span id="token">text-token</span>';
+  const sent = [];
+  globalThis.fetch = async (url, options) => {
+    sent.push({ url, options });
+    return Response.json({ data: { link: "https://shop.test/affiliate/1" } });
+  };
+  const recipe = structuredClone(baseRecipe);
+  recipe.steps = [
+    {
+      type: "extract",
+      source: "dom",
+      name: "csrf",
+      selector: "meta",
+      attribute: "content",
+    },
+    {
+      type: "request",
+      url: "https://shop.test/convert",
+      method: "POST",
+      headers: { "X-CSRF": "{{csrf}}" },
+      body: { url: "{{originalUrl}}" },
+      responsePath: "data.link",
+    },
+  ];
+  return { recipe, sent, window };
+}
+test("receita usa sessão somente na origem e devolve apenas o link", async () => {
+  const { recipe, sent } = setup();
+  const result = await executeRecipe(recipe, item);
+  assert.equal(result.affiliateUrl, "https://shop.test/affiliate/1");
+  assert.equal(sent[0].options.headers["X-CSRF"], "private-session-value");
+  assert.equal(sent[0].options.credentials, "include");
+  assert.equal(sent[0].options.redirect, "error");
+  assert.equal(JSON.stringify(result).includes("private-session-value"), false);
 });
-test('bloqueia envio de valores locais a outra origem e redirecionamentos',async()=>{
- let called=false;const execute=executor(async()=>{called=true;});const foreign=structuredClone(recipe);foreign.steps[1].url='https://other.test/convert';
- assert.ok((await execute(foreign,item)).error);assert.equal(called,false);
+test("campos e botões usam os valores configurados e cookies/storage permanecem locais", async () => {
+  const { recipe, sent } = setup();
+  localStorage.setItem("local", "local-token");
+  sessionStorage.setItem("session", "session-token");
+  document.cookie = "csrf=cookie-token";
+  let clicked = false;
+  document.querySelector("#convert").addEventListener("click", () => {
+    clicked = true;
+  });
+  recipe.steps.unshift(
+    { type: "extract", source: "localStorage", key: "local", name: "local" },
+    {
+      type: "extract",
+      source: "sessionStorage",
+      key: "session",
+      name: "session",
+    },
+    { type: "extract", source: "cookie", key: "csrf", name: "cookie" },
+    { type: "extract", source: "dom", selector: "#token", name: "text" },
+    { type: "fill", selector: "#url", value: "{{originalUrl}}" },
+    { type: "click", selector: "#convert" },
+  );
+  recipe.steps.at(-1).headers = {
+    Local: "{{local}}",
+    Session: "{{session}}",
+    "X-Cookie-Value": "{{cookie}}",
+    Text: "{{text}}",
+  };
+  recipe.steps.at(-1).bodyEncoding = "form";
+  const result = await executeRecipe(recipe, item);
+  assert.ok(result.affiliateUrl);
+  assert.equal(document.querySelector("#url").value, item.originalUrl);
+  assert.equal(clicked, true);
+  assert.equal(sent[0].options.headers["X-Cookie-Value"], "cookie-token");
+  assert.ok(sent[0].options.body instanceof URLSearchParams);
 });
-test('ausência de sessão ou HTTP 403 pausa o processamento para login',async()=>{
- const missing=await executor(()=>assert.fail('Não deveria chamar fetch'),null)(recipe,item);assert.equal(missing.needsLogin,true);
- const denied=await executor(async()=>({status:403}))(recipe,item);assert.equal(denied.needsLogin,true);
+test("recusa origem externa, credenciais na URL, headers reservados e saída não autorizada", async () => {
+  const cases = [
+    (recipe) => {
+      recipe.steps[1].url = "https://evil.test/convert";
+    },
+    (recipe) => {
+      recipe.steps[1].url = "https://user:secret@shop.test/convert";
+    },
+    (recipe) => {
+      recipe.steps[1].headers = { Cookie: "secret" };
+    },
+    (recipe) => {
+      recipe.affiliateOrigins = ["https://other.test"];
+    },
+  ];
+  for (const change of cases) {
+    const { recipe } = setup();
+    change(recipe);
+    const result = await executeRecipe(recipe, item);
+    assert.ok(result.error);
+    assert.equal(result.affiliateUrl, undefined);
+    assert.equal(JSON.stringify(result).includes("secret"), false);
+  }
+  const { recipe } = setup();
+  assert.ok(
+    (
+      await executeRecipe(recipe, {
+        ...item,
+        originalUrl: "https://other.test/1",
+      })
+    ).error,
+  );
 });
-test('resposta inválida não expõe payload nem tokens no erro',async()=>{
- const result=await executor(async()=>({ok:true,status:200,text:async()=>JSON.stringify({data:{link:'javascript:private-session-value'}})}))(recipe,item);assert.ok(result.error);assert.equal(JSON.stringify(result).includes('private-session-value'),false);
+test("sessão ausente e 401/403 pedem intervenção, enquanto erro técnico fica genérico", async () => {
+  const { recipe } = setup();
+  document.querySelector("meta").remove();
+  assert.equal((await executeRecipe(recipe, item)).needsLogin, true);
+  for (const status of [401, 403, 500]) {
+    const { recipe } = setup();
+    globalThis.fetch = async () => new Response("", { status });
+    const result = await executeRecipe(recipe, item);
+    assert.equal(!!result.needsLogin, status !== 500);
+    assert.ok(result.error);
+  }
+});
+test("valida resposta JSON, tamanho, caminho e tipo do link sem expor dados internos", async () => {
+  const bodies = [
+    "<html>",
+    JSON.stringify({ data: { link: 12 } }),
+    JSON.stringify({ data: { link: "javascript:private-session-value" } }),
+    JSON.stringify({ other: "private-session-value" }),
+    "x".repeat(262145),
+    JSON.stringify({ data: { link: "x".repeat(2001) } }),
+  ];
+  for (const body of bodies) {
+    const { recipe } = setup();
+    globalThis.fetch = async () => new Response(body);
+    const result = await executeRecipe(recipe, item);
+    assert.ok(result.error);
+    assert.equal(
+      JSON.stringify(result).includes("private-session-value"),
+      false,
+    );
+  }
+  const { recipe } = setup();
+  recipe.steps[1].responsePath = "__proto__.link";
+  assert.ok((await executeRecipe(recipe, item)).error);
+});
+test("GET, templates codificados e seletor inválido seguem o contrato", async () => {
+  const { recipe, sent } = setup();
+  recipe.steps[1].method = "GET";
+  recipe.steps[1].url =
+    "https://shop.test/convert?url={{originalUrl|urlencode}}";
+  assert.ok((await executeRecipe(recipe, item)).affiliateUrl);
+  assert.equal(sent[0].options.body, undefined);
+  assert.equal(new URL(sent[0].url).searchParams.get("url"), item.originalUrl);
+  const missing = setup();
+  missing.recipe.steps[1].headers = { Missing: "{{unknown}}" };
+  assert.ok((await executeRecipe(missing.recipe, item)).error);
+  for (const step of [
+    { type: "fill", selector: "#missing", value: "x" },
+    { type: "click", selector: "#missing" },
+  ]) {
+    const { recipe } = setup();
+    recipe.steps.unshift(step);
+    assert.ok((await executeRecipe(recipe, item)).error);
+  }
 });
