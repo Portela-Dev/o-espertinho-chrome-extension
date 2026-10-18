@@ -1,0 +1,12 @@
+node_modules/
+dist/
+artifacts/
+coverage/
+reports/
+.env
+.env.*
+*.pem
+*.crx
+*.log
+.DS_Store
+Thumbs.db

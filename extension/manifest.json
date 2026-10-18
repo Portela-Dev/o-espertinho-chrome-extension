@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "O Espertinho",
+  "description": "Extensão administrativa do O Espertinho. Estrutura inicial, sem integrações habilitadas.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "120",
+  "icons": {
+    "32": "icons/icon-32.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "O Espertinho",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "32": "icons/icon-32.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'; base-uri 'none'; frame-ancestors 'none';"
+  }
+}

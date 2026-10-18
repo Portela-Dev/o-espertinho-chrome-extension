@@ -1,0 +1,16 @@
+O ESPERTINHO — INSTALAÇÃO LOCAL DA EXTENSÃO
+
+1. Se você baixou o artefato pelo GitHub Actions, extraia o ZIP externo do artefato.
+2. Extraia também o arquivo o-espertinho-chrome-extension-<versão>.zip.
+3. No Chrome, abra chrome://extensions.
+4. Ative o "Modo do desenvolvedor".
+5. Clique em "Carregar sem compactação".
+6. Selecione a pasta extraída que contém manifest.json.
+7. Abra o menu de extensões do Chrome e fixe O Espertinho, se desejar.
+
+Mantenha a pasta no computador: o Chrome carrega os arquivos a partir dela.
+Para atualizar, substitua os arquivos e clique em "Recarregar" em chrome://extensions.
+Para remover, use "Remover" na mesma página.
+
+Este pacote é um boilerplate. Não há login, coleta de dados ou geração de links.
+Não é um instalador automático .exe/.crx nem uma publicação na Chrome Web Store.
