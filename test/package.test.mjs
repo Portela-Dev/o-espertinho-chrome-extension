@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { unzipSync, strFromU8 } from 'fflate';
 
-test('o pacote instala a extensão sem fontes, segredos ou permissões de navegação', async () => {
+test('o pacote contém os recursos e solicita somente permissões para o executor configurável', async () => {
   const cwd = fileURLToPath(new URL('../', import.meta.url));
   for (const script of ['scripts/build.mjs', 'scripts/package.mjs']) {
     const result = spawnSync(process.execPath, [script], { cwd, encoding: 'utf8', windowsHide: true });
@@ -21,13 +21,14 @@ test('o pacote instala a extensão sem fontes, segredos ou permissões de navega
   const manifest = JSON.parse(strFromU8(files['manifest.json']));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.equal(manifest.permissions?.length ?? 0, 0);
-  assert.equal(manifest.host_permissions?.length ?? 0, 0);
+  assert.deepEqual(manifest.permissions, ['storage','alarms','scripting']);
+  assert.equal(manifest.host_permissions.length, 1);
+  assert.ok(!manifest.host_permissions.includes('<all_urls>'));
   assert.equal(manifest.content_scripts?.length ?? 0, 0);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /unsafe-eval|unsafe-inline/);
 
-  for (const path of [manifest.action.default_popup, manifest.background.service_worker, 'popup.js', 'popup.css', ...Object.values(manifest.icons)]) {
+  for (const path of [manifest.action.default_popup, manifest.background.service_worker, 'popup.js', 'popup.css', 'config.js','contracts.js','executor.js', ...Object.values(manifest.icons)]) {
     assert.ok(files[path]?.length > 0, `Arquivo necessário ausente: ${path}`);
   }
   for (const path of Object.keys(files)) {
