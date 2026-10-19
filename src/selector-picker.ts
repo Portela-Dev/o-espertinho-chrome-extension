@@ -146,13 +146,14 @@ export function startSelectorPicker() {
     scopeButton.disabled=!current;
     draw();
   }
-  function selectorList(selector:string){
+  // Keep this helper local: the whole picker is serialized into the isolated tab.
+  const selectorList=(selector:string)=>{
     const parts:string[]=[];let start=0;
     const state={depth:0,quote:'',escaped:false};
     function separator(char:string){
       if(state.escaped){state.escaped=false;return false;}
       if(char==='\\'){state.escaped=true;return false;}
-      if(state.quote){if(char===state.quote)state.quote='';return false;}
+      if(state.quote){if(char===state.quote){state.quote='';}return false;}
       if(char==='"'||char==="'"){state.quote=char;return false;}
       if(char==='('||char==='[')state.depth++;
       if(char===')'||char===']')state.depth--;
@@ -162,7 +163,7 @@ export function startSelectorPicker() {
       if(separator(selector[i])){parts.push(selector.slice(start,i).trim());start=i+1;}
     }
     parts.push(selector.slice(start).trim());return parts;
-  }
+  };
   function candidateMatches(selector:string){
     try{return query(composeSelector(parentText.value.trim(),selector));}catch{return [];}
   }
@@ -225,8 +226,9 @@ export function startSelectorPicker() {
     for(const element of selected){const item=node('li',describe(element),list);button('Remover',item,()=>{selected.delete(element);refresh();}).className='remove';}
     const previous=candidates.value;candidates.replaceChildren();
     for(const candidate of suggestions()){const option=node('option',`${candidate.matches.length} resultados — ${candidate.selector}`,candidates);option.value=candidate.selector;}
-    if(Array.from(candidates.options).some(o=>o.value===previous))candidates.value=previous;
-    if(editorMode==='custom'){showPreview();}else if(editorMode==='parts'){updateParts();}else{showCandidate();}showCurrent();
+    if(Array.from(candidates.options).some(o=>o.value===previous)){candidates.value=previous;}
+    if(editorMode==='custom'){showPreview();}else if(editorMode==='parts'){updateParts();}else{showCandidate();}
+    showCurrent();
   }
   function up(){if(current?.parentElement&&current!==scope){children.set(current.parentElement,current);current=current.parentElement;locked=true;showCurrent();}}
   function down(){if(current){const child=children.get(current)??current.firstElementChild;if(child){current=child;locked=true;showCurrent();}}}
