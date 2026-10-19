@@ -7,7 +7,7 @@ export async function captureSession(browser:typeof chrome,market:ProofMarket,in
  let skipped=0;
  for(const origin of market.allowedOrigins){
   if(new URL(origin).protocol!=='https:')throw new Error('A captura exige domínios HTTPS.');
-  for(const c of await browser.cookies.getAll({url:origin+'/'})){
+  for(const c of await browser.cookies.getAll({domain:new URL(origin).hostname})){
    if(c.partitionKey||!market.cookieDomains.includes(c.domain.replace(/^\./u,''))||c.expirationDate!==undefined&&c.expirationDate<=Date.now()/1000){skipped++;continue;}
    cookies.set(c.domain+'\n'+c.path+'\n'+c.name,{name:c.name,value:c.value,domain:c.domain,path:c.path,expires:c.expirationDate??-1,httpOnly:c.httpOnly,secure:true,sameSite:c.sameSite==='strict'?'Strict':c.sameSite==='no_restriction'?'None':'Lax'});
   }

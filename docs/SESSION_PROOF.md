@@ -16,3 +16,9 @@ O backend exige a sessão real da extensão e uma conta administradora. Os endpo
 Cookies e armazenamento local não são gravados no banco, nos logs, no estado da extensão ou retornados ao popup. O backend mantém a entrada cifrada durante o processamento; o container restaura o estado em um navegador isolado e o encerra ao terminar. Somente o resultado sem credenciais fica disponível à sessão que solicitou o teste, por até cinco minutos. A auditoria registra o identificador e o resultado técnico, sem os valores da sessão.
 
 Não há geração de links, alteração de ofertas, agendamento ou retentativa automática. Uma sessão pode não funcionar quando transferida para outro navegador; `technical_failure` não comprova expiração ou bloqueio. Essa prova importa cookies e, opcionalmente, localStorage; não importa IndexedDB, sessionStorage, senhas, extensões ou perfil completo do Chrome.
+
+## Resultado observado na prova inicial
+
+Em 19/10/2026, uma captura explícita do Mercado Livre importou 42 cookies no container e permitiu extrair título e preço de um produto anteriormente redirecionado para login. A resposta foi HTTP 200, estado `available`, com preço de R$ 749,99. O backend registrou `extension.session_proof.available` na auditoria. Nenhum cookie foi incluído nesta documentação ou no resultado público.
+
+O resultado valida um acesso autenticado naquele momento. Não mede duração da sessão, renovação, estabilidade em lotes ou limites de acesso; os jobs continuam sem integração com essa sessão.

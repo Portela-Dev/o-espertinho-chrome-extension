@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {captureSession} from '../dist/session-proof.js';
 import {fixture} from './fixtures.mjs';
 const market={id:'generic',name:'Loja genérica',loginUrl:'https://shop.example.com',allowedOrigins:['https://shop.example.com','https://example.com'],cookieDomains:['shop.example.com','example.com'],testUrl:'https://shop.example.com/product'};
-const cookie={name:'session',value:'PRIVATE-COOKIE',domain:'.example.com',path:'/',httpOnly:true,secure:true,sameSite:'lax'};
-function configure(f){f.browser.tabs.query=async()=>[{id:1,url:market.testUrl,incognito:false}];f.browser.cookies={getAll:async()=>[cookie,{...cookie,name:'foreign',domain:'.foreign.com'},{...cookie,name:'expired',expirationDate:1},{...cookie,name:'partitioned',partitionKey:{topLevelSite:'https://example.com'}}]};}
+const cookie={name:'session',value:'PRIVATE-COOKIE',domain:'.example.com',path:'/account',httpOnly:true,secure:true,sameSite:'lax'};
+function configure(f){f.browser.tabs.query=async()=>[{id:1,url:market.testUrl,incognito:false}];f.browser.cookies={getAll:async query=>{assert.ok(query.domain);assert.equal(query.url,undefined);return [cookie,{...cookie,name:'foreign',domain:'.foreign.com'},{...cookie,name:'expired',expirationDate:1},{...cookie,name:'partitioned',partitionKey:{topLevelSite:'https://example.com'}}];}};}
 test('capture scopes cookies to registered domains, deduplicates, preserves HttpOnly and makes storage opt-in',async()=>{
  const f=fixture();configure(f);
  const captured=await captureSession(f.browser,market,false);assert.equal(captured.session.cookies.length,1);assert.equal(captured.session.cookies[0].value,cookie.value);assert.equal(captured.session.cookies[0].httpOnly,true);assert.equal(captured.session.cookies[0].expires,-1);assert.equal(captured.session.cookies[0].sameSite,'Lax');assert.deepEqual(captured.session.origins,[]);

@@ -74,12 +74,13 @@
         <button type="button" id="proof-load" class="secondary">Carregar marketplaces cadastrados</button>
         <label for="proof-marketplace">Marketplace da prova</label>
         <select id="proof-marketplace"></select>
-        <button type="button" id="proof-open" class="secondary">Abrir marketplace para login</button>
+        <button type="button" id="proof-open" class="secondary">Abrir marketplace</button>
+        <p class="hint">Se você já estiver logado na loja, use a sessão atual. Abra a extensão nessa aba e capture a sessão.</p>
         <label for="proof-url">Link HTTPS para testar</label>
         <input id="proof-url" type="url">
         <p id="proof-domains" class="hint"></p>
         <label><input type="checkbox" id="proof-storage"> Incluir armazenamento local da aba (opcional)</label>
-        <label><input type="checkbox" id="proof-consent"> Autorizo enviar temporariamente os cookies destes domínios para este teste.</label>
+        <label><input type="checkbox" id="proof-consent"> Autorizo enviar temporariamente os cookies destes domínios e o armazenamento selecionado para este teste.</label>
         <button type="button" id="proof-capture">Capturar sessão e testar</button>
         <output id="proof-result" aria-live="polite"></output>
       </section>
