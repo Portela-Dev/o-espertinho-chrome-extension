@@ -9,6 +9,7 @@ export function startSelectorPicker() {
   const selected = new Set<Element>();
   let scope: Document|Element = document, current: Element|null = null, locked = false;
   let preview: Element[] = [], selectedSelector = '', disposed = false, timer = 0;
+  let editorMode:'suggestion'|'parts'|'custom'='suggestion', matchPage=1, validSelector=false;
   const children = new WeakMap<Element, Element>();
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(`
@@ -46,16 +47,39 @@ export function startSelectorPicker() {
   const candidates=node('select','',panel);candidates.id='selector-candidates';
   const result=node('output','',panel);result.className='status';result.setAttribute('aria-live','polite');
   node('label','Seletor CSS',panel).htmlFor='selector-result';
-  const text=node('textarea','',panel);text.id='selector-result';text.readOnly=true;
+  const text=node('textarea','',panel);text.id='selector-result';text.maxLength=4000;
+  node('p','Edite o CSS para testar em tempo real. A edição do resultado é independente dos campos de composição.',panel).className='hint';
   const copy=button('Copiar seletor',panel,()=>{void copySelector();});
+  const compose=node('details','',panel);compose.open=true;
+  node('summary','Compor pai e filho',compose);
+  button('Usar seletor como pai',compose,saveParent);
+  node('label','Seletor pai',compose).htmlFor='selector-parent';
+  const parentText=node('textarea','',compose);parentText.id='selector-parent';parentText.maxLength=4000;
+  node('label','Relação entre pai e filho',compose).htmlFor='selector-relation';
+  const relation=node('select','',compose);relation.id='selector-relation';
+  for(const [value,label] of [['descendant','Qualquer descendente'],['child','Filho direto']]){const option=node('option',label,relation);option.value=value;}
+  node('label','Seletor filho',compose).htmlFor='selector-child';
+  const childText=node('textarea','',compose);childText.id='selector-child';childText.maxLength=4000;
+  node('p','Guarde o card como pai e depois selecione ou digite o link. Listas separadas por vírgula e :scope no início do filho são aceitos. A composição usa o escopo atual.',compose).className='hint';
+  const composeActions=node('div','',compose);composeActions.className='row';
+  button('Copiar pai',composeActions,()=>{void copyValue(parentText);});
+  button('Copiar filho',composeActions,()=>{void copyValue(childText);});
+  button('Limpar composição',composeActions,()=>{parentText.value='';editorMode='parts';updateParts();});
+  node('h3','Elementos encontrados',panel);
+  const matches=node('ol','',panel);matches.setAttribute('aria-label','Elementos encontrados');
+  const matchNavigation=node('div','',panel);matchNavigation.className='row';
+  const previousMatch=button('Resultados anteriores',matchNavigation,()=>{matchPage--;showMatches();});
+  const matchStatus=node('output','',matchNavigation);
+  const nextMatch=button('Próximos resultados',matchNavigation,()=>{matchPage++;showMatches();});
+  node('p','A lista permite inspecionar todos os resultados. Os contornos acompanham os elementos visíveis ao rolar a página.',panel).className='hint';
   node('p','Verde: seleção · azul: resultados · laranja: alvo atual. Iframes e árvores shadow precisam de contexto próprio; não são atravessados por este seletor.',panel).className='hint';
   const message=node('output','',panel);message.className='status';message.setAttribute('aria-live','polite');
   const outlines=node('div');outlines.setAttribute('aria-hidden','true');
   (document.body??document.documentElement).appendChild(host);
   function describe(element:Element){return element.localName+(element.id?'#'+element.id.slice(0,60):'')+Array.from(element.classList).slice(0,2).map(c=>'.'+c.slice(0,40)).join('');}
   function contains(element:Element){return element.isConnected&&element.getRootNode()===document&&(scope===document||scope.contains(element));}
-  function query(selector:string):Element[]{
-    try{if(selector===':scope'&&scope instanceof Element){return [scope];}return Array.from(scope.querySelectorAll(selector)).filter(e=>e!==host&&!host.contains(e));}catch{return [];}
+  function query(selector:string,strict=false):Element[]{
+    try{if(selector===':scope'&&scope instanceof Element){return [scope];}return Array.from(scope.querySelectorAll(selector)).filter(e=>e!==host&&!host.contains(e));}catch{if(strict){throw new Error('Seletor CSS inválido ou não suportado pelo navegador.');}return [];}
   }
   const stable=(value:string)=>value.length>0&&value.length<=70&&!/(?:[a-f0-9]{12}|\d{6}|^(?:css-|jsx-|ng-|sc-)|^(?:active|selected|hover|focus|loading|disabled|expanded)$)/i.test(value);
   function atoms(element:Element){
@@ -97,7 +121,7 @@ export function startSelectorPicker() {
       }
     }
     if(mode.value==='exact'||!selectors.size){const paths=elements.map(exactPath);selectors.add(paths.join(', '));}
-    return Array.from(selectors).map(selector=>({selector,matches:query(selector)})).filter(c=>elements.every(e=>c.matches.includes(e))&&(mode.value!=='exact'||c.matches.length===elements.length)).sort((a,b)=>{
+    return Array.from(selectors).map(selector=>({selector,matches:candidateMatches(selector)})).filter(c=>elements.every(e=>c.matches.includes(e))&&(mode.value!=='exact'||c.matches.length===elements.length)).sort((a,b)=>{
       const brittle=(s:string)=>s.includes(':nth-of-type')?1000:0;
       const broad=(s:string)=>s.includes('.')||s.includes('#')||s.includes('[')?0:100;
       return brittle(a.selector)-brittle(b.selector)||broad(a.selector)-broad(b.selector)||a.matches.length-b.matches.length||a.selector.length-b.selector.length;
@@ -105,8 +129,8 @@ export function startSelectorPicker() {
   }
   function draw(){
     outlines.replaceChildren();
-    const show=(element:Element,className:string)=>{if(!contains(element)){return;}const rect=element.getBoundingClientRect();if(rect.width<=0||rect.height<=0){return;}const box=node('div','',outlines);box.className='outline '+className;Object.assign(box.style,{left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px'});};
-    for(const element of preview.slice(0,60))show(element,'match');
+    const show=(element:Element,className:string)=>{if(!contains(element)){return;}const rect=element.getBoundingClientRect();if(rect.width<=0||rect.height<=0||rect.bottom<0||rect.top>window.innerHeight||rect.right<0||rect.left>window.innerWidth){return;}const box=node('div','',outlines);box.className='outline '+className;Object.assign(box.style,{left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px'});};
+    for(const element of preview)show(element,'match');
     for(const element of selected)show(element,'selected');
     if(current)show(current,'current');
   }
@@ -122,15 +146,77 @@ export function startSelectorPicker() {
     scopeButton.disabled=!current;
     draw();
   }
-  function showCandidate(){
-    selectedSelector=candidates.value;preview=query(selectedSelector);text.value=selectedSelector;copy.disabled=!selectedSelector;
-    const extras=preview.length-selected.size;
-    const additional=extras>0?'; '+extras+' adicionais':'';
-    result.textContent=selectedSelector?`${preview.length} encontrados; ${selected.size} selecionados${additional}.`:'Selecione elementos para gerar um seletor.';
-    if(selectedSelector.includes(':nth-of-type'))result.textContent+=' Caminho estrutural: pode mudar se a ordem da página mudar.';
-    if(selectedSelector.length>600)result.textContent+=' O seletor ultrapassa os 600 caracteres aceitos pelos cadastros; prefira um escopo menor.';
-    if(preview.length>60)result.textContent+=' Destaque limitado aos primeiros 60 resultados.';
-    draw();
+  // Keep this helper local: the whole picker is serialized into the isolated tab.
+  const selectorList=(selector:string)=>{
+    const parts:string[]=[];let start=0;
+    const state={depth:0,quote:'',escaped:false};
+    function separator(char:string){
+      if(state.escaped){state.escaped=false;return false;}
+      if(char==='\\'){state.escaped=true;return false;}
+      if(state.quote){if(char===state.quote){state.quote='';}return false;}
+      if(char==='"'||char==="'"){state.quote=char;return false;}
+      if(char==='('||char==='[')state.depth++;
+      if(char===')'||char===']')state.depth--;
+      return char===','&&state.depth===0;
+    }
+    for(let i=0;i<selector.length;i++){
+      if(separator(selector[i])){parts.push(selector.slice(start,i).trim());start=i+1;}
+    }
+    parts.push(selector.slice(start).trim());return parts;
+  };
+  function candidateMatches(selector:string){
+    try{return query(composeSelector(parentText.value.trim(),selector));}catch{return [];}
+  }
+  function composeSelector(parent=parentText.value.trim(),child=childText.value.trim()){
+    if(!parent){return child;}
+    query(parent,true);
+    if(!child){return parent;}
+    const parents=selectorList(parent),children=selectorList(child);
+    if(parents.length*children.length>100){throw new Error('A composição aceita até 100 combinações de seletores. Simplifique as listas.');}
+    return parents.flatMap(prefix=>children.map(part=>{
+      if(!part){throw new Error('Informe um seletor filho em cada parte da lista.');}
+      if(part===':scope'){return prefix;}
+      if(part.startsWith(':scope')){return prefix+part.slice(6);}
+      const separator=relation.value==='child'?' > ':' ';
+      return prefix+separator+part;
+    })).join(', ');
+  }
+  function showMatches(){
+    const pages=Math.max(1,Math.ceil(preview.length/25));matchPage=Math.max(1,Math.min(matchPage,pages));
+    matches.replaceChildren();matches.start=(matchPage-1)*25+1;
+    for(const element of preview.slice((matchPage-1)*25,matchPage*25)){
+      const item=node('li','',matches);
+      const label=(element.textContent??'').replace(/\s+/g,' ').trim().slice(0,80);
+      const description=label?describe(element)+' — '+label:describe(element);
+      button(description,item,()=>{current=element;locked=true;element.scrollIntoView({block:'center',behavior:'auto'});showCurrent();});
+    }
+    matchStatus.textContent='Página '+matchPage+' de '+pages+' · '+preview.length+' elementos';
+    previousMatch.disabled=matchPage<=1;nextMatch.disabled=matchPage>=pages;
+  }
+  function showPreview(){
+    selectedSelector=text.value.trim();validSelector=false;preview=[];
+    try{
+      if(selectedSelector){preview=query(selectedSelector,true);validSelector=true;}
+      const included=Array.from(selected).filter(e=>preview.includes(e)).length;
+      const extra=preview.length-included,additional=extra>0?'; '+extra+' adicionais':'';
+      let summary=preview.length+' encontrados.';
+      if(selected.size){summary=preview.length+' encontrados; '+selected.size+' selecionados'+additional+'. '+included+' de '+selected.size+' exemplos incluídos.';}
+      result.textContent=selectedSelector?summary:'Selecione elementos ou digite um seletor CSS.';
+      if(selectedSelector.includes(':nth-of-type'))result.textContent+=' Caminho estrutural: pode mudar se a ordem da página mudar.';
+      if(selectedSelector.length>600)result.textContent+=' O seletor ultrapassa os 600 caracteres aceitos pelos cadastros; prefira um escopo menor.';
+    }catch(error){result.textContent=error instanceof Error?error.message:'Não foi possível avaliar o seletor.';}
+    copy.disabled=!validSelector;result.setAttribute('aria-invalid',String(!validSelector&&!!selectedSelector));
+    showMatches();draw();
+  }
+  function updateParts(){
+    try{text.value=composeSelector();showPreview();}
+    catch(error){preview=[];selectedSelector='';validSelector=false;text.value='';copy.disabled=true;result.textContent=error instanceof Error?error.message:'Composição inválida.';result.setAttribute('aria-invalid','true');showMatches();draw();}
+  }
+  function showCandidate(){editorMode='suggestion';childText.value=candidates.value;updateParts();}
+  function saveParent(){
+    if(!validSelector){message.textContent='Informe um seletor válido antes de guardar o pai.';return;}
+    parentText.value=selectedSelector;childText.value='';editorMode='parts';selected.clear();current=null;locked=false;refresh();
+    message.textContent='Pai guardado. Selecione o link ou digite o seletor filho para compor.';
   }
   function refresh(){
     for(const element of selected)if(!contains(element))selected.delete(element);
@@ -140,8 +226,9 @@ export function startSelectorPicker() {
     for(const element of selected){const item=node('li',describe(element),list);button('Remover',item,()=>{selected.delete(element);refresh();}).className='remove';}
     const previous=candidates.value;candidates.replaceChildren();
     for(const candidate of suggestions()){const option=node('option',`${candidate.matches.length} resultados — ${candidate.selector}`,candidates);option.value=candidate.selector;}
-    if(Array.from(candidates.options).some(o=>o.value===previous))candidates.value=previous;
-    showCandidate();showCurrent();
+    if(Array.from(candidates.options).some(o=>o.value===previous)){candidates.value=previous;}
+    if(editorMode==='custom'){showPreview();}else if(editorMode==='parts'){updateParts();}else{showCandidate();}
+    showCurrent();
   }
   function up(){if(current?.parentElement&&current!==scope){children.set(current.parentElement,current);current=current.parentElement;locked=true;showCurrent();}}
   function down(){if(current){const child=children.get(current)??current.firstElementChild;if(child){current=child;locked=true;showCurrent();}}}
@@ -150,6 +237,7 @@ export function startSelectorPicker() {
     if(selected.has(current))selected.delete(current);
     else if(selected.size<20)selected.add(current);
     else{message.textContent='Selecione até 20 exemplos por vez.';return;}
+    if(parentText.value&&!childText.value)editorMode='suggestion';
     locked=true;message.textContent='Seleção atualizada. Use “Voltar a apontar” para inspecionar outro alvo.';refresh();
   }
   function inside(event:Event){return event.composedPath().includes(host);}
@@ -163,11 +251,12 @@ export function startSelectorPicker() {
     if(event.key==='ArrowDown'){block(event);down();}
     if(event.key==='Enter'){block(event);toggle();}
   }
-  async function copySelector(){
-    if(!selectedSelector){return;}
-    try{await navigator.clipboard.writeText(selectedSelector);message.textContent='Seletor copiado.';}
-    catch{text.focus();text.select();message.textContent='Cópia automática indisponível. Use Ctrl+C no campo selecionado.';}
+  async function copyValue(field:HTMLTextAreaElement){
+    if(!field.value.trim()){message.textContent='O campo está vazio.';return;}
+    try{await navigator.clipboard.writeText(field.value.trim());message.textContent='Seletor copiado.';}
+    catch{field.focus();field.select();message.textContent='Cópia automática indisponível. Use Ctrl+C no campo selecionado.';}
   }
+  async function copySelector(){if(validSelector){await copyValue(text);}}
   function dispose(){
     if(disposed){return;}disposed=true;controller.abort();observer.disconnect();clearTimeout(timer);host.remove();delete state[key];
   }
@@ -181,7 +270,10 @@ export function startSelectorPicker() {
   window.addEventListener('keydown',onKey,options);
   window.addEventListener('scroll',draw,options);
   window.addEventListener('resize',draw,{signal:controller.signal});
-  mode.addEventListener('change',refresh);candidates.addEventListener('change',showCandidate);
+  mode.addEventListener('change',refresh);candidates.addEventListener('change',()=>{matchPage=1;showCandidate();});
+  text.addEventListener('input',()=>{editorMode='custom';matchPage=1;showPreview();});
+  const partsChanged=()=>{editorMode='parts';matchPage=1;updateParts();};
+  parentText.addEventListener('input',partsChanged);childText.addEventListener('input',partsChanged);relation.addEventListener('change',partsChanged);
   state[key]={dispose};refresh();
   return {started:true};
 }
