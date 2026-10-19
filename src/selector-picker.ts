@@ -65,7 +65,7 @@ export function startSelectorPicker() {
       const value=element.getAttribute(attribute);if(value&&value.length<=120)values.push(`${tag}[${attribute}="${CSS.escape(value)}"]`);
     }
     const classes=Array.from(element.classList).filter(stable).slice(0,5);
-    for(const name of classes){values.push('.'+CSS.escape(name));values.push(tag+'.'+CSS.escape(name));}
+    for(const name of classes){values.push('.'+CSS.escape(name),tag+'.'+CSS.escape(name));}
     if(classes.length>1)values.push(tag+classes.slice(0,3).map(c=>'.'+CSS.escape(c)).join(''));
     values.push(tag);return values;
   }
@@ -99,7 +99,7 @@ export function startSelectorPicker() {
     if(mode.value==='exact'||!selectors.size){const paths=elements.map(exactPath);selectors.add(paths.join(', '));}
     return Array.from(selectors).map(selector=>({selector,matches:query(selector)})).filter(c=>elements.every(e=>c.matches.includes(e))&&(mode.value!=='exact'||c.matches.length===elements.length)).sort((a,b)=>{
       const brittle=(s:string)=>s.includes(':nth-of-type')?1000:0;
-      const broad=(s:string)=>/[.#\[]/.test(s)?0:100;
+      const broad=(s:string)=>s.includes('.')||s.includes('#')||s.includes('[')?0:100;
       return brittle(a.selector)-brittle(b.selector)||broad(a.selector)-broad(b.selector)||a.matches.length-b.matches.length||a.selector.length-b.selector.length;
     }).slice(0,12);
   }
@@ -113,7 +113,7 @@ export function startSelectorPicker() {
   function showCurrent(){
     trail.replaceChildren();
     const chain:Element[]=[];let element=current;
-    while(element&&chain.length<8){chain.unshift(element);if(element===scope)break;element=element.parentElement;}
+    while(element&&chain.length<8){chain.unshift(element);if(element===scope){break;}element=element.parentElement;}
     for(const ancestor of chain)button(describe(ancestor),trail,()=>{current=ancestor;locked=true;showCurrent();draw();});
     parentButton.disabled=!current?.parentElement||current===scope;
     childButton.disabled=!current?.firstElementChild;
@@ -125,7 +125,8 @@ export function startSelectorPicker() {
   function showCandidate(){
     selectedSelector=candidates.value;preview=query(selectedSelector);text.value=selectedSelector;copy.disabled=!selectedSelector;
     const extras=preview.length-selected.size;
-    result.textContent=selectedSelector?`${preview.length} encontrados; ${selected.size} selecionados${extras>0?`; ${extras} adicionais`:''}.`:'Selecione elementos para gerar um seletor.';
+    const additional=extras>0?'; '+extras+' adicionais':'';
+    result.textContent=selectedSelector?`${preview.length} encontrados; ${selected.size} selecionados${additional}.`:'Selecione elementos para gerar um seletor.';
     if(selectedSelector.includes(':nth-of-type'))result.textContent+=' Caminho estrutural: pode mudar se a ordem da página mudar.';
     if(selectedSelector.length>600)result.textContent+=' O seletor ultrapassa os 600 caracteres aceitos pelos cadastros; prefira um escopo menor.';
     if(preview.length>60)result.textContent+=' Destaque limitado aos primeiros 60 resultados.';
@@ -153,7 +154,7 @@ export function startSelectorPicker() {
   }
   function inside(event:Event){return event.composedPath().includes(host);}
   function target(event:Event){const element=event.composedPath().find(n=>n instanceof Element);if(!(element instanceof Element)){return null;}if(element.getRootNode()!==document){message.textContent='Este elemento está em uma árvore shadow. Selecione um elemento do documento principal.';return null;}return contains(element)?element:null;}
-  function block(event:Event){event.preventDefault();event.stopImmediatePropagation();}
+  function block(event:Event){if(disposed){return;}event.preventDefault();event.stopImmediatePropagation();}
   function onClick(event:Event){if(inside(event)){return;}block(event);const element=target(event);if(element){current=element;locked=true;showCurrent();}}
   function onKey(event:KeyboardEvent){
     if(event.key==='Escape'){block(event);dispose();return;}
