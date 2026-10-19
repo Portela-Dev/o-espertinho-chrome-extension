@@ -1,3 +1,4 @@
+import {launchSelectorPicker} from './picker-launcher.js';
 import { backendOrigin } from "./contracts.js";
 import { renderView, type View } from "./popup-view.js";
 const element = <T extends HTMLElement>(id: string) =>
@@ -11,6 +12,7 @@ async function send(type: string, extra: Record<string, unknown> = {}) {
   render();
 }
 function render() {
+  element<HTMLButtonElement>('pick-elements').disabled=busy||view?.progress.status==='running';
   if (view) {
     renderView(view, busy);
   }
@@ -83,6 +85,7 @@ element("settings").addEventListener("submit", (event) => {
     await send("BACKEND", { url });
   });
 });
+element('pick-elements').addEventListener('click',()=>{void act(async()=>{await launchSelectorPicker();window.close();});});
 await act(() => send("STATE"));
 setInterval(() => {
   if (!busy)

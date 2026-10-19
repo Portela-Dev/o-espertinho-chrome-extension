@@ -81,3 +81,17 @@ O workflow **CI e pacote da extensão** valida TypeScript, HTML, testes e depend
 SonarQube usa somente o runner `[self-hosted, Windows, X64, windows-portela-dev]` em develop, quando `SONAR_ENABLED=true`. Precisa do projeto `o-espertinho-chrome-extension`, secret `SONAR_TOKEN` com permissão de análise e variable `SONAR_HOST_URL`. A análise aguarda o Quality Gate. Pull requests não executam código no runner próprio.
 
 O teste de pacote verifica ZIP, recursos, permissões e checksum. Os testes do executor verificam uso local dos valores de sessão, bloqueio de outra origem, login pendente e respostas inválidas. A validação integrada em Chromium foi feita com o backend real e banco descartável; a identidade Google é substituída somente na configuração de teste, sem bypass de login no runtime.
+
+## Seletor visual de elementos
+
+Abra uma página HTTP/HTTPS, abra a extensão e clique em **Selecionar elementos na aba atual**. A ferramenta usa `activeTab`: o acesso é temporário à aba em que você a ativou, sem uma permissão permanente para todos os sites. A inspeção é local, independente do login e não envia HTML, cookies ou seletores ao backend. Pause a geração de links antes de iniciar a inspeção.
+
+- Passe o mouse e clique para fixar um alvo. Escolha um ancestral pela trilha, use **↑ Pai / ↓ Filho**, ou as teclas ↑ e ↓. O caminho de volta ao filho inspecionado é lembrado.
+- Use **Adicionar à seleção** ou Enter para confirmar. **Voltar a apontar** libera o mouse para escolher outro exemplo. Há suporte a até 20 exemplos, remoção individual e limpeza da seleção.
+- Em **Padrão**, os candidatos incluem os exemplos e podem encontrar outros elementos semelhantes; a contagem mostra quantos resultados adicionais existem. Em **Exato**, a expressão deve encontrar somente os exemplos selecionados. Quando não há um padrão simples, ela pode ser uma lista de seletores separados por vírgula. Caminhos posicionais são identificados como mais frágeis.
+- **Usar como escopo** limita as consultas ao elemento atual, útil para obter seletores relativos a um card. A seleção é limpa ao trocar o escopo. **Escopo: documento** retorna ao documento principal. Copie e use o seletor relativo com o mesmo escopo no extrator.
+- A prévia marca exemplos em verde, resultados em azul e alvo em laranja. O destaque fica limitado aos primeiros 60 resultados; a contagem permanece completa. O painel pode ser movido para o outro lado.
+- **Copiar seletor** copia o CSS. Se a área de transferência for negada, o campo é selecionado para cópia manual com Ctrl+C. Seletores acima de 600 caracteres recebem um aviso por excederem o limite atual dos cadastros.
+- Esc ou **Fechar** remove o painel, destaques e interceptação de cliques/teclas. Ativar novamente substitui a instância anterior. Mudanças no DOM atualizam a seleção e removem referências a elementos que desapareceram.
+
+Esta versão inspeciona somente o documento principal, sem atravessar iframes ou árvores shadow. Páginas internas do navegador, a loja de extensões e documentos protegidos podem impedir a injeção. Os candidatos são validados no DOM atual; não há garantia de estabilidade após mudanças de layout/estado do site. A ferramenta prefere identificadores/atributos/classes com aparência estável e evita classes aparentemente geradas e estados transitórios, mas a revisão visual continua necessária. Não há gravação automática nos perfis do Espertinho nesta entrega.

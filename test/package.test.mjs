@@ -27,7 +27,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
   const manifest = JSON.parse(strFromU8(files["manifest.json"]));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, "module");
-  assert.deepEqual(manifest.permissions, ["storage", "alarms", "scripting"]);
+  assert.deepEqual(manifest.permissions, ["storage", "alarms", "scripting", "activeTab"]);
   assert.equal(manifest.host_permissions.length, 1);
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
   assert.equal(manifest.content_scripts?.length ?? 0, 0);
@@ -48,6 +48,8 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
     "config.js",
     "contracts.js",
     "executor.js",
+    "selector-picker.js",
+    "picker-launcher.js",
     ...Object.values(manifest.icons),
   ]) {
     assert.ok(files[path]?.length > 0, `Arquivo necessário ausente: ${path}`);

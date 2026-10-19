@@ -5,7 +5,7 @@ import { Window } from "happy-dom";
 import { renderView } from "../dist/popup-view.js";
 import { configuration, account } from "./fixtures.mjs";
 const window = new Window({ url: "chrome-extension://test/popup.html" });
-for (const key of ["document", "Event"]) {
+for (const key of ["window", "document", "Event"]) {
   globalThis[key] = window[key];
 }
 document.write(
@@ -149,6 +149,12 @@ test("eventos da interface enviam comandos e apresentam erros da API", async () 
     el("open").click();
     await tick();
     assert.equal(el("error").hidden, false);
+    current.progress.status='idle';callback();await tick();let injections=0,closed=0;
+    chrome.tabs={query:async()=>[{id:12,url:'https://shop.test/products'}]};
+    chrome.scripting={executeScript:async()=>{injections++;}};
+    window.close=()=>{closed++;};
+    el('pick-elements').click();await tick();assert.equal(injections,1);assert.equal(closed,1);
+    chrome.tabs.query=async()=>[{id:12,url:'chrome://extensions'}];el('pick-elements').click();await tick();assert.equal(el('error').hidden,false);
     await tick();
   } finally {
     globalThis.setInterval = originalInterval;
