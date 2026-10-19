@@ -90,8 +90,19 @@ Abra uma página HTTP/HTTPS, abra a extensão e clique em **Selecionar elementos
 - Use **Adicionar à seleção** ou Enter para confirmar. **Voltar a apontar** libera o mouse para escolher outro exemplo. Há suporte a até 20 exemplos, remoção individual e limpeza da seleção.
 - Em **Padrão**, os candidatos incluem os exemplos e podem encontrar outros elementos semelhantes; a contagem mostra quantos resultados adicionais existem. Em **Exato**, a expressão deve encontrar somente os exemplos selecionados. Quando não há um padrão simples, ela pode ser uma lista de seletores separados por vírgula. Caminhos posicionais são identificados como mais frágeis.
 - **Usar como escopo** limita as consultas ao elemento atual, útil para obter seletores relativos a um card. A seleção é limpa ao trocar o escopo. **Escopo: documento** retorna ao documento principal. Copie e use o seletor relativo com o mesmo escopo no extrator.
-- A prévia marca exemplos em verde, resultados em azul e alvo em laranja. O destaque fica limitado aos primeiros 60 resultados; a contagem permanece completa. O painel pode ser movido para o outro lado.
+- A prévia marca exemplos em verde, resultados em azul e alvo em laranja. Todos os matches podem ser inspecionados na lista paginada (25 por página). Os contornos são desenhados nos elementos visíveis e atualizados com a rolagem. O painel pode ser movido para o outro lado.
 - **Copiar seletor** copia o CSS. Se a área de transferência for negada, o campo é selecionado para cópia manual com Ctrl+C. Seletores acima de 600 caracteres recebem um aviso por excederem o limite atual dos cadastros.
 - Esc ou **Fechar** remove o painel, destaques e interceptação de cliques/teclas. Ativar novamente substitui a instância anterior. Mudanças no DOM atualizam a seleção e removem referências a elementos que desapareceram.
 
 Esta versão inspeciona somente o documento principal, sem atravessar iframes ou árvores shadow. Páginas internas do navegador, a loja de extensões e documentos protegidos podem impedir a injeção. Os candidatos são validados no DOM atual; não há garantia de estabilidade após mudanças de layout/estado do site. A ferramenta prefere identificadores/atributos/classes com aparência estável e evita classes aparentemente geradas e estados transitórios, mas a revisão visual continua necessária. Não há gravação automática nos perfis do Espertinho nesta entrega.
+
+
+### Edição ao vivo e composição de seletores
+
+O campo **Seletor CSS** é editável: cada alteração recalcula os matches e os destaques. CSS inválido é sinalizado e desabilita a cópia; uma expressão válida sem resultados mostra zero matches. A edição manual é preservada quando o DOM muda ou os exemplos selecionados são atualizados. Escolher uma sugestão na lista substitui o editor pela sugestão.
+
+Para compor, encontre o seletor do card, clique em **Usar seletor como pai** e selecione ou digite o filho, por exemplo a[href]. Os campos **Seletor pai** e **Seletor filho** são editáveis, com escolha entre descendente e filho direto. O resultado combinado também pode ser editado independentemente. As sugestões de filho são validadas com o pai, evitando candidatos que só funcionariam fora do contêiner. Há botões separados para copiar pai, filho e resultado.
+
+Listas de CSS separadas por vírgula são combinadas sem confundir vírgulas em atributos, funções ou escapes. O início :scope no filho referencia o pai guardado; :scope sozinho seleciona o próprio pai. A composição admite até 100 combinações. Expressões acima dos 600 caracteres aceitos no cadastro continuam sinalizadas. Não há gravação automática no backend.
+
+A lista **Elementos encontrados** permite visitar todos os matches, 25 por página. Clicar em um deles rola até ele e o torna o alvo atual para inspeção; a seleção de exemplos só muda se o usuário confirmar.
