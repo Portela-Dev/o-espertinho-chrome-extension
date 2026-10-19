@@ -121,3 +121,17 @@ jobs:
           args: >-
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
+      - name: Detalhar resultado do Quality Gate
+        if: always()
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $key = ((Get-Content sonar-project.properties | Select-String '^sonar.projectKey=').Line -split '=', 2)[1]
+          $headers = @{ Authorization = 'Bearer ' + $env:SONAR_TOKEN; 'ngrok-skip-browser-warning' = 'true' }
+          $base = $env:SONAR_HOST_URL.TrimEnd('/')
+          $gate = Invoke-RestMethod -Uri ($base + '/api/qualitygates/project_status?projectKey=' + $key) -Headers $headers -TimeoutSec 30
+          $gate.projectStatus | ConvertTo-Json -Depth 5
+          $issues = Invoke-RestMethod -Uri ($base + '/api/issues/search?componentKeys=' + $key + '&resolved=false&inNewCodePeriod=true&ps=100') -Headers $headers -TimeoutSec 30
+          $issues.issues | Select-Object rule,component,line,message | ConvertTo-Json -Depth 5
