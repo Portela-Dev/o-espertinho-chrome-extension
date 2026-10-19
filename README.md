@@ -106,3 +106,6 @@ Para compor, encontre o seletor do card, clique em **Usar seletor como pai** e s
 Listas de CSS separadas por vírgula são combinadas sem confundir vírgulas em atributos, funções ou escapes. O início :scope no filho referencia o pai guardado; :scope sozinho seleciona o próprio pai. A composição admite até 100 combinações. Expressões acima dos 600 caracteres aceitos no cadastro continuam sinalizadas. Não há gravação automática no backend.
 
 A lista **Elementos encontrados** permite visitar todos os matches, 25 por página. Clicar em um deles rola até ele e o torna o alvo atual para inspeção; a seleção de exemplos só muda se o usuário confirmar.
+# Prova de sessão autenticada
+
+A extensão inclui uma prova local, explícita e restrita a administradores para testar um link no container com cookies da loja. A configuração vem do backend e a captura não é persistida. Consulte [o procedimento e os limites](docs/SESSION_PROOF.md).

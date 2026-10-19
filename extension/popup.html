@@ -68,6 +68,21 @@
           Reiniciar demonstração
         </button>
       </section>
+      <section id="session-proof" aria-labelledby="proof-title" hidden>
+        <h2 id="proof-title">Prova de sessão no container</h2>
+        <p class="hint">Somente para administrador no ambiente de teste. A sessão é enviada ao backend, usada em um único acesso e descartada, sem salvar cookies no banco.</p>
+        <button type="button" id="proof-load" class="secondary">Carregar marketplaces cadastrados</button>
+        <label for="proof-marketplace">Marketplace da prova</label>
+        <select id="proof-marketplace"></select>
+        <button type="button" id="proof-open" class="secondary">Abrir marketplace para login</button>
+        <label for="proof-url">Link HTTPS para testar</label>
+        <input id="proof-url" type="url">
+        <p id="proof-domains" class="hint"></p>
+        <label><input type="checkbox" id="proof-storage"> Incluir armazenamento local da aba (opcional)</label>
+        <label><input type="checkbox" id="proof-consent"> Autorizo enviar temporariamente os cookies destes domínios para este teste.</label>
+        <button type="button" id="proof-capture">Capturar sessão e testar</button>
+        <output id="proof-result" aria-live="polite"></output>
+      </section>
       <section aria-labelledby="picker-title">
         <h2 id="picker-title">Seletores da página</h2>
         <p class="hint">Inspecione elementos, escolha pais ou filhos e copie seletores CSS. Funciona localmente, sem enviar a página ao backend.</p>

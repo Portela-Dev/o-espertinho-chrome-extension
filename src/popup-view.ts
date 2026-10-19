@@ -1,5 +1,7 @@
 import type { Configuration, Progress, Account } from "./contracts.js";
 export interface View {
+  proofMarkets?:import('./session-proof.js').ProofMarket[];
+  proofTest?:import('./session-proof.js').ProofTest;
   backendUrl: string;
   user?: Account;
   pairing: boolean;
@@ -113,6 +115,7 @@ function resultRow(item: NonNullable<View["queue"]>["items"][number]) {
   return row;
 }
 export function renderView(view: View, busy: boolean) {
+  renderProof(view,busy);
   const running = view.progress.status === "running";
   renderAccount(view);
   const marketplace = renderMarketplaces(view, running);
@@ -130,4 +133,17 @@ export function renderView(view: View, busy: boolean) {
   element("results").replaceChildren(
     ...(view.queue?.items ?? []).map(resultRow),
   );
+}
+function renderProof(view:View,busy:boolean){
+ element('session-proof').hidden=!view.user;
+ const select=element<HTMLSelectElement>('proof-marketplace'),markets=view.proofMarkets??[],selected=select.value;
+ if(JSON.stringify([...select.options].map(o=>o.value))!==JSON.stringify(markets.map(m=>m.id))){select.replaceChildren(...markets.map(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;return o;}));if(markets.some(m=>m.id===selected))select.value=selected;}
+ const market=markets.find(m=>m.id===select.value),running=view.proofTest?.status==='running';
+ select.disabled=busy||running;
+ for(const id of ['proof-load','proof-open','proof-capture'])element<HTMLButtonElement>(id).disabled=busy||running||id!=='proof-load'&&!market;
+ element<HTMLInputElement>('proof-url').disabled=busy||running;
+ if(market&&!element<HTMLInputElement>('proof-url').value)element<HTMLInputElement>('proof-url').value=market.testUrl;
+ element('proof-domains').textContent=market?'Domínios autorizados: '+market.cookieDomains.join(', '):'Carregue os marketplaces para começar.';
+ const test=view.proofTest;
+ element('proof-result').textContent=!test?'Faça login na aba do marketplace antes de capturar.':test.status==='running'?'Teste em andamento no container…':test.error||('Último teste: '+(test.result?.status??test.status)+(test.result?.reason?' ('+test.result.reason+')':'')+'\n'+(test.result?.title||'')+'\nURL final: '+(test.result?.finalUrl||'')+'\nCookies importados: '+(test.result?.cookiesImported??0)+' · HTTP: '+(test.result?.navigationStatuses.join(' → ')||'sem resposta'));
 }

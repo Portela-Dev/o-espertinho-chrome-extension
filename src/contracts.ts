@@ -70,6 +70,8 @@ export interface Progress {
   currentTitle?: string;
 }
 export interface State {
+  proofMarkets?:import('./session-proof.js').ProofMarket[];
+  proofTest?:import('./session-proof.js').ProofTest;
   backendUrl: string;
   auth?: Auth;
   pair?: {

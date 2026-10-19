@@ -1,4 +1,5 @@
 import { DEFAULT_BACKEND_URL } from "./config.js";
+import {captureSession,type ProofMarket,type ProofTest} from './session-proof.js';
 import {
   backendOrigin,
   validateConfiguration,
@@ -15,6 +16,8 @@ export interface Command {
   type: string;
   url?: string;
   marketplaceId?: string;
+  consent?:boolean;
+  includeStorage?:boolean;
 }
 interface Claim {
   leaseId: string;
@@ -37,6 +40,7 @@ export class ExtensionRuntime {
   private initialization?: Promise<void>;
   private pumping = false;
   private generation = 0;
+  private proofCapturing=false;
   constructor(private readonly browser: typeof chrome = chrome) {}
   async init() {
     this.initialization ??= this.load();
@@ -68,12 +72,14 @@ export class ExtensionRuntime {
       marketplaceId: state.marketplaceId,
       progress: state.progress,
       version: this.browser.runtime.getManifest().version,
+      proofMarkets:state.proofMarkets,proofTest:state.proofTest,
     };
   }
   private disconnect(message: string) {
     this.generation++;
     delete this.state.auth;
     delete this.state.pair;
+    delete this.state.proofMarkets;delete this.state.proofTest;
     this.setPaused(message);
   }
   private setPaused(message: string) {
@@ -363,6 +369,7 @@ export class ExtensionRuntime {
     try {
       await this.init();
       await this.poll();
+      if(this.state.auth&&this.state.proofTest?.status==='running')await this.pollProof();
       while (this.state.auth && this.state.progress.status === "running") {
         if (!(await this.advance(this.generation))) {
           return;
@@ -500,6 +507,13 @@ export class ExtensionRuntime {
       case "REFRESH":
         await this.refresh();
         break;
+      case 'PROOF_MARKETS':
+        this.state.proofMarkets=(await this.api<{marketplaces:ProofMarket[]}>('/session-proof/marketplaces')).marketplaces;await this.save();break;
+      case 'PROOF_OPEN': {
+        if(!this.state.auth)throw new Error('Conecte sua conta administradora.');
+        const market=this.proofMarket(message.marketplaceId);await this.browser.tabs.create({url:market.loginUrl});break;
+      }
+      case 'PROOF_CAPTURE':await this.proveSession(message);break;
       case "OPEN":
         await this.openMarketplace(message.marketplaceId);
         break;
@@ -519,5 +533,22 @@ export class ExtensionRuntime {
         throw new Error("Operação desconhecida.");
     }
     return this.view();
+  }
+  private proofMarket(id?:string){const market=this.state.proofMarkets?.find(m=>m.id===id);if(!market)throw new Error('Carregue e escolha um marketplace para a prova.');return market;}
+  private async proveSession(message:Command){
+    if(!message.consent)throw new Error('Confirme o envio temporário da sessão para este teste.');
+    if(!this.state.auth)throw new Error('Conecte sua conta administradora.');
+    if(this.proofCapturing||this.state.proofTest?.status==='running'||this.state.progress.status==='running')throw new Error('Aguarde o processamento em andamento.');
+    const market=this.proofMarket(message.marketplaceId),url=new URL(message.url??'');
+    if(url.protocol!=='https:'||url.username||url.password||!market.allowedOrigins.includes(url.origin))throw new Error('Use um link HTTPS dos domínios cadastrados.');
+    if(!await this.browser.permissions.contains({permissions:['cookies'],origins:market.allowedOrigins.map(o=>o+'/*')}))throw new Error('Autorize cookies e os domínios do marketplace.');
+    const generation=this.generation;this.proofCapturing=true;
+    try{const {session}=await captureSession(this.browser,market,!!message.includeStorage);this.checkGeneration(generation);this.state.proofTest=await this.api<ProofTest>('/session-proof/tests',{marketplaceId:market.id,url:url.href,consent:true,session});this.checkGeneration(generation);await this.save();}
+    finally{this.proofCapturing=false;}
+  }
+  private async pollProof(){
+    const test=this.state.proofTest;if(!test)return;
+    try{const next=await this.api<ProofTest>('/session-proof/tests/'+test.id);if(this.state.proofTest?.id===test.id){this.state.proofTest=next;await this.save();}}
+    catch{if(this.state.proofTest?.id===test.id){this.state.proofTest={...test,status:'failed',error:'Teste expirado ou conexão perdida. Faça uma nova captura.'};await this.save();}}
   }
 }

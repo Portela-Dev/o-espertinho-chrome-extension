@@ -28,6 +28,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, "module");
   assert.deepEqual(manifest.permissions, ["storage", "alarms", "scripting", "activeTab"]);
+  assert.deepEqual(manifest.optional_permissions,['cookies']);
   assert.equal(manifest.host_permissions.length, 1);
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
   assert.equal(manifest.content_scripts?.length ?? 0, 0);
@@ -48,6 +49,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
     "config.js",
     "contracts.js",
     "executor.js",
+    "session-proof.js",
     "selector-picker.js",
     "picker-launcher.js",
     ...Object.values(manifest.icons),
