@@ -6,7 +6,7 @@ import { CatalogNavigation } from './catalog-navigation.js';
 import { discoverPage } from './catalog-discovery.js';
 import { extractCatalogProduct } from './catalog-product.js';
 import { executeRecipe } from './executor.js';
-import type { CatalogState, CatalogRun, CatalogStep, CatalogClaim, CatalogMarket } from './catalog-types.js';
+import type { CatalogState, CatalogRun, CatalogStep, CatalogClaim, CatalogMarket,CatalogStats } from './catalog-types.js';
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
 type CatalogCommand = {
@@ -19,6 +19,7 @@ type CatalogCommand = {
     runId?: string;
     page?: number;
     pageSize?: number;
+    hostWindowId?:number;
 };
 export class CatalogRuntime {
     state!: CatalogState;
@@ -28,6 +29,12 @@ export class CatalogRuntime {
     private generation = 0;
     private nextRequestAt = 0;
     private timer?: ReturnType<typeof setTimeout>;
+    private stats?:CatalogStats;
+    private statsAt=0;
+    private statsError='';
+    private statsFilter='';
+    private statsSequence=0;
+    private statsRequest?:{key:string;sequence:number;promise:Promise<void>};
     private readonly headers: RequestHeaderMemory;
     private readonly navigation: CatalogNavigation;
     constructor(private readonly browser: typeof chrome = chrome) {
@@ -69,6 +76,7 @@ export class CatalogRuntime {
         delete this.state.nextAt;
         delete this.state.locallyPaused;
         this.state.markets = [];
+        this.stats=undefined;this.statsAt=0;this.statsError='';this.statsFilter='';this.statsSequence++;this.statsRequest=undefined;
         this.state.message = 'Sessão encerrada. Entre novamente.';
         await this.save();
     }
@@ -131,6 +139,7 @@ export class CatalogRuntime {
     private async refresh() {
         const config = await this.api('/catalog/config');
         this.state.markets = config.marketplaces;
+        if(!this.state.markets.some(m=>m.id===this.state.marketplaceId))this.state.marketplaceId=this.state.markets[0]?.id;
         if (this.state.run) {
             this.state.run = await this.api('/catalog/runs/' + this.state.run.id);
             if (['completed', 'cancelled', 'failed'].includes(this.state.run!.status))
@@ -215,7 +224,7 @@ export class CatalogRuntime {
         else
             await this.headers.clear();
         await this.navigation.focus();
-        this.state.message = 'Faça login se necessário. Se a receita usa header de requisição, gere um link manualmente nesta janela para prepará-lo.';
+        this.state.message = 'Faça login se necessário. Se a receita usa header de requisição, gere um link manualmente nesta aba para prepará-lo.';
         await this.save();
     }
     private async focusProcessing() {
@@ -233,14 +242,23 @@ export class CatalogRuntime {
             await this.action('pause');
         await this.prepare(this.market(active ? run.marketplace_id : this.state.marketplaceId));
         this.state.message = active
-            ? 'Janela reaberta. Confira a sessão e clique em Continuar para retomar a mesma execução.'
-            : 'Janela de processamento aberta. Faça login se necessário.';
+            ? 'Aba reaberta. Confira a sessão e clique em Continuar para retomar a mesma execução.'
+            : 'Aba de processamento aberta. Faça login se necessário.';
         await this.save();
     }
     async handle(command: CatalogCommand) {
         await this.init();
+        if(command.hostWindowId!==undefined&&['START','PREPARE','FOCUS','ATTACH'].includes(command.type)){
+            if(!Number.isInteger(command.hostWindowId)||command.hostWindowId<0)throw new Error('Janela inválida.');
+            this.state.hostWindowId=command.hostWindowId;
+        }
         switch (command.type) {
             case 'STATE': break;
+            case 'FILTER':
+                this.state.marketplaceId=this.market(command.marketplaceId).id;
+                this.state.retryFailed=command.retryFailed??false;
+                await this.save();
+                break;
             case 'LOGIN':
                 await this.login();
                 break;
@@ -298,6 +316,7 @@ export class CatalogRuntime {
         }
         if (command.type === 'STATE')
             void this.pump();
+        if(this.state.auth)await this.loadStats(command.type!=='STATE');
         return this.view();
     }
     private async start(command: CatalogCommand) {
@@ -307,6 +326,7 @@ export class CatalogRuntime {
         if (market.catalog_executor !== 'extension')
             throw new Error('Ative o executor da extensão no admin.');
         this.state.marketplaceId = market.id;
+        this.state.retryFailed=command.retryFailed??false;
         if (command.step === 'convert') {
             if (!market.config.recipe)
                 throw new Error('Cadastre a receita de conversão.');
@@ -350,8 +370,28 @@ export class CatalogRuntime {
     }
     private view() {
         return {
-            backendUrl: this.state.backendUrl, user: this.state.auth?.user, pairing: !!this.state.pair, markets: this.state.markets, marketplaceId: this.state.marketplaceId, run: this.state.run, message: this.state.message, version: this.browser.runtime.getManifest().version
+            backendUrl: this.state.backendUrl, user: this.state.auth?.user, pairing: !!this.state.pair, markets: this.state.markets, marketplaceId: this.state.marketplaceId,retryFailed:this.state.retryFailed??false,stats:this.stats,statsError:this.statsError, run: this.state.run, message: this.state.message, version: this.browser.runtime.getManifest().version
         };
+    }
+    private async loadStats(force=false){
+        const marketplaceId=this.state.marketplaceId,retryFailed=this.state.retryFailed??false,generation=this.generation;
+        if(!marketplaceId)return;
+        const key=marketplaceId+':'+retryFailed;
+        if(this.statsRequest?.key===key)return this.statsRequest.promise;
+        if(!force&&this.statsFilter===key&&Date.now()-this.statsAt<15000)return;
+        if(this.stats?.marketplaceId!==marketplaceId||this.stats.retryFailed!==retryFailed)this.stats=undefined;
+        const sequence=++this.statsSequence;this.statsFilter=key;this.statsAt=Date.now();this.statsError='';
+        const promise=(async()=>{
+            try{
+                const data=await this.api<CatalogStats>('/catalog/stats?marketplaceId='+encodeURIComponent(marketplaceId)+'&retryFailed='+retryFailed);
+                if(generation!==this.generation||sequence!==this.statsSequence||this.state.marketplaceId!==marketplaceId||(this.state.retryFailed??false)!==retryFailed)return;
+                if(data.marketplaceId!==marketplaceId||data.retryFailed!==retryFailed)throw new Error('Contadores inválidos.');
+                this.stats=data;this.statsAt=Date.now();this.statsError='';
+            }catch{
+                if(generation===this.generation&&sequence===this.statsSequence&&this.state.marketplaceId===marketplaceId){this.stats=undefined;this.statsError='Contadores indisponíveis. Atualize as configurações para tentar novamente.';}
+            }finally{if(this.statsRequest?.sequence===sequence)this.statsRequest=undefined;}
+        })();
+        this.statsRequest={key,sequence,promise};await promise;
     }
     private async action(action: 'pause' | 'cancel' | 'human' | 'technical', reason = '') {
         if (!this.state.run)
@@ -596,6 +636,7 @@ export class CatalogRuntime {
         delete this.state.claim;
         this.state.nextAt = Date.now() + this.itemInterval(claim);
         this.state.run = await this.api('/catalog/runs/' + run.id);
+        if(this.state.run&&['completed','failed','cancelled'].includes(this.state.run.status))this.statsAt=0;
         this.state.message = 'Resultado salvo.';
         await this.save();
     }
@@ -628,6 +669,7 @@ export class CatalogRuntime {
         if (!claim?.item) {
             delete this.state.claim;
             this.state.run = await this.api('/catalog/runs/' + run.id);
+            this.statsAt=0;
             this.state.nextAt = Date.now() + 30000;
             await this.save();
             return;

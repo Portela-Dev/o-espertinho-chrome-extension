@@ -13,15 +13,9 @@ main { padding: 24px; }
 .side-panel section { padding: 16px; }
 .side-panel header > div { min-width: 0; }
 .side-panel h1 { font-size: clamp(19px, 6vw, 25px); }
-.display-controls { display: grid; gap: 8px; margin-top: 16px; }
-.display-controls label, .display-controls p { margin: 0; }
-.display-switch { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-.display-switch input { appearance: none; flex: 0 0 42px; width: 42px; height: 24px; margin: 0; padding: 2px; border-radius: 999px; border: 1px solid #849a8b; background: #65776b; cursor: pointer; }
-.display-switch input::before { content: ''; display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; transform: translateX(0); }
-.display-switch input:checked { background: #287b4d; }
-.display-switch input:checked::before { transform: translateX(18px); }
-.display-switch input:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
-.display-controls .hint { line-height: 1.5; }
+button.display-mode { flex: 0 0 36px; width: 36px; height: 36px; padding: 6px; margin-left: auto; display: grid; place-items: center; }
+.display-mode svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.display-mode:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 header { display: flex; align-items: center; gap: 12px; }
 header img { flex-shrink: 0; object-fit: contain; }
 h1 { margin: 3px 0 0; font-size: 25px; letter-spacing: -1px; }
@@ -35,7 +29,7 @@ footer { margin-top: 18px; font-size: 11px; color: #52695c; text-align: right; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .workflow-steps { display: grid; gap: 10px; margin: 16px 0; }
 .workflow-steps button { text-align: left; }
-input[type="checkbox"]:not([role="switch"]) { width: auto; margin-right: 6px; }
+input[type="checkbox"] { width: auto; margin-right: 6px; }
 button { background: #193a2e; color: white; border: 1px solid #193a2e; padding: 9px 12px; border-radius: 8px; font: inherit; font-size: 12px; cursor: pointer; }
 button.secondary { background: transparent; color: inherit; border-color: #849a8b; }
 button:disabled { opacity: .5; cursor: default; }

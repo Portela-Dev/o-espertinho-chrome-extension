@@ -1,4 +1,4 @@
-import type { CatalogMarket, CatalogRun } from './catalog-types.js';
+import type { CatalogMarket, CatalogRun,CatalogStats } from './catalog-types.js';
 import type { Account } from './contracts.js';
 export interface CatalogView {
     backendUrl: string;
@@ -6,6 +6,7 @@ export interface CatalogView {
     pairing: boolean;
     markets: CatalogMarket[];
     marketplaceId?: string;
+    retryFailed?:boolean;stats?:CatalogStats;statsError?:string;
     run?: CatalogRun;
     message: string;
     version: string;
@@ -14,6 +15,16 @@ const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as
 export const runLabel = (status: string) => ({
     queued: 'Aguardando início', running: 'Em execução', paused_by_user: 'Pausada', waiting_for_human: 'Intervenção humana necessária', paused_technical: 'Pausa técnica', completed: 'Concluída', failed: 'Falha', cancelled: 'Cancelada'
 } as Record<string, string>)[status] ?? status;
+export const stepLabel=(step:string)=>({discover:'1 — Extrair links',convert:'2 — Gerar links de afiliados',enrich:'3 — Extrair informações dos produtos',prices:'4 — Atualizar preços',preview:'Prévia manual',selector_test:'Teste de seletores'} as Record<string,string>)[step]??step;
+function renderQueue(view:CatalogView,marketplaceId:string){
+    const stats=view.stats?.marketplaceId===marketplaceId?view.stats:undefined;
+    for(const step of ['convert','enrich','prices'] as const){
+        const value=stats?.[step],button=el<HTMLButtonElement>('step-'+step);
+        button.textContent=stepLabel(step)+' · '+(value?`${value.pending} / ${value.total}`:'— / —');
+        button.title=step==='prices'?'Sem verificação bem-sucedida nas últimas 24h / ofertas publicadas com link de afiliado. A execução manual continua permitindo verificar todas as ofertas.':'Pendentes elegíveis / total de links descobertos não arquivados. Independente do limite por execução.';
+    }
+    el('queue-counts').textContent=view.statsError||'Conversão e extração: pendentes elegíveis / links não arquivados. Preços: sem verificação nas últimas 24h / ofertas publicadas.';
+}
 export function renderCatalog(view: CatalogView, busy: boolean) {
     el('account').textContent = view.user?.email ?? 'Conta desconectada';
     el('status').textContent = view.message;
@@ -27,7 +38,8 @@ export function renderCatalog(view: CatalogView, busy: boolean) {
     if (document.activeElement !== el('backend'))
         el<HTMLInputElement>('backend').value = view.backendUrl;
     const select = el<HTMLSelectElement>('marketplace');
-    const selected = select.value || view.marketplaceId || view.markets[0]?.id;
+    const selected = view.marketplaceId || select.value || view.markets[0]?.id;
+    select.disabled=busy;el<HTMLInputElement>('retry-failed').disabled=busy;
     if (JSON.stringify([...select.options].map(o => o.value)) !== JSON.stringify(view.markets.map(m => m.id)))
         select.replaceChildren(...view.markets.map(m => {
             const option = document.createElement('option');
@@ -37,10 +49,12 @@ export function renderCatalog(view: CatalogView, busy: boolean) {
         }));
     if (selected && [...select.options].some(o => o.value === selected))
         select.value = selected;
+    if(document.activeElement!==el('retry-failed'))el<HTMLInputElement>('retry-failed').checked=view.retryFailed??false;
+    renderQueue(view,select.value);
     const run = view.run, active = !!run && !['completed', 'failed', 'cancelled'].includes(run.status);
     let status = 'Nenhuma execução selecionada.';
     if (run) {
-        status = runLabel(run.status);
+        status = stepLabel(run.step)+' · '+(view.markets.find(m=>m.id===run.marketplace_id)?.name??run.marketplace_id??'')+' · '+runLabel(run.status);
         if (run.reason)
             status += ' · ' + run.reason;
     }

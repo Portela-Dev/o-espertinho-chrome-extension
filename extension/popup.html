@@ -10,26 +10,23 @@
   </head>
   <body>
     <main>
-      <header><img src="icons/fox-v4-128.png" width="64" height="64" alt="Mascote do O Espertinho"><div><p class="eyebrow">Seu próximo achado começa aqui</p><h1>O Espertinho</h1></div></header>
-      <div class="display-controls">
-        <label class="display-switch"><span>Popup</span><input type="checkbox" role="switch" aria-checked="false" id="display-mode" aria-label="Usar painel lateral" aria-describedby="display-hint"><span>Painel lateral</span></label>
-        <p id="display-hint" class="hint">O popup fecha ao interagir com a página. O painel permanece aberto.</p>
-      </div>
+      <header><img src="icons/fox-v4-128.png" width="64" height="64" alt="Mascote do O Espertinho"><div><p class="eyebrow">Seu próximo achado começa aqui</p><h1>O Espertinho</h1></div><button type="button" id="display-mode" class="display-mode secondary" aria-label="Abrir painel lateral" title="Abrir painel lateral"><svg id="display-icon-panel" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 8v8"/></svg><svg id="display-icon-popup" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false" hidden><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><rect x="11" y="11" width="8" height="7" rx="1"/></svg></button></header>
       <p id="error" class="error" role="alert" hidden></p>
       <section aria-labelledby="account-title"><h2 id="account-title">Conta do O Espertinho</h2><p id="account">Conta desconectada</p><output id="status" aria-live="polite">Conectando…</output><div class="actions"><button type="button" id="login">Entrar no O Espertinho</button><button type="button" id="logout" class="secondary" hidden>Sair</button></div></section>
       <section id="workspace" aria-labelledby="workspace-title" hidden>
         <h2 id="workspace-title">Manter catálogo</h2>
         <label for="marketplace">Marketplace</label><select id="marketplace"></select>
-        <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar janela / fazer login</button></div>
-        <p class="hint">Use a janela de processamento para o login. Se a receita exigir um header de sessão, gere um link manualmente nessa janela antes de converter.</p>
+        <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar aba / fazer login</button></div>
+        <p class="hint">Use a aba de processamento para o login. Se a receita exigir um header de sessão, gere um link manualmente nessa aba antes de converter.</p>
         <label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100">
         <label><input id="retry-failed" type="checkbox"> Incluir extrações com falha</label>
         <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-prices">4 — Atualizar preços</button></div>
+        <p id="queue-counts" class="hint" aria-live="polite"></p>
         <p class="hint">Etapas manuais e independentes. Revise categorias e produtos e publique pelo admin.</p>
         <h3>Execução atual</h3><output id="run-status" aria-live="polite">Nenhuma execução selecionada.</output>
         <progress id="progress" max="1" value="0" aria-label="Progresso da execução"></progress>
         <p id="counts" class="hint"></p>
-        <div class="actions"><button type="button" id="pause" class="secondary">Pausar</button><button type="button" id="resume">Continuar</button><button type="button" id="cancel" class="secondary">Cancelar execução</button><button type="button" id="focus" class="secondary">Abrir janela de processamento</button></div>
+        <div class="actions"><button type="button" id="pause" class="secondary">Pausar</button><button type="button" id="resume">Continuar</button><button type="button" id="cancel" class="secondary">Cancelar execução</button><button type="button" id="focus" class="secondary">Abrir aba de processamento</button></div>
         <details><summary>Retomar execução ou prévia solicitada no admin</summary><button type="button" id="load-runs" class="secondary">Carregar execuções</button><ul id="runs"></ul><label for="runs-size">Itens por página</label><select id="runs-size"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select><div class="actions"><button type="button" id="runs-previous" class="secondary">Anterior</button><span id="runs-page"></span><button type="button" id="runs-next" class="secondary">Próxima</button></div></details>
       </section>
       <section aria-labelledby="picker-title"><h2 id="picker-title">Selecionar elementos</h2><p>Selecione e componha seletores na página atual. Pause o processamento antes de inspecionar.</p><button type="button" id="pick-elements">Selecionar elementos na aba atual</button></section>

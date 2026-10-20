@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {createServer as createHttpsServer} from 'node:https';
 import {spawnSync} from 'node:child_process';
-import {mkdtemp,cp,readFile,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,cp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,relative} from 'node:path';
 import {chromium} from 'playwright';
 
-test('Chromium real executa os quatro passos configuráveis em janela própria, sem sessão no backend', {skip:process.env.TEST_NATIVE_BROWSER!=='1',timeout:90000},async()=>{
+test('Chromium real executa os quatro passos configuráveis em aba própria na mesma janela, sem sessão no backend', {skip:process.env.TEST_NATIVE_BROWSER!=='1',timeout:90000},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'espertinho-native-')),extension=join(directory,'extension');
  let context,server,marketServer;let marketOrigin,challenge=false;const received=[];let run,item;
  const discovery={rendering:{frameSelector:'',readySelector:'.card',timeoutMs:1000,settleDelayMs:0},extraction:{itemSelector:'.card',linkSelector:'a',linkAttribute:'href'},pagination:{mode:'next',nextSelector:'.next',disabledSelector:'',endSelector:'',missingNextAction:'finish',noProgressLimit:1,waitAfterMs:100},limits:{maxPages:2,maxItems:10,requestIntervalMs:100}};
@@ -24,6 +24,7 @@ test('Chromium real executa os quatro passos configuráveis em janela própria, 
    const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=chunks.length?JSON.parse(Buffer.concat(chunks)):undefined;
    const path=req.url.split('?')[0].replace('/api/extension','');let data={};
    if(path==='/catalog/config')data={marketplaces:[{id:'fixture',name:'Fixture',catalog_executor:'extension',website_url:marketOrigin,allowedOrigins:[marketOrigin],config:settings}]};
+   else if(path==='/catalog/stats')data={marketplaceId:'fixture',retryFailed:new URL(req.url,'http://localhost').searchParams.get('retryFailed')==='true',convert:{pending:1,total:1},enrich:{pending:1,total:1},prices:{pending:1,total:1},observedAt:new Date().toISOString()};
    else if(path==='/catalog/runs'&&req.method==='POST'){
     run={id:crypto.randomUUID(),marketplace_id:'fixture',step:body.step,status:'queued',total:1,completed:0,failed:0,snapshot};
     item={id:crypto.randomUUID(),lease_token:crypto.randomUUID(),payload:{url:body.step==='discover'?marketOrigin+'/list':marketOrigin+'/product',originalUrl:marketOrigin+'/product',config:discovery}};data=run;
@@ -50,11 +51,14 @@ test('Chromium real executa os quatro passos configuráveis em janela própria, 
    await globalThis.catalogTest.init();await chrome.storage.local.set({state:{version:2,backendUrl,auth:{token:'TEST_ONLY',refreshToken:'TEST_ONLY',expiresAt:Date.now()+900000,user:{id:'fixture',email:'fixture@example.com',permissions:['affiliate_links','discovery','catalog','updates']}},markets:[],message:''}});
    await globalThis.catalogTest.init();globalThis.catalogTest.state=(await chrome.storage.local.get('state')).state;await globalThis.catalogTest.handle({type:'REFRESH'});
   },{backendUrl});
+  const owner=await worker.evaluate(async()=>{const tabs=await chrome.tabs.query({active:true,lastFocusedWindow:true});globalThis.catalogTest.state.hostWindowId=tabs[0].windowId;return {tabId:tabs[0].id,windowId:tabs[0].windowId,url:tabs[0].url,windows:(await chrome.windows.getAll()).length};});
   for(const step of ['discover','convert','enrich','prices']){
    await worker.evaluate(step=>globalThis.catalogTest.handle({type:'START',step,marketplaceId:'fixture'}),step);
    const deadline=Date.now()+15000;let status;
    while(Date.now()<deadline){status=await worker.evaluate(()=>globalThis.catalogTest.state.run.status);if(status==='completed')break;if(status.startsWith('paused')||status==='waiting_for_human')throw Error(JSON.stringify(await worker.evaluate(async()=>({message:globalThis.catalogTest.state.message,tabs:(await chrome.tabs.query({})).map(t=>({url:t.url,status:t.status,window:t.windowId}))}))));await new Promise(r=>setTimeout(r,100));}
    assert.equal(status,'completed',step);
+   const current=await worker.evaluate(async owner=>({tab:await chrome.tabs.get(owner.tabId),windowId:globalThis.catalogTest.state.windowId,windows:(await chrome.windows.getAll()).length}),owner);
+   assert.equal(current.windowId,owner.windowId);assert.equal(current.windows,owner.windows);assert.equal(current.tab.url,owner.url);assert.equal(current.tab.active,true);
   }
   const before=received.length;challenge=true;
   await worker.evaluate(()=>globalThis.catalogTest.handle({type:'START',step:'prices',marketplaceId:'fixture'}));
@@ -63,11 +67,12 @@ test('Chromium real executa os quatro passos configuráveis em janela própria, 
   await assert.rejects(worker.evaluate(()=>globalThis.catalogTest.handle({type:'RESUME'})),/intervenção/);
   // Only our controlled fixture is changed. No real login or CAPTCHA is solved by this test.
   challenge=false;
-  const previousWindow=await worker.evaluate(()=>globalThis.catalogTest.state.windowId);
+  const previousTab=await worker.evaluate(()=>globalThis.catalogTest.state.tabId);
   const previousRun=await worker.evaluate(()=>globalThis.catalogTest.state.run.id);
-  await worker.evaluate(async()=>{await chrome.windows.remove(globalThis.catalogTest.state.windowId);});
+  await worker.evaluate(async()=>{await chrome.tabs.remove(globalThis.catalogTest.state.tabId);});
   await worker.evaluate(()=>globalThis.catalogTest.handle({type:'FOCUS'}));
-  assert.notEqual(await worker.evaluate(()=>globalThis.catalogTest.state.windowId),previousWindow);
+  assert.notEqual(await worker.evaluate(()=>globalThis.catalogTest.state.tabId),previousTab);
+  assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.windowId),owner.windowId);
   assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.id),previousRun);
   assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.status),'waiting_for_human');
   assert.equal(received.length,before);
@@ -81,6 +86,18 @@ test('Chromium real executa os quatro passos configuráveis em janela própria, 
   assert.deepEqual(received.find(r=>r.step==='enrich').sourceCategoryPath,['Eletrônicos','Áudio']);
   assert.equal(received.find(r=>r.step==='prices').data.priceCents,12345);
   assert.doesNotMatch(JSON.stringify(received),/TEST_ONLY|cookies|refreshToken/);
+  const panel=await context.newPage();await panel.setViewportSize({width:400,height:1000});
+  await panel.goto(new URL('popup.html?view=panel',worker.url()).href);
+  await panel.locator('#run-status').filter({hasText:'4 — Atualizar preços'}).waitFor();
+  assert.equal(await panel.locator('#step-convert').textContent(),'2 — Gerar links de afiliados · 1 / 1');
+  assert.equal(await panel.locator('#step-enrich').textContent(),'3 — Extrair informações dos produtos · 1 / 1');
+  assert.equal(await panel.locator('#step-prices').textContent(),'4 — Atualizar preços · 1 / 1');
+  assert.equal(await panel.locator('#display-mode').getAttribute('aria-label'),'Usar popup');
+  assert.equal(await panel.locator('#display-icon-popup').isVisible(),true);
+  assert.equal(await panel.locator('#display-icon-panel').isVisible(),false);
+  assert.equal(await panel.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await mkdir('reports',{recursive:true});
+  await panel.screenshot({path:'reports/catalog-panel.png',fullPage:true});
  }finally{
   await context?.close();if(server)await new Promise(r=>server.close(r));if(marketServer)await new Promise(r=>marketServer.close(r));
   if(relative(resolve(tmpdir()),resolve(directory)).startsWith('..'))throw Error('Diretório de teste inválido.');

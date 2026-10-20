@@ -8,7 +8,7 @@ Node 24 e Chrome 120+. Execute `npm ci` e `npm run package`. Carregue dist em ch
 
 BACKEND_URL no .env ou variable do build define a origem da API (padrão http://localhost:3000). A conexão pode ser alterada na interface após sair. Não coloque segredos no .env da extensão. Produção usa HTTPS. Nenhuma credencial de marketplace é embutida no pacote.
 
-O ícone abre o painel lateral por padrão. O switch Popup / Painel lateral aplica e salva a preferência; o painel permanece aberto enquanto você usa a página. O seletor visual e sua composição continuam disponíveis, com edição e contagem de matches. Pause a coleta antes de inspecionar uma página.
+O ícone da extensão abre o painel lateral por padrão. O botão de ícone no cabeçalho alterna entre painel lateral (janela com coluna lateral) e popup (janela com pequeno painel), com tooltip e nome acessível indicando o destino. A preferência é salva; o painel permanece aberto enquanto você usa a página. O seletor visual e sua composição continuam disponíveis, com edição e contagem de matches. Pause a coleta antes de inspecionar uma página.
 
 Entre no O Espertinho e aprove no site com a conta Google autorizada. A extensão exige affiliate_links e, por etapa, discovery, catalog ou updates. Requisições são autorizadas novamente pelo backend. Sessões revogadas/expiradas interrompem o fluxo.
 
@@ -21,11 +21,15 @@ Entre no O Espertinho e aprove no site com a conta Google autorizada. A extensã
 
 No admin, confirme categoria, atribua/crie produto e publique explicitamente. Cada botão inicia só sua própria etapa. Limite de itens e inclusão de falhas ficam na interface. Novas configurações valem para execuções novas.
 
-## Janela, bloqueios e retomada
+Os botões 2 e 3 mostram pendentes elegíveis / total de links descobertos não arquivados do marketplace selecionado. A inclusão de falhas altera os elegíveis da extração. O botão 4 mostra ofertas sem verificação bem-sucedida nas últimas 24 horas / ofertas publicadas com link de afiliado; falhas técnicas não renovam a data. Esse indicador não restringe a execução manual, que continua podendo verificar todas as ofertas, começando pelas mais antigas. Os totais independem do máximo de itens por execução. Contadores são atualizados ao trocar o filtro, atualizar configurações e concluir uma execução, com cache de até 15 segundos durante a consulta do painel. Falhas de consulta mostram indisponibilidade, sem inventar valores zero. Execução atual e histórico identificam a etapa; a execução atual também identifica o marketplace.
 
-Preparar janela / fazer login abre uma janela de processamento própria. Ela não substitui a aba que você está usando. Faça login ali quando necessário. Se a receita usa requestHeader, gere um link manualmente nessa janela: somente o header X- da chamada, aba e origem configuradas fica em storage.session confiável, com prazo de 15 minutos e limpeza ao sair. Ele nunca integra resultados enviados ao backend.
+## Aba, bloqueios e retomada
 
-Login, CAPTCHA, acesso negado ou limite são detectados por regras de URL, seletores ou texto e pausam o processamento. Resolva manualmente na mesma janela e clique Continuar; a extensão verifica novamente. Não há resolução automática de desafios ou troca de identidade para evitar bloqueio.
+O processamento cria uma aba própria na mesma janela em que você interage com a extensão. Navegações do lote não ativam essa aba nem substituem a sua aba atual. Preparar aba / fazer login e Abrir aba de processamento a ativam explicitamente para permitir sua interação. Uma aba própria existente de uma janela antiga pode ser movida para a janela atual; outras abas do usuário não são reutilizadas. Se a aba for fechada, use Abrir aba de processamento para recriá-la e depois Continuar para retomar a mesma execução.
+
+Faça login na aba de processamento quando necessário. Se a receita usa requestHeader, gere um link manualmente nessa aba: somente o header X- da chamada, aba e origem configuradas fica em storage.session confiável, com prazo de 15 minutos e limpeza ao sair. Ele nunca integra resultados enviados ao backend.
+
+Login, CAPTCHA, acesso negado ou limite são detectados por regras de URL, seletores ou texto e pausam o processamento. Resolva manualmente na mesma aba e clique Continuar; a extensão verifica novamente. Não há resolução automática de desafios ou troca de identidade para evitar bloqueio.
 
 Painel pode ser fechado sem perder progresso. Use Carregar execuções para retomar uma execução própria ou prévia solicitada no admin; a lista tem paginação e tamanho selecionável. Pausar/cancelar é explícito. Reservas e respostas pendentes são persistidas; resultados repetidos são idempotentes no backend. Uma retomada invalida reservas antigas e reextrai o item ainda não confirmado.
 

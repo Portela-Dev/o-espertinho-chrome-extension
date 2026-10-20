@@ -5,8 +5,9 @@ import {recipe,auth} from './fixtures.mjs';
 function fixture(options={}){
  let saved={backendUrl:'http://localhost:3000',auth,proofTest:{secret:'obsolete'},progress:{status:'running'}};let run;
  const calls=[],settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,blockRules:[],recipe:{...recipe,allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],loginUrl:'https://shop.example.com'}},market={id:'shop',name:'Shop',catalog_executor:'extension',website_url:'https://shop.example.com',allowedOrigins:['https://shop.example.com'],config:settings};
- const browser={runtime:{id:'a'.repeat(32),getManifest:()=>({version:'0.2.0'})},storage:{local:{setAccessLevel:async()=>{},get:async()=>({state:saved}),set:async({state})=>{saved=structuredClone(state);}},session:{get:async()=>({}),setAccessLevel:async()=>{},set:async()=>{},remove:async()=>{}}},alarms:{create:async()=>{}},permissions:{contains:async()=>true},windows:{create:async()=>({id:9,tabs:[{id:4,windowId:9}]}),update:async()=>{}},tabs:{get:async()=>({id:4,windowId:9,url:'https://shop.example.com',status:'complete'}),update:async()=>{},create:async()=>({id:4})},scripting:{executeScript:async call=>[{result:call.func.name==='checkPageState'?(options.blocked?.()??null):(options.result??{affiliateUrl:'https://shop.example.com/p?affiliate=1'})}]}};
+ const browser={runtime:{id:'a'.repeat(32),getManifest:()=>({version:'0.2.0'})},storage:{local:{setAccessLevel:async()=>{},get:async()=>({state:saved}),set:async({state})=>{saved=structuredClone(state);}},session:{get:async()=>({}),setAccessLevel:async()=>{},set:async()=>{},remove:async()=>{}}},alarms:{create:async()=>{}},permissions:{contains:async()=>true},windows:{getLastFocused:async()=>({id:9,type:'normal'}),get:async id=>({id,type:'normal'}),update:async()=>{}},tabs:{get:async()=>({id:4,windowId:9,url:'https://shop.example.com',status:'complete'}),update:async()=>{},create:async()=>({id:4,windowId:9})},scripting:{executeScript:async call=>[{result:call.func.name==='checkPageState'?(options.blocked?.()??null):(options.result??{affiliateUrl:'https://shop.example.com/p?affiliate=1'})}]}};
  const fetch=async(url,requestOptions)=>{const path=new URL(url).pathname.replace('/api/extension','');const body=requestOptions.body?JSON.parse(requestOptions.body):undefined;calls.push({path,body});
+  if(path==='/catalog/stats')return Response.json({marketplaceId:new URL(url).searchParams.get('marketplaceId'),retryFailed:new URL(url).searchParams.get('retryFailed')==='true',convert:{pending:3,total:5},enrich:{pending:2,total:5},prices:{pending:1,total:4},observedAt:new Date().toISOString()});
   if(path==='/catalog/config')return Response.json({marketplaces:[market]});
   if(path==='/catalog/runs'){run={id:'run',marketplace_id:'shop',status:'queued',step:body.step,total:1,completed:0,failed:0,snapshot:{market:{allowedHosts:['shop.example.com']},settings,profile:null}};return Response.json(run);}
   if(path.endsWith('/claim'))return Response.json({item:{id:'item',lease_token:'lease',payload:{url:'https://shop.example.com/p',originalUrl:'https://shop.example.com/p',...options.payload}},snapshot:run.snapshot,step:run.step});
@@ -20,7 +21,7 @@ function fixture(options={}){
  return {runtime:new CatalogRuntime(browser),browser,fetch,calls,saved:()=>saved};
 }
 
-for(const priorStatus of ['waiting_for_human','running'])test('reabrir janela fechada preserva execução e exige continuar: '+priorStatus,async()=>{
+for(const priorStatus of ['waiting_for_human','running'])test('reabrir aba fechada preserva execução e exige continuar: '+priorStatus,async()=>{
  let blocked='login';const f=fixture({blocked:()=>blocked}),original=globalThis.fetch;globalThis.fetch=f.fetch;
  try{
   await f.runtime.init();await f.runtime.handle({type:'REFRESH'});
@@ -30,7 +31,8 @@ for(const priorStatus of ['waiting_for_human','running'])test('reabrir janela fe
   f.runtime.state.run.status=priorStatus;
   const runId=f.saved().run.id;let exists=false,created=0;
   f.browser.tabs.get=async()=>{if(!exists)throw Error('No tab with id');return {id:7,windowId:12,status:'complete',url:'https://shop.example.com'};};
-  f.browser.windows.create=async()=>{exists=true;created++;return {id:12,tabs:[{id:7,windowId:12}]};};
+  f.browser.windows.getLastFocused=async()=>({id:12,type:'normal'});
+  f.browser.tabs.create=async()=>{exists=true;created++;return {id:7,windowId:12};};
   await f.runtime.handle({type:'FOCUS'});
   assert.equal(created,1);assert.equal(f.saved().tabId,7);assert.equal(f.saved().windowId,12);
   assert.equal(f.saved().run.id,runId);assert.equal(f.saved().run.status,priorStatus==='running'?'paused_by_user':'waiting_for_human');
@@ -41,7 +43,7 @@ for(const priorStatus of ['waiting_for_human','running'])test('reabrir janela fe
  }finally{globalThis.fetch=original;}
 });
 
-test('abrir janela sem execução cria uma janela própria e não inicia lote',async()=>{
+test('abrir aba sem execução cria uma aba própria e não inicia lote',async()=>{
  const f=fixture(),original=globalThis.fetch;globalThis.fetch=f.fetch;
  try{
   await f.runtime.init();await f.runtime.handle({type:'REFRESH'});
@@ -115,5 +117,17 @@ test('chamadas simultâneas reutilizam uma única renovação do token de acesso
  try{
   await f.runtime.init();await Promise.all([f.runtime.handle({type:'REFRESH'}),f.runtime.handle({type:'REFRESH'})]);
   assert.equal(refreshes,1);assert.equal(f.saved().auth.token,'rotated-access-token');
+ }finally{globalThis.fetch=original;}
+});
+
+test('contadores respeitam o filtro, usam cache e falha não encerra a sessão',async()=>{
+ const f=fixture(),original=globalThis.fetch;let unavailable=false;
+ globalThis.fetch=async(url,options)=>url.includes('/catalog/stats')&&unavailable?Response.json({error:'offline'},{status:503}):f.fetch(url,options);
+ try{
+  await f.runtime.handle({type:'REFRESH'});let view=await f.runtime.handle({type:'STATE'});assert.equal(view.stats.convert.pending,3);
+  await f.runtime.handle({type:'STATE'});assert.equal(f.calls.filter(c=>c.path==='/catalog/stats').length,1);
+  await f.runtime.handle({type:'FILTER',marketplaceId:'shop',retryFailed:true});view=await f.runtime.handle({type:'STATE'});assert.equal(view.stats.retryFailed,true);assert.equal(f.calls.filter(c=>c.path==='/catalog/stats').length,2);
+  unavailable=true;view=await f.runtime.handle({type:'REFRESH'});assert.equal(view.stats,undefined);assert.match(view.statsError,/indisponíveis/);assert.ok(view.user);
+  await f.runtime.handle({type:'LOGOUT'});view=await f.runtime.handle({type:'STATE'});assert.equal(view.stats,undefined);assert.equal(view.user,undefined);
  }finally{globalThis.fetch=original;}
 });

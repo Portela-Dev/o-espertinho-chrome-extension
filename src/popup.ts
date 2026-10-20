@@ -1,17 +1,19 @@
 import { launchSelectorPicker } from './picker-launcher.js';
 import { backendOrigin } from './contracts.js';
-import { renderCatalog, runLabel, type CatalogView } from './catalog-view.js';
+import { renderCatalog, runLabel,stepLabel, type CatalogView } from './catalog-view.js';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let view: CatalogView | undefined, busy = false, page = 1, total = 0;
 const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
 document.body.classList.toggle('side-panel', isPanel);
-function syncDisplaySwitch() {
-    const input = element<HTMLInputElement>('display-mode');
-    input.checked = isPanel;
-    input.setAttribute('aria-checked', String(isPanel));
+function syncDisplayIcon() {
+    const button=element<HTMLButtonElement>('display-mode'),label=isPanel?'Usar popup':'Abrir painel lateral';
+    button.setAttribute('aria-label',label);button.title=label;
+    element('display-icon-panel').toggleAttribute('hidden',isPanel);
+    element('display-icon-popup').toggleAttribute('hidden',!isPanel);
 }
-syncDisplaySwitch();
+syncDisplayIcon();
 function render() {
+    element<HTMLButtonElement>('display-mode').disabled=busy;
     if (view)
         renderCatalog(view, busy);
 }
@@ -34,8 +36,9 @@ async function act(callback: () => Promise<unknown>) {
     }
 }
 async function request(type: string, extra: Record<string, unknown> = {}) {
+    const current=['PREPARE','START','FOCUS','ATTACH'].includes(type)?await chrome.windows.getCurrent():undefined;
     const reply = await chrome.runtime.sendMessage({
-        type, ...extra
+        type, ...extra,...(current?.id!==undefined?{hostWindowId:current.id}:{})
     });
     if (reply.error)
         throw new Error(reply.error);
@@ -45,11 +48,9 @@ async function send(type: string, extra: Record<string, unknown> = {}) {
     view = await request(type, extra);
     render();
 }
-element('display-mode').addEventListener('change', () => {
+element('display-mode').addEventListener('click', () => {
     void act(async () => {
-        const mode = element<HTMLInputElement>('display-mode').checked ? 'panel' : 'popup';
-        if (mode === (isPanel ? 'panel' : 'popup'))
-            return;
+        const mode = isPanel ? 'popup' : 'panel';
         if (mode === 'panel') {
             const current = await chrome.windows.getCurrent();
             if (current.id === undefined)
@@ -66,7 +67,7 @@ element('display-mode').addEventListener('change', () => {
         });
         window.close();
     }).finally(() => {
-        syncDisplaySwitch();
+        syncDisplayIcon();
     });
 });
 for (const [id, type] of Object.entries({
@@ -76,6 +77,7 @@ for (const [id, type] of Object.entries({
         void act(() => send(type));
     });
 const marketplace = () => element<HTMLSelectElement>('marketplace').value;
+for(const id of ['marketplace','retry-failed'])element(id).addEventListener('change',()=>{const marketplaceId=marketplace(),retryFailed=element<HTMLInputElement>('retry-failed').checked;void act(()=>send('FILTER',{marketplaceId,retryFailed}));});
 async function grant() {
     const market = view?.markets.find(m => m.id === marketplace());
     if (!market)
@@ -137,7 +139,7 @@ async function runs() {
     element('runs').replaceChildren(...data.items.map((run: any) => {
         const row = document.createElement('li'), button = document.createElement('button');
         button.className = 'secondary';
-        button.textContent = run.step + ' · ' + runLabel(run.status) + ' · ' + new Date(run.created_at).toLocaleString('pt-BR');
+        button.textContent = stepLabel(run.step) + ' · ' + runLabel(run.status) + ' · ' + new Date(run.created_at).toLocaleString('pt-BR');
         button.addEventListener('click', () => {
             void act(() => send('ATTACH', {
                 runId: run.id
