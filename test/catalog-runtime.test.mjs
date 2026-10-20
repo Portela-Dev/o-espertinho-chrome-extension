@@ -4,8 +4,8 @@ import {CatalogRuntime} from '../dist/catalog-runtime.js';
 import {recipe,auth} from './fixtures.mjs';
 function fixture(options={}){
  let saved={backendUrl:'http://localhost:3000',auth,proofTest:{secret:'obsolete'},progress:{status:'running'}};let run;
- const calls=[],settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,blockRules:[],recipe:{...recipe,allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],loginUrl:'https://shop.example.com'}},market={id:'shop',name:'Shop',catalog_executor:'extension',website_url:'https://shop.example.com',allowedOrigins:['https://shop.example.com'],config:settings};
- const browser={runtime:{id:'a'.repeat(32),getManifest:()=>({version:'0.2.0'})},storage:{local:{setAccessLevel:async()=>{},get:async()=>({state:saved}),set:async({state})=>{saved=structuredClone(state);}},session:{get:async()=>({}),setAccessLevel:async()=>{},set:async()=>{},remove:async()=>{}}},alarms:{create:async()=>{}},permissions:{contains:async()=>true},windows:{getLastFocused:async()=>({id:9,type:'normal'}),get:async id=>({id,type:'normal'}),update:async()=>{}},tabs:{get:async()=>({id:4,windowId:9,url:'https://shop.example.com',status:'complete'}),update:async()=>{},create:async()=>({id:4,windowId:9})},scripting:{executeScript:async call=>[{result:call.func.name==='checkPageState'?(options.blocked?.()??null):(options.result??{affiliateUrl:'https://shop.example.com/p?affiliate=1'})}]}};
+ const calls=[],navigations=[],settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,blockRules:[],recipe:{...recipe,allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],loginUrl:'https://shop.example.com'}},market={id:'shop',name:'Shop',catalog_executor:'extension',website_url:'https://shop.example.com',allowedOrigins:['https://shop.example.com'],config:settings};
+ const browser={runtime:{id:'a'.repeat(32),getManifest:()=>({version:'0.2.0'})},storage:{local:{setAccessLevel:async()=>{},get:async()=>({state:saved}),set:async({state})=>{saved=structuredClone(state);}},session:{get:async()=>({}),setAccessLevel:async()=>{},set:async()=>{},remove:async()=>{}}},alarms:{create:async()=>{}},permissions:{contains:async()=>true},windows:{getLastFocused:async()=>({id:9,type:'normal'}),get:async id=>({id,type:'normal'}),update:async()=>{}},tabs:{get:async()=>({id:4,windowId:9,url:'https://shop.example.com',status:'complete'}),update:async(id,options)=>{if(options.url)navigations.push(options.url);},create:async options=>{navigations.push(options.url);return {id:4,windowId:9};}},scripting:{executeScript:async call=>[{result:call.func.name==='checkPageState'?(options.blocked?.()??null):(options.result??{affiliateUrl:'https://shop.example.com/p?affiliate=1'})}]}};
  const fetch=async(url,requestOptions)=>{const path=new URL(url).pathname.replace('/api/extension','');const body=requestOptions.body?JSON.parse(requestOptions.body):undefined;calls.push({path,body});
   if(path==='/catalog/stats')return Response.json({marketplaceId:new URL(url).searchParams.get('marketplaceId'),retryFailed:new URL(url).searchParams.get('retryFailed')==='true',convert:{pending:3,completed:2,total:5},enrich:{pending:2,completed:1,total:5},prices:{pending:1,total:4},observedAt:new Date().toISOString()});
   if(path==='/catalog/config')return Response.json({marketplaces:[market]});
@@ -18,7 +18,7 @@ function fixture(options={}){
   if(path==='/auth/logout')return Response.json({ok:true});
   throw Error('unexpected '+path);
  };
- return {runtime:new CatalogRuntime(browser),browser,fetch,calls,saved:()=>saved};
+ return {runtime:new CatalogRuntime(browser),browser,fetch,calls,navigations,saved:()=>saved};
 }
 
 test('atualizar configurações independe da execução salva; acompanhamento limpa somente referências locais de execução removida',async()=>{
@@ -107,9 +107,9 @@ test('descoberta usa checkpoint e envia apenas URLs; extração e preço mantêm
   await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'discover'});await finished(f);
   const data=f.calls.find(c=>c.path.endsWith('/results')).body;assert.deepEqual(data.links,['https://shop.example.com/p?ref=one']);assert.equal(data.checkpoint.advance,false);assert.equal(data.data,undefined);
   for(const step of ['enrich','prices']){
-   const g=fixture({result:{outcome:'success',data:{title:'Produto',priceCents:12000},sourceCategoryPath:['Tecnologia']}});globalThis.fetch=g.fetch;
+   const g=fixture({payload:{url:'https://shop.example.com/affiliate',originalUrl:'https://shop.example.com/p'},result:{outcome:'success',data:{title:'Produto',priceCents:12000},sourceCategoryPath:['Tecnologia']}});globalThis.fetch=g.fetch;
    await g.runtime.init();await g.runtime.handle({type:'REFRESH'});await g.runtime.handle({type:'START',marketplaceId:'shop',step});await finished(g);
-   const result=g.calls.find(c=>c.path.endsWith('/results')).body;assert.equal(result.data.priceCents,12000);assert.equal(result.affiliateUrl,undefined);assert.deepEqual(result.sourceCategoryPath,['Tecnologia']);
+   const result=g.calls.find(c=>c.path.endsWith('/results')).body;assert.equal(result.data.priceCents,12000);assert.equal(result.affiliateUrl,undefined);assert.deepEqual(result.sourceCategoryPath,['Tecnologia']);assert.equal(g.navigations[0],step==='enrich'?'https://shop.example.com/p':'https://shop.example.com/affiliate');
   }
  }finally{globalThis.fetch=original;}
 });

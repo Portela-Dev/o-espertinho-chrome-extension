@@ -446,6 +446,8 @@ export class CatalogRuntime {
             throw new Error('incomplete');
         const origins = snapshot.market.allowedHosts.map((h: string) => 'https://' + h), settings = snapshot.settings;
         let url = item.payload.url;
+        if (step === 'enrich')
+            url = item.payload.originalUrl;
         if (step === 'convert')
             url = settings.recipe.loginUrl;
         if (step === 'discover' && item.payload.checkpoint)

@@ -18,7 +18,7 @@ Entre no O Espertinho e aprove no site com a conta Google autorizada. A extensã
 
 1. **Extrair links:** carrega vitrines/perfis habilitados e percorre a paginação configurada. Envia URLs e origem, não dados incompletos de cards.
 2. **Gerar links de afiliados:** processa candidatos ainda sem conversão usando a receita cadastrada. Categoria/produto ainda não são necessários. A URL original é preservada separadamente.
-3. **Extrair informações:** navega nos links convertidos e aplica seletores de produto; grava categorias de origem e dados para revisão, sem confirmar mapeamentos ou publicar.
+3. **Extrair informações:** navega na URL original dos produtos que já possuem link de afiliado e aplica os seletores de produto; grava categorias de origem e dados para revisão, sem confirmar mapeamentos ou publicar.
 4. **Atualizar preços:** atualiza ofertas publicadas e seu histórico diário. Falha técnica mantém o último preço e a oferta.
 
 No admin, confirme categoria, atribua/crie produto e publique explicitamente. Cada botão inicia só sua própria etapa. Limite de itens e inclusão de falhas ficam na interface. Novas configurações valem para execuções novas.
