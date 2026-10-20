@@ -444,7 +444,7 @@ export class CatalogRuntime {
                     u.pathname = u.pathname.slice(0, at) || '/';
             }
             return u.href;
-        }).sort().join('\n');
+        }).sort((a,b)=>a.localeCompare(b,'en')).join('\n');
     }
     private async discoveryCheckpoint(claim: CatalogClaim, result: any, links: string[]) {
         const { config, checkpoint } = claim.item!.payload, page = (checkpoint?.page ?? 0) + 1;

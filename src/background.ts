@@ -5,7 +5,6 @@ const runtime = new CatalogRuntime();
 async function restoreModeSafely(){
   try { await restoreDisplayMode(); } catch { console.error("Não foi possível restaurar a visualização da extensão."); }
 }
-void restoreModeSafely();
 chrome.webRequest.onBeforeSendHeaders.addListener(details=>{void runtime.observeAffiliateHeaders(details).catch(()=>{});},{urls:['https://*/*'],types:['xmlhttprequest']},['requestHeaders']);
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (
@@ -34,6 +33,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 chrome.runtime.onStartup.addListener(() => {
+  void restoreModeSafely();
   void runtime.pump();
 });
 chrome.runtime.onInstalled.addListener(() => {
