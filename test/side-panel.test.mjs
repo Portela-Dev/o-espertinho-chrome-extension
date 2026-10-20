@@ -25,13 +25,13 @@ test('selecionar elementos mantém painel aberto e alternância solicita popup a
   try {
     await import('../dist/popup.js');
     assert.equal(document.body.classList.contains('side-panel'), true);
-    assert.equal(document.getElementById('display-mode').checked, true);
+    assert.equal(document.getElementById('display-mode').getAttribute('aria-label'),'Usar popup');
+    assert.equal(document.getElementById('display-icon-popup').hasAttribute('hidden'),false);
     document.getElementById('pick-elements').click();
     await tick();
     assert.equal(injected, 1);
     assert.equal(closed, 0);
-    document.getElementById('display-mode').checked = false;
-    document.getElementById('display-mode').dispatchEvent(new page.Event('change'));
+    document.getElementById('display-mode').click();
     await tick();
     assert.ok(messages.some(message => message.type === 'DISPLAY_MODE' && message.mode === 'popup'));
     assert.equal(closed, 1);

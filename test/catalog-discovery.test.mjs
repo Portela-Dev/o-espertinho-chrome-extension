@@ -12,6 +12,22 @@ test('vitrine resolve links relativos e dispensa paginação; desafio impede ext
  assert.equal(blocked.blocked,'challenge');assert.equal(clicks,0);
 });
 
+test('bottom strategy targets current height, reports growth and supports a scroll container',async()=>{
+ const win=new Window({url:'https://shop.example.com/list'});globalThis.document=win.document;globalThis.location=win.location;globalThis.window=win;
+ document.body.innerHTML='<div id="scroller"><div class="card"><a href="/a">A</a></div></div>';
+ const scroller=document.querySelector('#scroller');let height=1500;
+ Object.defineProperty(scroller,'scrollHeight',{get:()=>height});Object.defineProperty(scroller,'clientHeight',{value:500});
+ scroller.scrollTo=options=>{scroller.scrollTop=options.top-500;};
+ const scrollConfig={...config,pagination:{mode:'scroll',scrollStrategy:'bottom',scrollContainerSelector:'#scroller'}};
+ await discoverPage({config:scrollConfig,rules:[],action:'advance',page:1});assert.equal(scroller.scrollTop,1000);
+ let result=await discoverPage({config:scrollConfig,rules:[],action:'read',page:1});assert.deepEqual(result.scroll,{position:1000,height:1500,viewport:500});
+ height=2500;scroller.insertAdjacentHTML('beforeend','<div class="card"><a href="/b">B</a></div>');
+ result=await discoverPage({config:scrollConfig,rules:[],action:'read',page:2});assert.equal(result.links.length,2);assert.equal(result.scroll.height,2500);
+ await discoverPage({config:scrollConfig,rules:[],action:'advance',page:2});assert.equal(scroller.scrollTop,2000);
+ let distance=0;scroller.scrollBy=options=>{distance=options.top;};
+ await discoverPage({config:{...scrollConfig,pagination:{...scrollConfig.pagination,scrollStrategy:'step',scrollStepPx:800}},rules:[],action:'advance',page:3});assert.equal(distance,800);
+});
+
 
 test('paginação por botão avança sem href e limite de cards não trunca silenciosamente',async()=>{
  const win=new Window({url:'https://shop.example.com/list'});globalThis.document=win.document;globalThis.location=win.location;globalThis.window=win;

@@ -33,7 +33,13 @@ export async function extractCatalogProduct(input: {
             return (document.body?.innerText ?? '').slice(0, 500000).includes(rule.value);
         },
         state() {
-            return input.settings.blockRules.find((r: any) => reader.matches(r))?.kind ?? null;
+            let unavailable = false;
+            for (const rule of input.settings.blockRules) {
+                if (!reader.matches(rule)) continue;
+                if (rule.kind !== 'unavailable') return rule.kind;
+                unavailable = true;
+            }
+            return unavailable ? 'unavailable' : null;
         },
         value(node: Element, rule: any) {
             let value = (node as HTMLElement).innerText || node.textContent || '';
@@ -179,6 +185,8 @@ export async function extractCatalogProduct(input: {
             };
         if (block === 'unavailable') {
             result.data.priceCents = null;
+            result.data.originalPriceCents = null;
+            result.data.missing = result.data.missing.filter((field: string) => field !== 'price');
             return {
                 ...result, outcome: 'unavailable'
             };

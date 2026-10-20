@@ -6,9 +6,12 @@ import { CatalogNavigation } from './catalog-navigation.js';
 import { discoverPage } from './catalog-discovery.js';
 import { extractCatalogProduct } from './catalog-product.js';
 import { executeRecipe } from './executor.js';
-import type { CatalogState, CatalogRun, CatalogStep, CatalogClaim, CatalogMarket } from './catalog-types.js';
+import type { CatalogState, CatalogRun, CatalogStep, CatalogClaim, CatalogMarket,CatalogStats } from './catalog-types.js';
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+class BackendError extends Error {
+    constructor(message: string, readonly status: number) { super(message); }
+}
 type CatalogCommand = {
     type: string;
     marketplaceId?: string;
@@ -19,6 +22,7 @@ type CatalogCommand = {
     runId?: string;
     page?: number;
     pageSize?: number;
+    hostWindowId?:number;
 };
 export class CatalogRuntime {
     state!: CatalogState;
@@ -28,6 +32,12 @@ export class CatalogRuntime {
     private generation = 0;
     private nextRequestAt = 0;
     private timer?: ReturnType<typeof setTimeout>;
+    private stats?:CatalogStats;
+    private statsAt=0;
+    private statsError='';
+    private statsFilter='';
+    private statsSequence=0;
+    private statsRequest?:{key:string;sequence:number;promise:Promise<void>};
     private readonly headers: RequestHeaderMemory;
     private readonly navigation: CatalogNavigation;
     constructor(private readonly browser: typeof chrome = chrome) {
@@ -68,7 +78,9 @@ export class CatalogRuntime {
         delete this.state.run;
         delete this.state.nextAt;
         delete this.state.locallyPaused;
+        delete this.state.error;
         this.state.markets = [];
+        this.stats=undefined;this.statsAt=0;this.statsError='';this.statsFilter='';this.statsSequence++;this.statsRequest=undefined;
         this.state.message = 'Sessão encerrada. Entre novamente.';
         await this.save();
     }
@@ -110,7 +122,7 @@ export class CatalogRuntime {
         if (response.status === 401 || response.status === 403)
             await this.disconnect();
         if (!response.ok)
-            throw new Error(data.error ?? 'Não foi possível concluir a operação.');
+            throw new BackendError(data.error ?? 'Não foi possível concluir a operação.', response.status);
         return data as T;
     }
     private async renew(auth:Auth){
@@ -131,10 +143,27 @@ export class CatalogRuntime {
     private async refresh() {
         const config = await this.api('/catalog/config');
         this.state.markets = config.marketplaces;
-        if (this.state.run) {
-            this.state.run = await this.api('/catalog/runs/' + this.state.run.id);
-            if (['completed', 'cancelled', 'failed'].includes(this.state.run!.status))
-                this.state.locallyPaused = false;
+        if(!this.state.markets.some(m=>m.id===this.state.marketplaceId))this.state.marketplaceId=this.state.markets[0]?.id;
+        this.state.message = 'Configurações atualizadas.';
+        await this.save();
+    }
+    private async syncRun() {
+        const run = this.state.run;
+        if (!run) return;
+        try {
+            const updated = await this.api<CatalogRun>('/catalog/runs/' + run.id);
+            if (this.state.run?.id === run.id) this.state.run = updated;
+        } catch (error) {
+            if (!(error instanceof BackendError) || error.status !== 404) throw error;
+            if (this.state.run?.id !== run.id) return;
+            clearTimeout(this.timer);
+            delete this.state.run;
+            delete this.state.claim;
+            delete this.state.pendingResult;
+            delete this.state.nextAt;
+            delete this.state.locallyPaused;
+            delete this.state.error;
+            this.state.message = 'A execução anterior não está mais disponível. Você pode iniciar uma nova execução.';
         }
         await this.save();
     }
@@ -215,7 +244,9 @@ export class CatalogRuntime {
         else
             await this.headers.clear();
         await this.navigation.focus();
-        this.state.message = 'Faça login se necessário. Se a receita usa header de requisição, gere um link manualmente nesta janela para prepará-lo.';
+        this.state.message = recipe?.steps.some(step => step.type === 'extract' && step.source === 'requestHeader')
+            ? 'Faça login se necessário e gere um link manualmente nesta aba para preparar o header exigido pela receita.'
+            : 'Aba preparada. Faça login se necessário; os valores de sessão serão obtidos automaticamente conforme a receita.';
         await this.save();
     }
     private async focusProcessing() {
@@ -233,14 +264,24 @@ export class CatalogRuntime {
             await this.action('pause');
         await this.prepare(this.market(active ? run.marketplace_id : this.state.marketplaceId));
         this.state.message = active
-            ? 'Janela reaberta. Confira a sessão e clique em Continuar para retomar a mesma execução.'
-            : 'Janela de processamento aberta. Faça login se necessário.';
+            ? 'Aba reaberta. Confira a sessão e clique em Continuar para retomar a mesma execução.'
+            : 'Aba de processamento aberta. Faça login se necessário.';
         await this.save();
     }
     async handle(command: CatalogCommand) {
         await this.init();
+        if (command.type !== 'STATE') delete this.state.error;
+        if(command.hostWindowId!==undefined&&['START','PREPARE','FOCUS','ATTACH'].includes(command.type)){
+            if(!Number.isInteger(command.hostWindowId)||command.hostWindowId<0)throw new Error('Janela inválida.');
+            this.state.hostWindowId=command.hostWindowId;
+        }
         switch (command.type) {
             case 'STATE': break;
+            case 'FILTER':
+                this.state.marketplaceId=this.market(command.marketplaceId).id;
+                this.state.retryFailed=command.retryFailed??false;
+                await this.save();
+                break;
             case 'LOGIN':
                 await this.login();
                 break;
@@ -298,15 +339,18 @@ export class CatalogRuntime {
         }
         if (command.type === 'STATE')
             void this.pump();
+        if(this.state.auth)await this.loadStats(command.type!=='STATE');
         return this.view();
     }
     private async start(command: CatalogCommand) {
+        if (this.state.run && !['completed', 'cancelled', 'failed'].includes(this.state.run.status)) await this.syncRun();
         if (this.state.run && !['completed', 'cancelled', 'failed'].includes(this.state.run.status))
             throw new Error('Conclua ou cancele a execução atual.');
         const market = this.market(command.marketplaceId);
         if (market.catalog_executor !== 'extension')
             throw new Error('Ative o executor da extensão no admin.');
         this.state.marketplaceId = market.id;
+        this.state.retryFailed=command.retryFailed??false;
         if (command.step === 'convert') {
             if (!market.config.recipe)
                 throw new Error('Cadastre a receita de conversão.');
@@ -350,8 +394,28 @@ export class CatalogRuntime {
     }
     private view() {
         return {
-            backendUrl: this.state.backendUrl, user: this.state.auth?.user, pairing: !!this.state.pair, markets: this.state.markets, marketplaceId: this.state.marketplaceId, run: this.state.run, message: this.state.message, version: this.browser.runtime.getManifest().version
+            backendUrl: this.state.backendUrl, user: this.state.auth?.user, pairing: !!this.state.pair, markets: this.state.markets, marketplaceId: this.state.marketplaceId,retryFailed:this.state.retryFailed??false,stats:this.stats,statsError:this.statsError, error:this.state.error, run: this.state.run, message: this.state.message, version: this.browser.runtime.getManifest().version
         };
+    }
+    private async loadStats(force=false){
+        const marketplaceId=this.state.marketplaceId,retryFailed=this.state.retryFailed??false,generation=this.generation;
+        if(!marketplaceId)return;
+        const key=marketplaceId+':'+retryFailed;
+        if(this.statsRequest?.key===key)return this.statsRequest.promise;
+        if(!force&&this.statsFilter===key&&Date.now()-this.statsAt<15000)return;
+        if(this.stats?.marketplaceId!==marketplaceId||this.stats.retryFailed!==retryFailed)this.stats=undefined;
+        const sequence=++this.statsSequence;this.statsFilter=key;this.statsAt=Date.now();this.statsError='';
+        const promise=(async()=>{
+            try{
+                const data=await this.api<CatalogStats>('/catalog/stats?marketplaceId='+encodeURIComponent(marketplaceId)+'&retryFailed='+retryFailed);
+                if(generation!==this.generation||sequence!==this.statsSequence||this.state.marketplaceId!==marketplaceId||(this.state.retryFailed??false)!==retryFailed)return;
+                if(data.marketplaceId!==marketplaceId||data.retryFailed!==retryFailed)throw new Error('Contadores inválidos.');
+                this.stats=data;this.statsAt=Date.now();this.statsError='';
+            }catch{
+                if(generation===this.generation&&sequence===this.statsSequence&&this.state.marketplaceId===marketplaceId){this.stats=undefined;this.statsError='Contadores indisponíveis. Atualize as configurações para tentar novamente.';}
+            }finally{if(this.statsRequest?.sequence===sequence)this.statsRequest=undefined;}
+        })();
+        this.statsRequest={key,sequence,promise};await promise;
     }
     private async action(action: 'pause' | 'cancel' | 'human' | 'technical', reason = '') {
         if (!this.state.run)
@@ -382,6 +446,8 @@ export class CatalogRuntime {
             throw new Error('incomplete');
         const origins = snapshot.market.allowedHosts.map((h: string) => 'https://' + h), settings = snapshot.settings;
         let url = item.payload.url;
+        if (step === 'enrich')
+            url = item.payload.originalUrl;
         if (step === 'convert')
             url = settings.recipe.loginUrl;
         if (step === 'discover' && item.payload.checkpoint)
@@ -458,7 +524,7 @@ export class CatalogRuntime {
         }
     }
     private linkIdentity(links: string[], rules: any[]) {
-        return links.map(value => {
+        return [...new Set(links.map(value => {
             const u = new URL(value);
             u.search = '';
             u.hash = '';
@@ -470,20 +536,20 @@ export class CatalogRuntime {
                     u.pathname = u.pathname.slice(0, at) || '/';
             }
             return u.href;
-        }).sort((a,b)=>a.localeCompare(b,'en')).join('\n');
+        }))].sort((a,b)=>a.localeCompare(b,'en'));
     }
     private async discoveryCheckpoint(claim: CatalogClaim, result: any, links: string[]) {
         const { config, checkpoint } = claim.item!.payload, page = (checkpoint?.page ?? 0) + 1;
-        const identity = this.linkIdentity(links, claim.snapshot.market.normalizationRules ?? []);
-        const fingerprint = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(identity))), seen = checkpoint?.seen ?? [], found = (checkpoint?.found ?? 0) + links.length;
-        const repeated = seen.includes(fingerprint), noProgress = repeated ? (checkpoint?.noProgress ?? 0) + 1 : 0;
+        const normalized = this.linkIdentity(links, claim.snapshot.market.normalizationRules ?? []);
+        const fingerprint = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized.join('\n')))), seen = checkpoint?.seen ?? [];
+        const repeated = seen.includes(fingerprint);
         const repeatedPage = ['next', 'url'].includes(config.pagination.mode) && repeated;
-        const limit = page >= config.limits.maxPages || found >= config.limits.maxItems;
-        const done = result.done || repeatedPage || limit || noProgress >= config.pagination.noProgressLimit;
+        const done = result.done || repeatedPage || page >= config.limits.maxPages;
         const advance = !done && config.pagination.mode === 'next' && !result.nextUrl;
         return {
-            outcome: 'success', links: links.slice(0, Math.max(0, config.limits.maxItems - (checkpoint?.found ?? 0))), done, checkpoint: {
-                url: result.nextUrl ?? result.url, page, seen: [...seen, fingerprint].slice(-1000), found: Math.min(found, config.limits.maxItems), noProgress, advance
+            outcome: 'success', links: normalized, done, checkpoint: {
+                url: result.nextUrl ?? result.url, page, seen: [...seen, fingerprint].slice(-1000), found: checkpoint?.found ?? 0, noProgress: checkpoint?.noProgress ?? 0, advance,
+                ...(config.pagination.mode === 'scroll' ? {scroll:result.scroll} : {})
             }
         };
     }
@@ -596,6 +662,7 @@ export class CatalogRuntime {
         delete this.state.claim;
         this.state.nextAt = Date.now() + this.itemInterval(claim);
         this.state.run = await this.api('/catalog/runs/' + run.id);
+        if(this.state.run&&['completed','failed','cancelled'].includes(this.state.run.status))this.statsAt=0;
         this.state.message = 'Resultado salvo.';
         await this.save();
     }
@@ -608,9 +675,11 @@ export class CatalogRuntime {
         return interval;
     }
     private async pumpRun(run: CatalogRun) {
+        if (['completed', 'cancelled', 'failed'].includes(run.status)) return;
         if (['queued', 'running'].includes(run.status) && (this.state.nextAt ?? 0) > Date.now())
             return;
-        this.state.run = await this.api<CatalogRun>('/catalog/runs/' + run.id);
+        await this.syncRun();
+        if (!this.state.run || this.state.run.id !== run.id) return;
         if (!['queued', 'running'].includes(this.state.run.status) || ((this.state.nextAt ?? 0) > Date.now()))
             return;
         const generation = this.generation;
@@ -628,6 +697,7 @@ export class CatalogRuntime {
         if (!claim?.item) {
             delete this.state.claim;
             this.state.run = await this.api('/catalog/runs/' + run.id);
+            this.statsAt=0;
             this.state.nextAt = Date.now() + 30000;
             await this.save();
             return;
@@ -636,7 +706,8 @@ export class CatalogRuntime {
     }
     private async pauseOnFailure(error: unknown) {
         const reason = error instanceof Error ? error.message : '';
-        this.state.message = reason;
+        this.state.error = reason || 'Não foi possível continuar o processamento.';
+        this.state.message = 'O processamento encontrou um erro. Confira a notificação e tente novamente.';
         if (this.state.auth && this.state.run && ['queued', 'running'].includes(this.state.run.status)) {
             const code = ['permission', 'tab_closed', 'incomplete'].includes(reason) ? reason : 'network';
             try {
