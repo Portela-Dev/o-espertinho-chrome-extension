@@ -1,3 +1,5 @@
+> Histórico de POC encerrada. Este procedimento não faz parte da extensão atual. Use o README e o plano de migração. Não exporte sessões de marketplace.
+
 # Prova local de sessão autenticada
 
 Esta prova usa os marketplaces, domínios e seletores cadastrados no backend. Não contém adaptadores por loja e não integra sessões aos jobs de enriquecimento ou preços.

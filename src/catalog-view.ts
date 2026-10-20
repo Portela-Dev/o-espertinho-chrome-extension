@@ -8,7 +8,7 @@ export function renderCatalog(view:CatalogView,busy:boolean){
  el('workspace').hidden=!view.user;el('login').hidden=!!view.user;el<HTMLButtonElement>('login').disabled=busy||view.pairing;el('logout').hidden=!view.user&&!view.pairing;
  el<HTMLInputElement>('backend').disabled=!!view.user||view.pairing;el<HTMLButtonElement>('save-backend').disabled=busy||!!view.user||view.pairing;
  if(document.activeElement!==el('backend'))el<HTMLInputElement>('backend').value=view.backendUrl;
- const select=el<HTMLSelectElement>('marketplace');const selected=select.value||view.marketplaceId;
+ const select=el<HTMLSelectElement>('marketplace');const selected=select.value||view.marketplaceId||view.markets[0]?.id;
  if(JSON.stringify([...select.options].map(o=>o.value))!==JSON.stringify(view.markets.map(m=>m.id)))select.replaceChildren(...view.markets.map(m=>{const option=document.createElement('option');option.value=m.id;option.textContent=m.name+(m.catalog_executor==='extension'?'':' — extensão não ativada');return option;}));
  if(selected&&[...select.options].some(o=>o.value===selected))select.value=selected;
  const run=view.run,active=!!run&&!['completed','failed','cancelled'].includes(run.status);
@@ -17,6 +17,7 @@ export function renderCatalog(view:CatalogView,busy:boolean){
  el<HTMLProgressElement>('progress').max=Math.max(1,run?.total??1);el<HTMLProgressElement>('progress').value=(run?.completed??0)+(run?.failed??0);
  const permissions:Record<string,string>={discover:'discovery',convert:'affiliate_links',enrich:'catalog',prices:'updates'};
  for(const step of Object.keys(permissions))el<HTMLButtonElement>('step-'+step).disabled=busy||active||!view.user?.permissions.includes(permissions[step]);
+ el<HTMLButtonElement>('prepare').disabled=busy||!!run&&['queued','running'].includes(run.status);
  el<HTMLButtonElement>('pause').disabled=busy||!run||!['queued','running'].includes(run.status);
  el<HTMLButtonElement>('resume').disabled=busy||!run||!['queued','paused_by_user','waiting_for_human','paused_technical'].includes(run.status);
  el<HTMLButtonElement>('cancel').disabled=busy||!active;el<HTMLButtonElement>('pick-elements').disabled=busy||!!run&&['queued','running'].includes(run.status);

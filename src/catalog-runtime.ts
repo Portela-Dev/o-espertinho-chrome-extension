@@ -21,7 +21,7 @@ export class CatalogRuntime {
   this.state.backendUrl=backendOrigin(this.state.backendUrl);await this.browser.alarms.create('worker',{periodInMinutes:0.5});await this.save();
  }
  private save(){return this.browser.storage.local.set({state:this.state});}
- private async disconnect(){this.generation++;clearTimeout(this.timer);await this.headers.clear();delete this.state.auth;delete this.state.pair;delete this.state.claim;delete this.state.pendingResult;this.state.markets=[];this.state.message='Sessão encerrada. Entre novamente.';await this.save();}
+ private async disconnect(){this.generation++;clearTimeout(this.timer);await this.headers.clear();delete this.state.auth;delete this.state.pair;delete this.state.claim;delete this.state.pendingResult;delete this.state.run;delete this.state.nextAt;this.state.markets=[];this.state.message='Sessão encerrada. Entre novamente.';await this.save();}
  private async request(path:string,body?:unknown,token?:string){
   const response=await fetch(this.state.backendUrl+'/api/extension'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Espertinho-Extension-Id':this.browser.runtime.id,...(token?{Authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body),credentials:'omit',redirect:'error',signal:AbortSignal.timeout(20000)});
   let data:any;try{data=await response.json();}catch{throw Error('Resposta inválida do backend.');}return {response,data};
@@ -52,8 +52,10 @@ export class CatalogRuntime {
   this.state.auth=data;delete this.state.pair;this.state.message='Conta conectada.';await this.refresh();
  }
  private async prepare(market:CatalogMarket){
-  const recipe=market.config.recipe;if(!recipe)throw Error('Cadastre uma receita de conversão no admin.');validateRecipe(recipe);
-  const tabId=await this.navigation.ensure(recipe.loginUrl,market.allowedOrigins);await this.navigation.wait(market.allowedOrigins,market.config.timeoutMs);await this.headers.arm(recipe,tabId);await this.navigation.focus();
+  const recipe=market.config.recipe;if(recipe)validateRecipe(recipe);
+  if(this.state.run&&!['completed','failed','cancelled'].includes(this.state.run.status)&&this.state.run.marketplace_id!==market.id)throw Error('Prepare o marketplace da execução atual.');
+  if(this.state.tabId){try{await this.browser.tabs.get(this.state.tabId);}catch{delete this.state.tabId;delete this.state.windowId;await this.save();}}
+  const tabId=await this.navigation.ensure(recipe?.loginUrl??market.website_url,market.allowedOrigins);await this.navigation.wait(market.allowedOrigins,market.config.timeoutMs);if(recipe)await this.headers.arm(recipe,tabId);else await this.headers.clear();await this.navigation.focus();
   this.state.message='Faça login se necessário. Se a receita usa header de requisição, gere um link manualmente nesta janela para prepará-lo.';await this.save();
  }
  async handle(command:{type:string;marketplaceId?:string;step?:CatalogStep;url?:string;limit?:number;retryFailed?:boolean;runId?:string;page?:number;pageSize?:number}){
@@ -70,7 +72,7 @@ export class CatalogRuntime {
     const market=this.market(command.marketplaceId);if(market.catalog_executor!=='extension')throw Error('Ative o executor da extensão no admin.');
     this.state.marketplaceId=market.id;
     if(command.step==='convert'){if(!market.config.recipe)throw Error('Cadastre a receita de conversão.');await this.headers.values(market.config.recipe);}
-    this.state.run=await this.api('/catalog/runs',{marketplaceId:market.id,step:command.step,requestKey:crypto.randomUUID(),limit:command.limit??100,retryFailed:command.retryFailed??false});delete this.state.claim;delete this.state.pendingResult;await this.save();void this.pump();break;
+    this.state.run=await this.api('/catalog/runs',{marketplaceId:market.id,step:command.step,requestKey:crypto.randomUUID(),limit:command.limit??100,retryFailed:command.retryFailed??false});delete this.state.claim;delete this.state.pendingResult;delete this.state.nextAt;await this.save();void this.pump();break;
    }
    case 'ATTACH':{
     const run=await this.api<CatalogRun>('/catalog/runs/'+command.runId);if(this.state.run&&this.state.run.id!==run.id&&!['completed','cancelled','failed'].includes(this.state.run.status))throw Error('Já existe uma execução local.');this.state.run=run;await this.save();break;

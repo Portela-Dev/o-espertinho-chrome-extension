@@ -43,7 +43,6 @@ export interface Recipe {
 }
 export interface Configuration {
   version: 1;
-  mock: boolean;
   marketplaces: Recipe[];
 }
 export interface Item {
@@ -70,38 +69,6 @@ export interface Progress {
   message: string;
   currentTitle?: string;
 }
-export interface State {
-  affiliateConfig?:Configuration;
-  affiliateHeaderReady?:boolean;
-  affiliateProof?:{id:string;recipe:Recipe;expiresAt:number;items:Item[];results:Result[];status:'running'|'paused'|'converted'|'enriching'|'complete';message:string;nextAt?:number;run?:{id:string;status:string;total:number;error?:string};runItems?:{link_id:string;status:string;error?:string}[]};
-  proofMarkets?:import('./session-proof.js').ProofMarket[];
-  proofTest?:import('./session-proof.js').ProofTest;
-  backendUrl: string;
-  auth?: Auth;
-  pair?: {
-    deviceCode: string;
-    verifier: string;
-    expiresAt: number;
-    verificationUrl: string;
-    nextAt: number;
-  };
-  config?: Configuration;
-  marketplaceId?: string;
-  batch?: Batch;
-  tabId?: number;
-  nextAt?: number;
-  progress: Progress;
-  queue?: {
-    items: {
-      id: string;
-      title: string;
-      state: string;
-      affiliateUrl?: string;
-      error?: string;
-    }[];
-  };
-}
-
 export function backendOrigin(value: string): string {
   const u = new URL(value);
   if (

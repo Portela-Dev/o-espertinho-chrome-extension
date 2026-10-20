@@ -1,115 +1,50 @@
-# O Espertinho — Chrome Extension
+# O Espertinho — extensão Chrome
 
-A prova [Conversão antes do enriquecimento](docs/AFFILIATE_PROOF.md) permite gerar até três links usando a sessão local do marketplace e solicitar o job sem exportar cookies ou headers ao backend. A configuração e a fila demonstrativas abaixo continuam disponíveis separadamente.
+Extensão Manifest V3/TypeScript para quatro etapas manuais de manutenção do catálogo, usando receitas e seletores do backend, sem implementação fixa por marketplace.
 
-Extensão Chrome Manifest V3 em TypeScript, com autenticação real no O Espertinho e executor genérico de conversão orientado por configuração. A versão 0.2.0 usa filas e receitas mockadas do backend para testar o fluxo completo. Não possui implementação específica para Amazon, Mercado Livre ou qualquer outra loja.
+## Instalar e conectar
 
-## Testar localmente
+Node 24 e Chrome 120+. Execute `npm ci` e `npm run package`. Carregue dist em chrome://extensions ou extraia o ZIP de artifacts em pasta permanente e carregue a pasta com manifest.json. Após atualizar, recarregue a extensão. O pipeline gera ZIP, checksum e instruções, sem deploy/Web Store.
 
-Ao clicar no ícone, a extensão abre por padrão no **painel lateral**, que permanece aberto enquanto você navega e seleciona elementos da página. Use o switch **Popup / Painel lateral** para alternar: a mudança é aplicada imediatamente. Ao escolher popup, clique no ícone para abri-lo. A preferência é salva neste perfil do Chrome e restaurada quando o navegador reinicia. Login, filas e progresso continuam compartilhados entre as duas visualizações. A largura do painel pode ser ajustada arrastando sua borda no Chrome.
+BACKEND_URL no .env ou variable do build define a origem da API (padrão http://localhost:3000). A conexão pode ser alterada na interface após sair. Não coloque segredos no .env da extensão. Produção usa HTTPS. Nenhuma credencial de marketplace é embutida no pacote.
 
-Requisito: Node.js 24 e Chrome. O backend precisa estar na branch que implementa `/api/extension`, com a migration `019_extension_access.sql` aplicada.
+O ícone abre o painel lateral por padrão. O switch Popup / Painel lateral aplica e salva a preferência; o painel permanece aberto enquanto você usa a página. O seletor visual e sua composição continuam disponíveis, com edição e contagem de matches. Pause a coleta antes de inspecionar uma página.
 
-No backend (`1-backend`):
+Entre no O Espertinho e aprove no site com a conta Google autorizada. A extensão exige affiliate_links e, por etapa, discovery, catalog ou updates. Requisições são autorizadas novamente pelo backend. Sessões revogadas/expiradas interrompem o fluxo.
 
-```powershell
-npm run db:migrate
-npm run dev
-```
+## Quatro etapas
 
-Use o frontend normalmente para entrar com Google. O login existente continua validando a identidade no backend. Abra o site com `localhost`, assim como a URL do backend, para que a aba de autorização compartilhe o cookie; misturar `127.0.0.1` e `localhost` não compartilha a sessão.
+1. **Extrair links:** carrega vitrines/perfis habilitados e percorre a paginação configurada. Envia URLs e origem, não dados incompletos de cards.
+2. **Gerar links de afiliados:** processa candidatos ainda sem conversão usando a receita cadastrada. Categoria/produto ainda não são necessários. A URL original é preservada separadamente.
+3. **Extrair informações:** navega nos links convertidos e aplica seletores de produto; grava categorias de origem e dados para revisão, sem confirmar mapeamentos ou publicar.
+4. **Atualizar preços:** atualiza ofertas publicadas e seu histórico diário. Falha técnica mantém o último preço e a oferta.
 
-Na extensão:
+No admin, confirme categoria, atribua/crie produto e publique explicitamente. Cada botão inicia só sua própria etapa. Limite de itens e inclusão de falhas ficam na interface. Novas configurações valem para execuções novas.
 
-```powershell
-npm ci
-Copy-Item .env.example .env  # Somente se ainda não existir .env
-npm run check
-npm run package
-```
+## Janela, bloqueios e retomada
 
-O `.env` contém `BACKEND_URL=http://localhost:3000`. O build incorpora o endereço como padrão; não incorpora credenciais. O valor também pode ser alterado nas configurações da extensão, depois de sair da conta. URLs de produção devem usar HTTPS; HTTP é permitido somente em localhost/127.0.0.1.
+Preparar janela / fazer login abre uma janela de processamento própria. Ela não substitui a aba que você está usando. Faça login ali quando necessário. Se a receita usa requestHeader, gere um link manualmente nessa janela: somente o header X- da chamada, aba e origem configuradas fica em storage.session confiável, com prazo de 15 minutos e limpeza ao sair. Ele nunca integra resultados enviados ao backend.
 
-1. Abra `chrome://extensions`, ative **Modo do desenvolvedor** e carregue `dist` em **Carregar sem compactação**. Se já instalou o boilerplate, recarregue a extensão e confirme as novas permissões.
-2. Abra a extensão e clique em **Entrar no O Espertinho**.
-3. Na aba aberta, entre no site com Google se necessário, clique em **Verificar login novamente** e depois em **Autorizar extensão**. Somente perfis com a permissão **Gerar links de afiliados pela extensão** podem autorizar. A migration concede essa permissão ao perfil Administrador; outros perfis podem recebê-la na gestão de perfis já existente.
-4. Volte ao popup. A conexão pode levar até 30 segundos se o popup esteve fechado.
-5. Escolha **Loja demonstrativa** e clique em **Gerar links pendentes**. A extensão abre uma aba local e processa cinco itens em lotes de dois.
-6. Confira progresso e resultados; teste **Pausar**, **Continuar geração**, **Reiniciar demonstração** e **Sair**.
+Login, CAPTCHA, acesso negado ou limite são detectados por regras de URL, seletores ou texto e pausam o processamento. Resolva manualmente na mesma janela e clique Continuar; a extensão verifica novamente. Não há resolução automática de desafios ou troca de identidade para evitar bloqueio.
 
-O teste não cadastra ofertas ou produtos e não gera comissões reais. Nenhum cookie de marketplace é enviado ao backend.
+Painel pode ser fechado sem perder progresso. Use Carregar execuções para retomar uma execução própria ou prévia solicitada no admin; a lista tem paginação e tamanho selecionável. Pausar/cancelar é explícito. Reservas e respostas pendentes são persistidas; resultados repetidos são idempotentes no backend. Uma retomada invalida reservas antigas e reextrai o item ainda não confirmado.
 
-## Sessão e permissões
+O computador e o Chrome precisam estar disponíveis. Suspensão, abas congeladas/descartadas, perda de rede ou janela fechada podem pausar a execução. Não existe garantia de processamento com janela minimizada. Iframes configurados não são suportados nesta versão e causam falha controlada; documento principal, links de próximo, templates de URL, carregar mais e rolagem usam configurações limitadas.
 
-A extensão inicia um pareamento de cinco minutos com desafio SHA-256 e verificador secreto local. A aprovação usa a sessão Google existente do site e sua proteção XSRF. O segredo de verificação não aparece na URL da aba. O backend entrega um token opaco de acesso de 15 minutos e refresh token de até sete dias, com rotação. A sessão também depende da validade da sessão do site.
+## Segurança e limites
 
-Os tokens da extensão ficam no armazenamento local do perfil Chrome, restrito aos contextos confiáveis da extensão, sem sincronização. Somente hashes são persistidos pelo backend. A permissão `affiliate_links` é verificada a cada chamada; bloquear o usuário, remover a permissão ou sair do site impede o acesso. Sair da extensão revoga sua sessão e interrompe o processamento local.
+Cookies, Authorization, tokens CSRF e storage do marketplace não são enviados ao backend. Sessão é enviada apenas pelo próprio navegador à origem do marketplace. Há permissão obrigatória apenas para o host da API e permissões opcionais por domínio de navegação. A antiga permissão cookies e as POCs de exportação de sessão foram removidas do pacote.
 
-O backend deve responder em `EXTENSION_BACKEND_URL=http://localhost:3000`. `EXTENSION_MOCK_ENABLED=true` habilita as rotas fora de produção; em produção elas sempre ficam desativadas nesta implementação.
+Receitas suportam extract, request GET/POST na mesma origem, fill e click, com variáveis locais e responsePath. Headers reservados são recusados. Não há eval, scripts remotos ou código por loja. Receitas complexas não suportadas devem permanecer pendentes, sem fallback específico.
 
-## Executor declarativo
+## Testar e empacotar
 
-O backend entrega `/api/extension/config`, com versão do contrato, indicação de mock e lista de marketplaces. Cada receita define:
+- `npm run check`: TypeScript, HTML, testes e cobertura.
+- `npm run test:native`: quatro passos em Chromium real, com páginas HTTPS e API descartáveis. Requer Chromium do Playwright e OpenSSL; `npx --no-install playwright install chromium` prepara o navegador.
+- `npm run package`: build de produção sem source maps e ZIP instalável com checksum.
 
-- `id`, `name`, `loginUrl` e `allowedOrigins`.
-- `affiliateOrigins`: origens aceitas nos links retornados.
-- `batchSize` e `intervalMs` (100 a 60.000 ms).
-- `steps`: operações suportadas pelo executor.
+Playwright é dependência somente de testes e não entra no ZIP. O teste nativo usa perfil temporário, certificado descartável e flags exclusivamente de teste; não acessa perfil pessoal, banco ou sessões reais. A API de fixture não substitui os testes SQL do backend. O CI instala Chromium e executa esse teste além dos unitários.
 
-Operações disponíveis:
+SonarQube permanece no runner Windows windows-portela-dev; validação/pacote ficam em ubuntu-latest. Projeto Sonar: o-espertinho-chrome-extension. Configurações: SONAR_ENABLED, SONAR_HOST_URL e SONAR_TOKEN. Nenhum deploy acontece em PR.
 
-- `extract`: ler texto/atributo de um seletor DOM, uma chave de localStorage/sessionStorage ou um cookie acessível a JavaScript.
-- `fill` e `click`: preencher um campo e acionar um elemento.
-- `request`: chamada GET/POST na mesma origem da aba, com sessão do navegador, headers configuráveis, corpo JSON/form e extração do resultado por caminho JSON, como `data.shortUrl`.
-
-Templates aceitam `{{originalUrl}}`, variáveis extraídas como `{{csrf}}` e codificação `{{originalUrl|urlencode}}`. As variáveis da sessão são usadas somente no mundo isolado da aba e somente o link final ou um erro genérico retorna ao worker. Cookies HttpOnly são enviados pelo navegador quando aplicável; não são lidos nem exportados pela extensão.
-
-Não há eval, JavaScript remoto, plugins por marketplace ou manipulação de headers reservados como Cookie/Origin/Host. As requisições de conversão não seguem redirecionamentos e não enviam os valores extraídos a outra origem. Se um fluxo exigir operações não suportadas, ele deve permanecer pendente para uma evolução futura; não existe uma implementação alternativa específica para aquela loja.
-
-Domínios HTTPS dos marketplaces são permissões opcionais, solicitadas ao clicar em abrir/gerar. O build concede acesso inicial somente ao host do backend. Nenhum token do O Espertinho é passado à receita ou à aba do marketplace.
-
-## Lotes e retomada
-
-O processamento acontece no service worker, continua com o popup fechado e usa um alarme para recuperar o estado após suspensão. Configuração, progresso, reserva e resultados ainda não enviados são salvos localmente. Há uma única execução por instância da extensão.
-
-O mock reserva até dois itens por 120 segundos, vincula a reserva à sessão da extensão e aceita reenvio idempotente dos mesmos resultados. Uma falha de rede pausa sem apagar o lote local. A ausência de sessão do marketplace também pausa e abre sua aba para intervenção. Reservas expiradas são buscadas novamente. Intervalos longos e suspensão do Chrome podem atrasar a retomada; o alarme tem período de 30 segundos.
-
-A fila mockada fica em memória no backend, separada por usuário. Reiniciar o backend recria a demonstração; as sessões da extensão são persistidas no PostgreSQL. A fila real, a gestão das receitas no admin e a publicação são etapas futuras do backend.
-
-## Pacote e pipeline
-
-`npm run package` gera em `artifacts` o ZIP `o-espertinho-chrome-extension-0.2.0.zip`, `SHA256SUMS` e `INSTALAR.txt`. Para instalar o ZIP, extraia-o em uma pasta permanente e carregue a pasta que contém `manifest.json` em `chrome://extensions`.
-
-O workflow **CI e pacote da extensão** valida TypeScript, HTML, testes e dependências, e disponibiliza o pacote por 30 dias. Build roda em `ubuntu-latest`, sem deploy. A variable opcional `BACKEND_URL` do GitHub define o padrão do pacote; sem ela, usa `http://localhost:3000`.
-
-SonarQube usa somente o runner `[self-hosted, Windows, X64, windows-portela-dev]` em develop, quando `SONAR_ENABLED=true`. Precisa do projeto `o-espertinho-chrome-extension`, secret `SONAR_TOKEN` com permissão de análise e variable `SONAR_HOST_URL`. A análise aguarda o Quality Gate. Pull requests não executam código no runner próprio.
-
-O teste de pacote verifica ZIP, recursos, permissões e checksum. Os testes do executor verificam uso local dos valores de sessão, bloqueio de outra origem, login pendente e respostas inválidas. A validação integrada em Chromium foi feita com o backend real e banco descartável; a identidade Google é substituída somente na configuração de teste, sem bypass de login no runtime.
-
-## Seletor visual de elementos
-
-Abra uma página HTTP/HTTPS, abra a extensão e clique em **Selecionar elementos na aba atual**. A ferramenta usa `activeTab`: o acesso é temporário à aba em que você a ativou, sem uma permissão permanente para todos os sites. A inspeção é local, independente do login e não envia HTML, cookies ou seletores ao backend. Pause a geração de links antes de iniciar a inspeção.
-
-- Passe o mouse e clique para fixar um alvo. Escolha um ancestral pela trilha, use **↑ Pai / ↓ Filho**, ou as teclas ↑ e ↓. O caminho de volta ao filho inspecionado é lembrado.
-- Use **Adicionar à seleção** ou Enter para confirmar. **Voltar a apontar** libera o mouse para escolher outro exemplo. Há suporte a até 20 exemplos, remoção individual e limpeza da seleção.
-- Em **Padrão**, os candidatos incluem os exemplos e podem encontrar outros elementos semelhantes; a contagem mostra quantos resultados adicionais existem. Em **Exato**, a expressão deve encontrar somente os exemplos selecionados. Quando não há um padrão simples, ela pode ser uma lista de seletores separados por vírgula. Caminhos posicionais são identificados como mais frágeis.
-- **Usar como escopo** limita as consultas ao elemento atual, útil para obter seletores relativos a um card. A seleção é limpa ao trocar o escopo. **Escopo: documento** retorna ao documento principal. Copie e use o seletor relativo com o mesmo escopo no extrator.
-- A prévia marca exemplos em verde, resultados em azul e alvo em laranja. Todos os matches podem ser inspecionados na lista paginada (25 por página). Os contornos são desenhados nos elementos visíveis e atualizados com a rolagem. O painel pode ser movido para o outro lado.
-- **Copiar seletor** copia o CSS. Se a área de transferência for negada, o campo é selecionado para cópia manual com Ctrl+C. Seletores acima de 600 caracteres recebem um aviso por excederem o limite atual dos cadastros.
-- Esc ou **Fechar** remove o painel, destaques e interceptação de cliques/teclas. Ativar novamente substitui a instância anterior. Mudanças no DOM atualizam a seleção e removem referências a elementos que desapareceram.
-
-Esta versão inspeciona somente o documento principal, sem atravessar iframes ou árvores shadow. Páginas internas do navegador, a loja de extensões e documentos protegidos podem impedir a injeção. Os candidatos são validados no DOM atual; não há garantia de estabilidade após mudanças de layout/estado do site. A ferramenta prefere identificadores/atributos/classes com aparência estável e evita classes aparentemente geradas e estados transitórios, mas a revisão visual continua necessária. Não há gravação automática nos perfis do Espertinho nesta entrega.
-
-
-### Edição ao vivo e composição de seletores
-
-O campo **Seletor CSS** é editável: cada alteração recalcula os matches e os destaques. CSS inválido é sinalizado e desabilita a cópia; uma expressão válida sem resultados mostra zero matches. A edição manual é preservada quando o DOM muda ou os exemplos selecionados são atualizados. Escolher uma sugestão na lista substitui o editor pela sugestão.
-
-Para compor, encontre o seletor do card, clique em **Usar seletor como pai** e selecione ou digite o filho, por exemplo a[href]. Os campos **Seletor pai** e **Seletor filho** são editáveis, com escolha entre descendente e filho direto. O resultado combinado também pode ser editado independentemente. As sugestões de filho são validadas com o pai, evitando candidatos que só funcionariam fora do contêiner. Há botões separados para copiar pai, filho e resultado.
-
-Listas de CSS separadas por vírgula são combinadas sem confundir vírgulas em atributos, funções ou escapes. O início :scope no filho referencia o pai guardado; :scope sozinho seleciona o próprio pai. A composição admite até 100 combinações. Expressões acima dos 600 caracteres aceitos no cadastro continuam sinalizadas. Não há gravação automática no backend.
-
-A lista **Elementos encontrados** permite visitar todos os matches, 25 por página. Clicar em um deles rola até ele e o torna o alvo atual para inspeção; a seleção de exemplos só muda se o usuário confirmar.
-# Prova de sessão autenticada
-
-A extensão inclui uma prova local, explícita e restrita a administradores para testar um link no container com cookies da loja. A configuração vem do backend e a captura não é persistida. Consulte [o procedimento e os limites](docs/SESSION_PROOF.md).
+Documentos em docs/SESSION_PROOF.md e docs/AFFILIATE_PROOF.md são registros históricos de provas encerradas, sem rotas/telas no runtime atual. O plano principal e os aceites operacionais ficam no workspace e em 1-backend/docs.

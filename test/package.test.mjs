@@ -30,7 +30,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
   assert.deepEqual(manifest.permissions, ["storage", "alarms", "scripting", "activeTab", "webRequest", "sidePanel"]);
   assert.equal(manifest.action.default_popup, undefined);
   assert.equal(manifest.side_panel.default_path, "popup.html?view=panel");
-  assert.deepEqual(manifest.optional_permissions,['cookies']);
+  assert.equal(manifest.optional_permissions,undefined);
   assert.equal(manifest.host_permissions.length, 1);
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
   assert.equal(manifest.content_scripts?.length ?? 0, 0);
@@ -51,7 +51,8 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
     "config.js",
     "contracts.js",
     "executor.js",
-    "session-proof.js",
+    "catalog-runtime.js",
+    "catalog-product.js",
     "selector-picker.js",
     "picker-launcher.js",
     ...Object.values(manifest.icons),
