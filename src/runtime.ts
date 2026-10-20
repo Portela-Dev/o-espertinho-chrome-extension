@@ -18,6 +18,7 @@ export interface Command {
   marketplaceId?: string;
   consent?:boolean;
   includeStorage?:boolean;
+  batchFailed?:boolean;
 }
 interface Claim {
   leaseId: string;
@@ -539,11 +540,11 @@ export class ExtensionRuntime {
     if(!message.consent)throw new Error('Confirme o envio temporário da sessão para este teste.');
     if(!this.state.auth)throw new Error('Conecte sua conta administradora.');
     if(this.proofCapturing||this.state.proofTest?.status==='running'||this.state.progress.status==='running')throw new Error('Aguarde o processamento em andamento.');
-    const market=this.proofMarket(message.marketplaceId),url=new URL(message.url??'');
-    if(url.protocol!=='https:'||url.username||url.password||!market.allowedOrigins.includes(url.origin))throw new Error('Use um link HTTPS dos domínios cadastrados.');
+    const market=this.proofMarket(message.marketplaceId),url=message.batchFailed?undefined:new URL(message.url??'');
+    if(url&&(url.protocol!=='https:'||url.username||url.password||!market.allowedOrigins.includes(url.origin)))throw new Error('Use um link HTTPS dos domínios cadastrados.');
     if(!await this.browser.permissions.contains({permissions:['cookies'],origins:market.allowedOrigins.map(o=>o+'/*')}))throw new Error('Autorize cookies e os domínios do marketplace.');
     const generation=this.generation;this.proofCapturing=true;
-    try{const {session}=await captureSession(this.browser,market,!!message.includeStorage);this.checkGeneration(generation);this.state.proofTest=await this.api<ProofTest>('/session-proof/tests',{marketplaceId:market.id,url:url.href,consent:true,session});this.checkGeneration(generation);await this.save();}
+    try{const {session}=await captureSession(this.browser,market,!!message.includeStorage);this.checkGeneration(generation);this.state.proofTest=await this.api<ProofTest>('/session-proof/tests',{marketplaceId:market.id,...(url?{url:url.href}:{}),batchFailed:!!message.batchFailed,consent:true,session});this.checkGeneration(generation);await this.save();}
     finally{this.proofCapturing=false;}
   }
   private async pollProof(){

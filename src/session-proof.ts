@@ -1,5 +1,6 @@
 export interface ProofMarket {id:string;name:string;loginUrl:string;allowedOrigins:string[];cookieDomains:string[];testUrl:string}
-export interface ProofTest {id:string;status:'running'|'completed'|'failed';expiresAt:number;error?:string;result?:{status:string;reason?:string;title:string|null;priceCents:number|null;finalUrl:string;navigationStatuses:number[];missing:string[];cookiesImported:number;storageOriginsImported:number}}
+export interface ProofResult {status:string;reason?:string;title:string|null;priceCents:number|null;finalUrl:string;navigationStatuses:number[];missing:string[];cookiesImported:number;storageOriginsImported:number}
+export interface ProofTest {id:string;status:'running'|'completed'|'failed';expiresAt:number;error?:string;result?:ProofResult;batch?:{total:number;completed:number;intervalMs:number;items:{url:string;discoveryLinkId?:string;result?:ProofResult;error?:string}[]}}
 export async function captureSession(browser:typeof chrome,market:ProofMarket,includeStorage:boolean){
  const tabs=await browser.tabs.query({active:true,currentWindow:true}),tab=tabs[0];
  if(!tab?.id||!tab.url||tab.incognito||!market.allowedOrigins.includes(new URL(tab.url).origin))throw new Error('Abra o marketplace selecionado numa aba normal, faça login e volte à extensão.');

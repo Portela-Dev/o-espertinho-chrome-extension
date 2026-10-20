@@ -87,6 +87,7 @@ element("settings").addEventListener("submit", (event) => {
 });
 element('pick-elements').addEventListener('click',()=>{void act(async()=>{await launchSelectorPicker();window.close();});});
 const proofMarket=()=>view?.proofMarkets?.find(m=>m.id===element<HTMLSelectElement>('proof-marketplace').value);
+element('proof-batch').addEventListener('change',render);
 element('proof-load').addEventListener('click',()=>{void act(()=>send('PROOF_MARKETS'));});
 element('proof-marketplace').addEventListener('change',()=>{element<HTMLInputElement>('proof-url').value=proofMarket()?.testUrl||'';element<HTMLInputElement>('proof-consent').checked=false;render();});
 element('proof-open').addEventListener('click',()=>{void act(async()=>{const market=proofMarket();if(!market)throw new Error('Escolha um marketplace.');await grantOrigins(market.allowedOrigins);await send('PROOF_OPEN',{marketplaceId:market.id});});});
@@ -94,7 +95,7 @@ element('proof-capture').addEventListener('click',()=>{void act(async()=>{
  const market=proofMarket();if(!market)throw new Error('Escolha um marketplace.');
  if(!element<HTMLInputElement>('proof-consent').checked)throw new Error('Confirme o envio temporário da sessão para este teste.');
  if(!await chrome.permissions.request({permissions:['cookies'],origins:market.allowedOrigins.map(o=>o+'/*')}))throw new Error('Permissão de cookies e domínios não concedida.');
- await send('PROOF_CAPTURE',{marketplaceId:market.id,url:element<HTMLInputElement>('proof-url').value,consent:true,includeStorage:element<HTMLInputElement>('proof-storage').checked});
+ await send('PROOF_CAPTURE',{marketplaceId:market.id,url:element<HTMLInputElement>('proof-url').value,batchFailed:element<HTMLInputElement>('proof-batch').checked,consent:true,includeStorage:element<HTMLInputElement>('proof-storage').checked});
  element<HTMLInputElement>('proof-consent').checked=false;
 });});
 await act(() => send("STATE"));

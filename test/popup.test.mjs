@@ -27,6 +27,12 @@ const initial = () => ({
 });
 const el = (id) => document.getElementById(id);
 
+test('batch proof renders progress, prices and safe per-link errors',()=>{
+ const view=initial();view.user=account;
+ view.proofTest={id:'batch',status:'running',expiresAt:Date.now()+900000,batch:{total:5,completed:2,intervalMs:20000,items:[{url:'https://shop.test/one',result:{status:'available',title:'<script>unsafe</script>',priceCents:74999,missing:[],finalUrl:'https://shop.test/one',navigationStatuses:[200],cookiesImported:42,storageOriginsImported:0}},{url:'https://shop.test/two',error:'Falha técnica'}]}};
+ renderView(view,false);assert.match(el('proof-result').textContent,/2\/5/);assert.match(el('proof-result').textContent,/749,99/);assert.match(el('proof-result').textContent,/Falha técnica/);assert.equal(el('proof-result').querySelector('script'),null);assert.equal(el('proof-capture').disabled,true);
+});
+
 test("popup renderiza login, pareamento, progresso e resultados sem executar HTML", () => {
   const view = initial();
   renderView(view, false);
