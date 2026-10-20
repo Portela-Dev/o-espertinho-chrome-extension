@@ -21,6 +21,8 @@ test("eventos do Chrome aceitam somente paginas internas e encaminham erros", as
   );
   assert.equal((await call({ type: "STATE" }, valid)).value.version, "0.2.0");
   assert.ok((await call({ type: "UNKNOWN" }, valid)).error);
+  assert.equal((await call({ type: "DISPLAY_MODE", mode: "popup" }, valid)).error, undefined);
+  assert.match((await call({ type: "DISPLAY_MODE", mode: "invalid" }, valid)).error, /inválida/);
   f.listeners.installed();
   f.listeners.startup();
   f.listeners.alarm({ name: "other" });

@@ -27,6 +27,12 @@ const initial = () => ({
 });
 const el = (id) => document.getElementById(id);
 
+test('batch proof renders progress, prices and safe per-link errors',()=>{
+ const view=initial();view.user=account;
+ view.proofTest={id:'batch',status:'running',expiresAt:Date.now()+900000,batch:{total:5,completed:2,intervalMs:20000,items:[{url:'https://shop.test/one',result:{status:'available',title:'<script>unsafe</script>',priceCents:74999,missing:[],finalUrl:'https://shop.test/one',navigationStatuses:[200],cookiesImported:42,storageOriginsImported:0}},{url:'https://shop.test/two',error:'Falha técnica'}]}};
+ renderView(view,false);assert.match(el('proof-result').textContent,/2\/5/);assert.match(el('proof-result').textContent,/749,99/);assert.match(el('proof-result').textContent,/Falha técnica/);assert.match(el('proof-result').textContent,/URL final: https:\/\/shop.test\/one/);assert.match(el('proof-result').textContent,/Campos ausentes: nenhum/);assert.equal(el('proof-result').querySelector('script'),null);assert.equal(el('proof-capture').disabled,true);
+});
+
 test("popup renderiza login, pareamento, progresso e resultados sem executar HTML", () => {
   const view = initial();
   renderView(view, false);
@@ -155,6 +161,14 @@ test("eventos da interface enviam comandos e apresentam erros da API", async () 
     window.close=()=>{closed++;};
     el('pick-elements').click();await tick();assert.equal(injections,1);assert.equal(closed,1);
     chrome.tabs.query=async()=>[{id:12,url:'chrome://extensions'}];el('pick-elements').click();await tick();assert.equal(el('error').hidden,false);
+    let panelWindow;
+    chrome.windows = { getCurrent: async () => ({ id: 42 }) };
+    chrome.sidePanel = { setOptions: async () => {}, open: async options => { panelWindow = options.windowId; } };
+    el('display-mode').checked = true;
+    el('display-mode').dispatchEvent(new window.Event('change'));await tick();
+    assert.equal(panelWindow, 42);
+    assert.ok(messages.some(message => message.type === 'DISPLAY_MODE' && message.mode === 'panel'));
+    assert.equal(closed, 2);
     await tick();
   } finally {
     globalThis.setInterval = originalInterval;

@@ -10,6 +10,7 @@ export interface ExecutionResult {
 export async function executeRecipe(
   recipe: Recipe,
   item: Item,
+  localVariables:Record<string,string>={},
 ): Promise<ExecutionResult> {
   // Capture the page document inside the function serialized into the isolated tab.
   const pageDocument = document;
@@ -44,6 +45,7 @@ export async function executeRecipe(
   }
   function readValue(step: Extract<Step, { type: "extract" }>) {
     switch (step.source) {
+      case 'requestHeader':return localVariables[step.name];
       case "localStorage":
         return localStorage.getItem(step.key ?? "");
       case "sessionStorage":

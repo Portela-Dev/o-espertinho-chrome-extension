@@ -14,10 +14,11 @@ export type Step =
   | {
       type: "extract";
       name: string;
-      source: "dom" | "localStorage" | "sessionStorage" | "cookie";
+      source: "dom" | "localStorage" | "sessionStorage" | "cookie" | "requestHeader";
       selector?: string;
       attribute?: string;
       key?: string;
+      sourceUrl?:string;
     }
   | {
       type: "request";
@@ -70,6 +71,11 @@ export interface Progress {
   currentTitle?: string;
 }
 export interface State {
+  affiliateConfig?:Configuration;
+  affiliateHeaderReady?:boolean;
+  affiliateProof?:{id:string;recipe:Recipe;expiresAt:number;items:Item[];results:Result[];status:'running'|'paused'|'converted'|'enriching'|'complete';message:string;nextAt?:number;run?:{id:string;status:string;total:number;error?:string};runItems?:{link_id:string;status:string;error?:string}[]};
+  proofMarkets?:import('./session-proof.js').ProofMarket[];
+  proofTest?:import('./session-proof.js').ProofTest;
   backendUrl: string;
   auth?: Auth;
   pair?: {
@@ -209,7 +215,7 @@ function validateExtract(step: Extract<Step, { type: "extract" }>) {
     ["originalUrl", "__proto__", "constructor", "prototype"].includes(
       step.name,
     ) ||
-    !["dom", "localStorage", "sessionStorage", "cookie"].includes(step.source)
+    !["dom", "localStorage", "sessionStorage", "cookie", "requestHeader"].includes(step.source)
   ) {
     throw new Error("Extração inválida.");
   }
@@ -217,6 +223,7 @@ function validateExtract(step: Extract<Step, { type: "extract" }>) {
     validateSelector(step.selector);
     return;
   }
+  if(step.source==='requestHeader'&&(!step.sourceUrl||!/^x-[\w-]+$/i.test(step.key??'')||new URL(step.sourceUrl).protocol!=='https:'))throw new Error('Origem do header inválida.');
   if (typeof step.key !== "string" || !step.key) {
     throw new Error("Chave de extração inválida.");
   }

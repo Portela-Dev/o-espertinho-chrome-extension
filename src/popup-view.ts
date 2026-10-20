@@ -1,5 +1,10 @@
-import type { Configuration, Progress, Account } from "./contracts.js";
+import type { Configuration, Progress, Account,State } from "./contracts.js";
 export interface View {
+  affiliateConfig?:Configuration;
+  affiliateProof?:State['affiliateProof'];
+  affiliateHeaderReady?:boolean;
+  proofMarkets?:import('./session-proof.js').ProofMarket[];
+  proofTest?:import('./session-proof.js').ProofTest;
   backendUrl: string;
   user?: Account;
   pairing: boolean;
@@ -113,6 +118,8 @@ function resultRow(item: NonNullable<View["queue"]>["items"][number]) {
   return row;
 }
 export function renderView(view: View, busy: boolean) {
+  renderAffiliate(view,busy);
+  renderProof(view,busy);
   const running = view.progress.status === "running";
   renderAccount(view);
   const marketplace = renderMarketplaces(view, running);
@@ -130,4 +137,41 @@ export function renderView(view: View, busy: boolean) {
   element("results").replaceChildren(
     ...(view.queue?.items ?? []).map(resultRow),
   );
+}
+function renderAffiliate(view:View,busy:boolean){
+ element('affiliate-proof').hidden=!view.user;
+ const select=element<HTMLSelectElement>('affiliate-marketplace'),markets=view.affiliateConfig?.marketplaces??[],selected=select.value;
+ if(JSON.stringify([...select.options].map(o=>o.value))!==JSON.stringify(markets.map(m=>m.id))){select.replaceChildren(...markets.map(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;return o;}));if(markets.some(m=>m.id===selected))select.value=selected;}
+ const proof=view.affiliateProof,running=proof?.status==='running'||proof?.status==='enriching';select.disabled=busy||running;
+ element<HTMLButtonElement>('affiliate-load').disabled=busy||running;
+ element<HTMLButtonElement>('affiliate-arm').disabled=busy||running||!markets.length;
+ element<HTMLButtonElement>('affiliate-start').disabled=busy||running||!markets.length;
+ element('affiliate-start').textContent=proof?.status==='paused'?'Continuar conversão':'Converter até 3 links';
+ element<HTMLButtonElement>('affiliate-enrich').disabled=busy||proof?.status!=='converted'||!proof.results.some(r=>r.affiliateUrl);
+ element<HTMLButtonElement>('affiliate-refresh').disabled=busy||!proof;
+ element<HTMLButtonElement>('affiliate-reset').disabled=busy||running||!proof;
+ element('affiliate-header').textContent=view.affiliateHeaderReady?'Header de sessão pronto na memória local.':'Prepare a aba e gere um link manualmente pelo marketplace.';
+ element('affiliate-result').textContent=proof?proof.message+'\n'+proof.results.length+'/'+proof.items.length+' conversões\n'+proof.results.map(r=>(r.affiliateUrl||r.error||'Pendente')).join('\n')+'\n'+(proof.run?'Job: '+proof.run.status+'\n':'')+(proof.runItems??[]).map(i=>i.status+(i.error?' ('+i.error+')':'')).join('\n'):'Nenhum teste iniciado.';
+}
+function renderProof(view:View,busy:boolean){
+ element('session-proof').hidden=!view.user;
+ const select=element<HTMLSelectElement>('proof-marketplace'),markets=view.proofMarkets??[],selected=select.value;
+ if(JSON.stringify([...select.options].map(o=>o.value))!==JSON.stringify(markets.map(m=>m.id))){select.replaceChildren(...markets.map(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;return o;}));if(markets.some(m=>m.id===selected))select.value=selected;}
+ const market=markets.find(m=>m.id===select.value),running=view.proofTest?.status==='running';
+ select.disabled=busy||running;
+ for(const id of ['proof-load','proof-open','proof-capture'])element<HTMLButtonElement>(id).disabled=busy||running||id!=='proof-load'&&!market;
+ element<HTMLInputElement>('proof-batch').disabled=busy||running;
+ element('proof-capture').textContent=element<HTMLInputElement>('proof-batch').checked?'Capturar sessão e testar lote':'Capturar sessão e testar';
+ element<HTMLInputElement>('proof-url').disabled=busy||running||element<HTMLInputElement>('proof-batch').checked;
+ if(market&&!element<HTMLInputElement>('proof-url').value)element<HTMLInputElement>('proof-url').value=market.testUrl;
+ element('proof-domains').textContent=market?'Domínios autorizados: '+market.cookieDomains.join(', '):'Carregue os marketplaces para começar.';
+ const test=view.proofTest;
+ if(test?.batch){
+  const batch=test.batch;
+  element('proof-result').textContent=(test.error||'Lote '+(test.status==='running'?'em andamento':'finalizado'))+': '+batch.completed+'/'+batch.total+' · intervalo '+batch.intervalMs/1000+' s\n'+batch.items.map((item,index)=>{
+   const r=item.result,price=r?.priceCents==null?'':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(r.priceCents/100);
+   return (index+1)+'. '+(item.error||r?.status||'sem resultado')+(r?.reason?' ('+r.reason+')':'')+' '+price+'\n'+(r?.title||'')+'\n'+item.url+'\nURL final: '+(r?.finalUrl||'sem resposta')+'\nCampos ausentes: '+(r?.missing.join(', ')||'nenhum')+'\nHTTP: '+(r?.navigationStatuses.join(' → ')||'sem resposta')+' · Cookies: '+(r?.cookiesImported??0);
+  }).join('\n\n');return;
+ }
+ element('proof-result').textContent=!test?'Faça login na aba do marketplace antes de capturar.':test.status==='running'?'Teste em andamento no container…':test.error||('Último teste: '+(test.result?.status??test.status)+(test.result?.reason?' ('+test.result.reason+')':'')+'\n'+(test.result?.title||'')+'\nURL final: '+(test.result?.finalUrl||'')+'\nCookies importados: '+(test.result?.cookiesImported??0)+' · HTTP: '+(test.result?.navigationStatuses.join(' → ')||'sem resposta'));
 }

@@ -53,12 +53,16 @@ export function fixture(initial = {}) {
     redirect: false,
   };
   const browser = {
+    sidePanel: { setOptions: async () => {}, setPanelBehavior: async () => {} },
+    action: { setPopup: async () => {} },
+    webRequest:{onBeforeSendHeaders:{addListener:fn=>{listeners.requestHeaders=fn;}}},
     storage: {
+      session:(()=>{let values={};return {setAccessLevel:async()=>{},get:async key=>({[key]:structuredClone(values[key])}),set:async input=>{Object.assign(values,structuredClone(input));},remove:async key=>{delete values[key];}};})(),
       local: {
         setAccessLevel: async () => {},
         get: async () => ({ state: structuredClone(saved) }),
         set: async ({ state }) => {
-          saved = structuredClone(state);
+          if (state !== undefined) saved = structuredClone(state);
         },
       },
     },

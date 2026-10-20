@@ -55,6 +55,8 @@ test("receita usa sessão somente na origem e devolve apenas o link", async () =
   assert.equal(sent[0].options.redirect, "error");
   assert.equal(JSON.stringify(result).includes("private-session-value"), false);
 });
+
+test('request header variables stay local to the same-origin conversion and only the link is returned',async()=>{const {recipe,sent}=setup();recipe.steps[0]={type:'extract',source:'requestHeader',name:'csrf',key:'x-csrf-token',sourceUrl:'https://shop.test/convert'};const result=await executeRecipe(recipe,item,{csrf:'PRIVATE-HEADER'});assert.equal(sent[0].options.headers['X-CSRF'],'PRIVATE-HEADER');assert.ok(result.affiliateUrl);assert.equal(JSON.stringify(result).includes('PRIVATE-HEADER'),false);});
 test("campos e botões usam os valores configurados e cookies/storage permanecem locais", async () => {
   const { recipe, sent } = setup();
   localStorage.setItem("local", "local-token");

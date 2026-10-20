@@ -1,5 +1,8 @@
 import { ExtensionRuntime } from "./runtime.js";
+import { restoreDisplayMode, saveDisplayMode } from "./display-mode.js";
 const runtime = new ExtensionRuntime();
+void restoreDisplayMode().catch(() => console.error("Não foi possível restaurar a visualização da extensão."));
+chrome.webRequest.onBeforeSendHeaders.addListener(details=>{void runtime.observeAffiliateHeaders(details).catch(()=>{});},{urls:['https://*/*'],types:['xmlhttprequest']},['requestHeaders']);
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (
     sender.id !== chrome.runtime.id ||
@@ -8,8 +11,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     respond({ error: "Origem não autorizada." });
     return false;
   }
-  runtime
-    .handle(message)
+  const result = message?.type === "DISPLAY_MODE"
+    ? saveDisplayMode(message.mode)
+    : runtime.handle(message);
+  result
     .then((value) => respond({ value }))
     .catch((error) =>
       respond({

@@ -22,6 +22,14 @@
           <h1>O Espertinho</h1>
         </div>
       </header>
+      <div class="display-controls">
+        <label class="display-switch">
+          <span>Popup</span>
+          <input type="checkbox" role="switch" id="display-mode" aria-label="Usar painel lateral" aria-describedby="display-hint">
+          <span>Painel lateral</span>
+        </label>
+        <p id="display-hint" class="hint">Sua preferência será usada ao clicar no ícone. O popup fecha ao interagir com a página.</p>
+      </div>
       <p id="error" class="error" role="alert" hidden></p>
       <section aria-labelledby="status-title">
         <span class="badge" id="mode">Conexão local</span>
@@ -67,6 +75,39 @@
         <button type="button" id="reset" class="secondary" hidden>
           Reiniciar demonstração
         </button>
+      </section>
+      <section id="affiliate-proof" aria-labelledby="affiliate-proof-title" hidden>
+        <h2 id="affiliate-proof-title">Conversão antes do enriquecimento</h2>
+        <p class="hint">Teste com até 3 links. Somente os links gerados vão ao backend; cookies e headers de sessão ficam no navegador.</p>
+        <button type="button" id="affiliate-load" class="secondary">Carregar receitas cadastradas</button>
+        <label for="affiliate-marketplace">Marketplace do teste</label>
+        <select id="affiliate-marketplace"></select>
+        <button type="button" id="affiliate-arm" class="secondary">Preparar aba do marketplace</button>
+        <p class="hint">Depois de preparar a aba, gere um link manualmente pelo site para observar o header configurado. Não é necessário copiar cookies ou tokens.</p>
+        <p id="affiliate-header" role="status"></p>
+        <button type="button" id="affiliate-start">Converter até 3 links</button>
+        <button type="button" id="affiliate-enrich" class="secondary">Iniciar enriquecimento dos convertidos</button>
+        <button type="button" id="affiliate-refresh" class="secondary">Atualizar resultado do teste</button>
+        <button type="button" id="affiliate-reset" class="secondary">Novo teste</button>
+        <output id="affiliate-result" aria-live="polite"></output>
+      </section>
+      <section id="session-proof" aria-labelledby="proof-title" hidden>
+        <h2 id="proof-title">Prova de sessão no container</h2>
+        <p class="hint">Somente para administrador no ambiente de teste. A sessão é enviada ao backend e descartada após o teste, sem salvar cookies no banco.</p>
+        <button type="button" id="proof-load" class="secondary">Carregar marketplaces cadastrados</button>
+        <label for="proof-marketplace">Marketplace da prova</label>
+        <select id="proof-marketplace"></select>
+        <button type="button" id="proof-open" class="secondary">Abrir marketplace</button>
+        <p class="hint">Se você já estiver logado na loja, use a sessão atual. Abra a extensão nessa aba e capture a sessão.</p>
+        <label for="proof-url">Link HTTPS para testar</label>
+        <input id="proof-url" type="url">
+        <label><input type="checkbox" id="proof-batch"> Testar até 5 links com falha no enriquecimento deste marketplace</label>
+        <p class="hint">No lote, o backend escolhe os links com falha. Os acessos são sequenciais, com pelo menos 20 segundos entre eles, sem alterar os registros de enriquecimento.</p>
+        <p id="proof-domains" class="hint"></p>
+        <label><input type="checkbox" id="proof-storage"> Incluir armazenamento local da aba (opcional)</label>
+        <label><input type="checkbox" id="proof-consent"> Autorizo enviar temporariamente os cookies destes domínios e o armazenamento selecionado para este teste.</label>
+        <button type="button" id="proof-capture">Capturar sessão e testar</button>
+        <output id="proof-result" aria-live="polite"></output>
       </section>
       <section aria-labelledby="picker-title">
         <h2 id="picker-title">Seletores da página</h2>
