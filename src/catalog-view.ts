@@ -21,10 +21,12 @@ function renderQueue(view:CatalogView,marketplaceId:string){
     const stats=view.stats?.marketplaceId===marketplaceId?view.stats:undefined;
     for(const step of ['convert','enrich','prices'] as const){
         const value=stats?.[step],button=el<HTMLButtonElement>('step-'+step);
-        button.textContent=stepLabel(step)+' · '+(value?`${value.pending} / ${value.total}`:'— / —');
-        button.title=step==='prices'?'Sem verificação bem-sucedida nas últimas 24h / ofertas publicadas com link de afiliado. A execução manual continua permitindo verificar todas as ofertas.':'Pendentes elegíveis / total de links descobertos não arquivados. Independente do limite por execução.';
+        const count=step==='prices'?stats?.prices?.pending:stats?.[step]?.completed;
+        const label={convert:'Gerados',enrich:'Extraídos',prices:'Pendentes (24h)'}[step];
+        button.textContent=stepLabel(step)+' · '+label+': '+(value&&count!==undefined?`${count} / ${value.total}`:'— / —');
+        button.title=step==='prices'?'Sem verificação bem-sucedida nas últimas 24h / ofertas publicadas com link de afiliado. A execução manual continua permitindo verificar todas as ofertas.':'Concluídos / total de links descobertos não arquivados. Falhas não contam como conclusão. Independente do limite por execução.';
     }
-    el('queue-counts').textContent='Conversão e extração: pendentes elegíveis / links não arquivados. Preços: sem verificação nas últimas 24h / ofertas publicadas.';
+    el('queue-counts').textContent='Conversão e extração: concluídos / links não arquivados. Preços: pendentes de verificação nas últimas 24h / ofertas publicadas.';
 }
 export function renderCatalog(view: CatalogView, busy: boolean) {
     el('account').textContent = view.user?.email ?? 'Conta desconectada';

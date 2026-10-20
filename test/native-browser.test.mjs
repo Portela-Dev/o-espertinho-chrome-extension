@@ -24,7 +24,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=chunks.length?JSON.parse(Buffer.concat(chunks)):undefined;
    const path=req.url.split('?')[0].replace('/api/extension','');let data={};
    if(path==='/catalog/config')data={marketplaces:[{id:'fixture',name:'Fixture',catalog_executor:'extension',website_url:marketOrigin,allowedOrigins:[marketOrigin],config:settings}]};
-   else if(path==='/catalog/stats')data={marketplaceId:'fixture',retryFailed:new URL(req.url,'http://localhost').searchParams.get('retryFailed')==='true',convert:{pending:1,total:1},enrich:{pending:1,total:1},prices:{pending:1,total:1},observedAt:new Date().toISOString()};
+   else if(path==='/catalog/stats')data={marketplaceId:'fixture',retryFailed:new URL(req.url,'http://localhost').searchParams.get('retryFailed')==='true',convert:{pending:0,completed:1,total:1},enrich:{pending:0,completed:1,total:1},prices:{pending:1,total:1},observedAt:new Date().toISOString()};
    else if(path==='/catalog/runs'&&req.method==='POST'){
     run={id:crypto.randomUUID(),marketplace_id:'fixture',step:body.step,status:'queued',total:1,completed:0,failed:0,snapshot};
     item={id:crypto.randomUUID(),lease_token:crypto.randomUUID(),payload:{url:body.step==='discover'?marketOrigin+'/list':marketOrigin+'/product',originalUrl:marketOrigin+'/product',config:discovery}};data=run;
@@ -95,9 +95,9 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   const panel=await context.newPage();await panel.setViewportSize({width:400,height:1000});
   await panel.goto(new URL('popup.html?view=panel',worker.url()).href);
   await panel.locator('#run-status').filter({hasText:'4 — Atualizar preços'}).waitFor();
-  assert.equal(await panel.locator('#step-convert').textContent(),'2 — Gerar links de afiliados · 1 / 1');
-  assert.equal(await panel.locator('#step-enrich').textContent(),'3 — Extrair informações dos produtos · 1 / 1');
-  assert.equal(await panel.locator('#step-prices').textContent(),'4 — Atualizar preços · 1 / 1');
+  assert.equal(await panel.locator('#step-convert').textContent(),'2 — Gerar links de afiliados · Gerados: 1 / 1');
+  assert.equal(await panel.locator('#step-enrich').textContent(),'3 — Extrair informações dos produtos · Extraídos: 1 / 1');
+  assert.equal(await panel.locator('#step-prices').textContent(),'4 — Atualizar preços · Pendentes (24h): 1 / 1');
   assert.equal(await panel.locator('#display-mode').getAttribute('aria-label'),'Usar popup');
   assert.equal(await panel.locator('#display-icon-popup').isVisible(),true);
   assert.equal(await panel.locator('#display-icon-panel').isVisible(),false);

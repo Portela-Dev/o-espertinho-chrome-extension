@@ -14,8 +14,11 @@ test('interface mostra permissões, progresso e texto externo sem HTML',()=>{
  state.user=undefined;renderCatalog(state,false);assert.equal(el('workspace').hidden,true);
 });
 test('tipo da execução e pendências por marketplace são exibidos sem confundir contagem com limite',()=>{
- const state={...view(),marketplaceId:'fixture',retryFailed:true,stats:{marketplaceId:'fixture',retryFailed:true,convert:{pending:7,total:100},enrich:{pending:3,total:100},prices:{pending:2,total:40}},run:{step:'prices',marketplace_id:'fixture',status:'running',total:5,completed:1,failed:0}};
- renderCatalog(state,false);assert.match(el('run-status').textContent,/4 — Atualizar preços · Loja · Em execução/);assert.match(el('step-convert').textContent,/7 \/ 100/);assert.match(el('step-enrich').textContent,/3 \/ 100/);assert.match(el('step-prices').textContent,/2 \/ 40/);assert.equal(el('retry-failed').checked,true);
+ const state={...view(),marketplaceId:'fixture',retryFailed:true,stats:{marketplaceId:'fixture',retryFailed:true,convert:{pending:7,completed:93,total:100},enrich:{pending:3,completed:80,total:100},prices:{pending:2,total:40}},run:{step:'prices',marketplace_id:'fixture',status:'running',total:5,completed:1,failed:0}};
+ renderCatalog(state,false);assert.match(el('run-status').textContent,/4 — Atualizar preços · Loja · Em execução/);assert.match(el('step-convert').textContent,/Gerados: 93 \/ 100/);assert.match(el('step-enrich').textContent,/Extraídos: 80 \/ 100/);assert.match(el('step-prices').textContent,/2 \/ 40/);assert.equal(el('retry-failed').checked,true);
+ state.stats.convert={pending:3,completed:0,total:3};state.stats.enrich={pending:0,completed:0,total:3};renderCatalog(state,false);
+ assert.match(el('step-convert').textContent,/Gerados: 0 \/ 3/);assert.match(el('step-enrich').textContent,/Extraídos: 0 \/ 3/);assert.match(el('step-prices').textContent,/Pendentes \(24h\): 2 \/ 40/);
+ delete state.stats.convert.completed;renderCatalog(state,false);assert.match(el('step-convert').textContent,/Gerados: — \/ —/);
  state.stats.marketplaceId='other';renderCatalog(state,false);assert.match(el('step-convert').textContent,/— \/ —/);assert.equal(el('display-mode').tagName,'BUTTON');assert.equal(document.querySelector('[role="switch"]'),null);
 });
 

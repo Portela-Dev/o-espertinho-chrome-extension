@@ -5,7 +5,7 @@ export interface CatalogSettings {intervalMs:number;timeoutMs:number;humanTimeou
 export interface CatalogMarket {id:string;name:string;website_url:string;catalog_executor:string;allowedOrigins:string[];config:CatalogSettings}
 export interface CatalogRun {id:string;marketplace_id:string;step:CatalogStep|'preview'|'selector_test';status:string;reason:string;total:number;completed:number;failed:number;snapshot:any}
 export interface CatalogClaim {item:{id:string;payload:any;lease_token:string;target_id:string}|null;snapshot:any;step:CatalogRun['step']}
-export interface CatalogStats {marketplaceId:string;retryFailed:boolean;observedAt:string;convert:{pending:number;total:number};enrich:{pending:number;total:number}|null;prices:{pending:number;total:number}|null}
+export interface CatalogStats {marketplaceId:string;retryFailed:boolean;observedAt:string;convert:{pending:number;completed?:number;total:number};enrich:{pending:number;completed?:number;total:number}|null;prices:{pending:number;total:number}|null}
 export interface CatalogState {
  version:2;backendUrl:string;auth?:Auth;
  pair?:{deviceCode:string;verifier:string;expiresAt:number;verificationUrl:string;nextAt:number};
