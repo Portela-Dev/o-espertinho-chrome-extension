@@ -8,7 +8,8 @@
     "storage",
     "alarms",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "webRequest"
   ],
   "host_permissions": [
     "http://localhost/*"

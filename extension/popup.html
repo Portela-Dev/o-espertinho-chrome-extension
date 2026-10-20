@@ -68,6 +68,21 @@
           Reiniciar demonstração
         </button>
       </section>
+      <section id="affiliate-proof" aria-labelledby="affiliate-proof-title" hidden>
+        <h2 id="affiliate-proof-title">Conversão antes do enriquecimento</h2>
+        <p class="hint">Teste com até 3 links. Somente os links gerados vão ao backend; cookies e headers de sessão ficam no navegador.</p>
+        <button type="button" id="affiliate-load" class="secondary">Carregar receitas cadastradas</button>
+        <label for="affiliate-marketplace">Marketplace do teste</label>
+        <select id="affiliate-marketplace"></select>
+        <button type="button" id="affiliate-arm" class="secondary">Preparar aba do marketplace</button>
+        <p class="hint">Depois de preparar a aba, gere um link manualmente pelo site para observar o header configurado. Não é necessário copiar cookies ou tokens.</p>
+        <p id="affiliate-header" role="status"></p>
+        <button type="button" id="affiliate-start">Converter até 3 links</button>
+        <button type="button" id="affiliate-enrich" class="secondary">Iniciar enriquecimento dos convertidos</button>
+        <button type="button" id="affiliate-refresh" class="secondary">Atualizar resultado do teste</button>
+        <button type="button" id="affiliate-reset" class="secondary">Novo teste</button>
+        <output id="affiliate-result" aria-live="polite"></output>
+      </section>
       <section id="session-proof" aria-labelledby="proof-title" hidden>
         <h2 id="proof-title">Prova de sessão no container</h2>
         <p class="hint">Somente para administrador no ambiente de teste. A sessão é enviada ao backend e descartada após o teste, sem salvar cookies no banco.</p>

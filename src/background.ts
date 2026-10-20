@@ -1,5 +1,6 @@
 import { ExtensionRuntime } from "./runtime.js";
 const runtime = new ExtensionRuntime();
+chrome.webRequest.onBeforeSendHeaders.addListener(details=>{void runtime.observeAffiliateHeaders(details).catch(()=>{});},{urls:['https://*/*'],types:['xmlhttprequest']},['requestHeaders']);
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (
     sender.id !== chrome.runtime.id ||

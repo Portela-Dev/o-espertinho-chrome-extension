@@ -1,5 +1,8 @@
-import type { Configuration, Progress, Account } from "./contracts.js";
+import type { Configuration, Progress, Account,State } from "./contracts.js";
 export interface View {
+  affiliateConfig?:Configuration;
+  affiliateProof?:State['affiliateProof'];
+  affiliateHeaderReady?:boolean;
   proofMarkets?:import('./session-proof.js').ProofMarket[];
   proofTest?:import('./session-proof.js').ProofTest;
   backendUrl: string;
@@ -115,6 +118,7 @@ function resultRow(item: NonNullable<View["queue"]>["items"][number]) {
   return row;
 }
 export function renderView(view: View, busy: boolean) {
+  renderAffiliate(view,busy);
   renderProof(view,busy);
   const running = view.progress.status === "running";
   renderAccount(view);
@@ -133,6 +137,21 @@ export function renderView(view: View, busy: boolean) {
   element("results").replaceChildren(
     ...(view.queue?.items ?? []).map(resultRow),
   );
+}
+function renderAffiliate(view:View,busy:boolean){
+ element('affiliate-proof').hidden=!view.user;
+ const select=element<HTMLSelectElement>('affiliate-marketplace'),markets=view.affiliateConfig?.marketplaces??[],selected=select.value;
+ if(JSON.stringify([...select.options].map(o=>o.value))!==JSON.stringify(markets.map(m=>m.id))){select.replaceChildren(...markets.map(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;return o;}));if(markets.some(m=>m.id===selected))select.value=selected;}
+ const proof=view.affiliateProof,running=proof?.status==='running'||proof?.status==='enriching';select.disabled=busy||running;
+ element<HTMLButtonElement>('affiliate-load').disabled=busy||running;
+ element<HTMLButtonElement>('affiliate-arm').disabled=busy||running||!markets.length;
+ element<HTMLButtonElement>('affiliate-start').disabled=busy||running||!markets.length;
+ element('affiliate-start').textContent=proof?.status==='paused'?'Continuar conversão':'Converter até 3 links';
+ element<HTMLButtonElement>('affiliate-enrich').disabled=busy||proof?.status!=='converted'||!proof.results.some(r=>r.affiliateUrl);
+ element<HTMLButtonElement>('affiliate-refresh').disabled=busy||!proof;
+ element<HTMLButtonElement>('affiliate-reset').disabled=busy||running||!proof;
+ element('affiliate-header').textContent=view.affiliateHeaderReady?'Header de sessão pronto na memória local.':'Prepare a aba e gere um link manualmente pelo marketplace.';
+ element('affiliate-result').textContent=proof?proof.message+'\n'+proof.results.length+'/'+proof.items.length+' conversões\n'+proof.results.map(r=>(r.affiliateUrl||r.error||'Pendente')).join('\n')+'\n'+(proof.run?'Job: '+proof.run.status+'\n':'')+(proof.runItems??[]).map(i=>i.status+(i.error?' ('+i.error+')':'')).join('\n'):'Nenhum teste iniciado.';
 }
 function renderProof(view:View,busy:boolean){
  element('session-proof').hidden=!view.user;

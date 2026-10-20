@@ -12,6 +12,7 @@ import {
   type Result,
 } from "./contracts.js";
 import { executeRecipe, type ExecutionResult } from "./executor.js";
+import {RequestHeaderMemory} from './request-header-memory.js';
 export interface Command {
   type: string;
   url?: string;
@@ -42,7 +43,9 @@ export class ExtensionRuntime {
   private pumping = false;
   private generation = 0;
   private proofCapturing=false;
-  constructor(private readonly browser: typeof chrome = chrome) {}
+  private readonly headerMemory:RequestHeaderMemory;
+  constructor(private readonly browser: typeof chrome = chrome) {this.headerMemory=new RequestHeaderMemory(browser);}
+  async observeAffiliateHeaders(details:Parameters<RequestHeaderMemory['observe']>[0]){await this.headerMemory.observe(details);}
   async init() {
     this.initialization ??= this.load();
     return this.initialization;
@@ -74,13 +77,16 @@ export class ExtensionRuntime {
       progress: state.progress,
       version: this.browser.runtime.getManifest().version,
       proofMarkets:state.proofMarkets,proofTest:state.proofTest,
+      affiliateConfig:state.affiliateConfig,affiliateProof:state.affiliateProof,affiliateHeaderReady:state.affiliateHeaderReady,
     };
   }
   private disconnect(message: string) {
+    void this.headerMemory.clear();
     this.generation++;
     delete this.state.auth;
     delete this.state.pair;
     delete this.state.proofMarkets;delete this.state.proofTest;
+    delete this.state.affiliateConfig;delete this.state.affiliateProof;delete this.state.affiliateHeaderReady;
     this.setPaused(message);
   }
   private setPaused(message: string) {
@@ -371,6 +377,8 @@ export class ExtensionRuntime {
       await this.init();
       await this.poll();
       if(this.state.auth&&this.state.proofTest?.status==='running')await this.pollProof();
+      if(this.state.auth&&this.state.affiliateProof?.status==='running')await this.advanceAffiliate();
+      if(this.state.auth&&this.state.affiliateProof?.status==='enriching')await this.refreshAffiliate();
       while (this.state.auth && this.state.progress.status === "running") {
         if (!(await this.advance(this.generation))) {
           return;
@@ -426,6 +434,7 @@ export class ExtensionRuntime {
         await this.api("/auth/logout", {});
       }
     } finally {
+      await this.headerMemory.clear();
       this.disconnect("Você saiu. Conecte sua conta para continuar.");
       delete this.state.batch;
       delete this.state.config;
@@ -494,8 +503,15 @@ export class ExtensionRuntime {
     await this.init();
     switch (message.type) {
       case "STATE":
+        if(this.state.affiliateConfig?.marketplaces[0])this.state.affiliateHeaderReady=await this.headerMemory.ready(this.state.affiliateProof?.recipe??this.state.affiliateConfig.marketplaces[0]);
         void this.pump();
         break;
+      case 'AFFILIATE_LOAD':this.state.affiliateConfig=validateConfiguration(await this.api('/affiliate-proof/config'));await this.save();break;
+      case 'AFFILIATE_ARM':await this.armAffiliate(message.marketplaceId);break;
+      case 'AFFILIATE_START':await this.startAffiliate(message.marketplaceId);break;
+      case 'AFFILIATE_ENRICH':await this.enrichAffiliate();break;
+      case 'AFFILIATE_REFRESH':await this.refreshAffiliate();break;
+      case 'AFFILIATE_RESET':if(this.state.affiliateProof&&['running','enriching'].includes(this.state.affiliateProof.status))throw new Error('Aguarde o teste em andamento.');delete this.state.affiliateProof;await this.save();break;
       case "LOGIN":
         await this.login();
         break;
@@ -536,11 +552,64 @@ export class ExtensionRuntime {
     }
     return this.view();
   }
+  private affiliateRecipe(id?:string){const recipe=this.state.affiliateConfig?.marketplaces.find(m=>m.id===id);if(!recipe)throw new Error('Carregue e escolha uma receita de conversão.');return recipe;}
+  private async armAffiliate(id?:string){
+    const recipe=this.affiliateRecipe(id);
+    if(this.state.progress.status==='running'||this.state.proofTest?.status==='running'||this.state.affiliateProof?.status==='running')throw new Error('Aguarde o processamento em andamento.');
+    if(!await this.browser.permissions.contains({origins:recipe.allowedOrigins.map(o=>o+'/*')}))throw new Error('Autorize os domínios do marketplace.');
+    const tabs=await this.browser.tabs.query({url:recipe.allowedOrigins.map(o=>o+'/*')}),tab=tabs.find(t=>t.active)??tabs[0]??await this.browser.tabs.create({url:recipe.loginUrl});
+    if(!tab.id)throw new Error('Não foi possível preparar a aba.');
+    this.state.tabId=tab.id;await this.headerMemory.arm(recipe,tab.id);this.state.affiliateHeaderReady=await this.headerMemory.ready(recipe);await this.save();await this.browser.tabs.update(tab.id,{active:true});
+  }
+  private async startAffiliate(id?:string){
+    if(this.state.progress.status==='running'||this.state.proofTest?.status==='running')throw new Error('Aguarde o processamento em andamento.');
+    const recipe=this.affiliateRecipe(id);await this.headerMemory.values(recipe);
+    let proof=this.state.affiliateProof;
+    if(proof&&['running','enriching'].includes(proof.status))throw new Error('Este teste já está em andamento.');
+    if(!proof||proof.status==='complete'||proof.recipe.id!==recipe.id||proof.expiresAt<Date.now()){
+      const created=await this.api<{id:string;expiresAt:number;items:Item[];recipe:Recipe}>('/affiliate-proof/tests',{marketplaceId:recipe.id});
+      validateConfiguration({version:1,mock:false,marketplaces:[created.recipe]});
+      proof={...created,results:[],status:'running',message:'Convertendo links na aba do marketplace…'};this.state.affiliateProof=proof;
+    }else if(proof.status==='converted')throw new Error('Os links já foram convertidos. Inicie o enriquecimento.');
+    proof.status='running';await this.save();void this.pump();
+  }
+  private async advanceAffiliate(){
+    const proof=this.state.affiliateProof!;if((proof.nextAt??0)>Date.now())return;
+    const generation=this.generation;
+    try{
+      if(proof.expiresAt<Date.now())throw new Error('O teste expirou. Prepare uma nova captura local do header.');
+      const item=proof.items[proof.results.length];
+      if(!item){proof.status='converted';proof.message='Conversão concluída. Confira os resultados e inicie o enriquecimento.';await this.save();return;}
+      const variables=await this.headerMemory.values(proof.recipe),tabId=this.state.tabId;
+      if(!tabId)throw new Error('Prepare a aba do marketplace novamente.');
+      await this.waitForTab(tabId,proof.recipe);
+      const [{result}]=await this.browser.scripting.executeScript({target:{tabId},func:executeRecipe,args:[proof.recipe,item,variables],world:'ISOLATED'});
+      this.checkGeneration(generation);
+      if(result?.needsLogin){proof.status='paused';proof.message=result.error??'Confirme o login na aba.';await this.save();return;}
+      const converted=this.itemResult(item.id,result);
+      await this.api('/affiliate-proof/tests/'+proof.id+'/results',{results:[converted.affiliateUrl?{id:item.id,affiliateUrl:converted.affiliateUrl}:{id:item.id,error:'conversion_failed'}]});
+      this.checkGeneration(generation);proof.results.push(converted);proof.nextAt=Date.now()+proof.recipe.intervalMs;
+      proof.message='Conversões: '+proof.results.length+'/'+proof.items.length;
+      if(proof.results.length===proof.items.length){proof.status='converted';proof.message='Conversão concluída. Inicie o enriquecimento dos links gerados.';}
+      await this.save();
+    }catch(error){if(generation===this.generation){proof.status='paused';proof.message=error instanceof Error?error.message:'Falha técnica na conversão.';await this.save();}}
+  }
+  private async enrichAffiliate(){
+    const proof=this.state.affiliateProof;if(!proof||proof.status!=='converted')throw new Error('Conclua a conversão primeiro.');
+    proof.run=await this.api('/affiliate-proof/tests/'+proof.id+'/enrich',{});proof.status='enriching';proof.message='Enriquecimento solicitado ao job, sem cookies.';await this.save();
+  }
+  private async refreshAffiliate(){
+    const proof=this.state.affiliateProof;if(!proof)return;
+    const state=await this.api<{run:typeof proof.run;runItems:typeof proof.runItems}>('/affiliate-proof/tests/'+proof.id);
+    proof.run=state.run;proof.runItems=state.runItems;
+    if(state.run&&['completed','failed','cancelled'].includes(state.run.status)){proof.status='complete';proof.message='Enriquecimento '+state.run.status+'.';}
+    await this.save();
+  }
   private proofMarket(id?:string){const market=this.state.proofMarkets?.find(m=>m.id===id);if(!market)throw new Error('Carregue e escolha um marketplace para a prova.');return market;}
   private async proveSession(message:Command){
     if(!message.consent)throw new Error('Confirme o envio temporário da sessão para este teste.');
     if(!this.state.auth)throw new Error('Conecte sua conta administradora.');
-    if(this.proofCapturing||this.state.proofTest?.status==='running'||this.state.progress.status==='running')throw new Error('Aguarde o processamento em andamento.');
+    if(this.proofCapturing||this.state.proofTest?.status==='running'||this.state.progress.status==='running'||this.state.affiliateProof&&['running','enriching'].includes(this.state.affiliateProof.status))throw new Error('Aguarde o processamento em andamento.');
     const market=this.proofMarket(message.marketplaceId),url=message.batchFailed?undefined:new URL(message.url??'');
     if(url&&(url.protocol!=='https:'||url.username||url.password||!market.allowedOrigins.includes(url.origin)))throw new Error('Use um link HTTPS dos domínios cadastrados.');
     if(!await this.browser.permissions.contains({permissions:['cookies'],origins:market.allowedOrigins.map(o=>o+'/*')}))throw new Error('Autorize cookies e os domínios do marketplace.');

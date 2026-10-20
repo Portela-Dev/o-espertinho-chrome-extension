@@ -1,5 +1,7 @@
 # O Espertinho — Chrome Extension
 
+A prova [Conversão antes do enriquecimento](docs/AFFILIATE_PROOF.md) permite gerar até três links usando a sessão local do marketplace e solicitar o job sem exportar cookies ou headers ao backend. A configuração e a fila demonstrativas abaixo continuam disponíveis separadamente.
+
 Extensão Chrome Manifest V3 em TypeScript, com autenticação real no O Espertinho e executor genérico de conversão orientado por configuração. A versão 0.2.0 usa filas e receitas mockadas do backend para testar o fluxo completo. Não possui implementação específica para Amazon, Mercado Livre ou qualquer outra loja.
 
 ## Testar localmente

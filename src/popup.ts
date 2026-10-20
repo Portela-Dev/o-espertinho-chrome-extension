@@ -87,6 +87,13 @@ element("settings").addEventListener("submit", (event) => {
 });
 element('pick-elements').addEventListener('click',()=>{void act(async()=>{await launchSelectorPicker();window.close();});});
 const proofMarket=()=>view?.proofMarkets?.find(m=>m.id===element<HTMLSelectElement>('proof-marketplace').value);
+const affiliateMarket=()=>view?.affiliateConfig?.marketplaces.find(m=>m.id===element<HTMLSelectElement>('affiliate-marketplace').value);
+element('affiliate-load').addEventListener('click',()=>{void act(()=>send('AFFILIATE_LOAD'));});
+element('affiliate-arm').addEventListener('click',()=>{void act(async()=>{const recipe=affiliateMarket();if(!recipe)throw new Error('Escolha um marketplace.');await grantOrigins(recipe.allowedOrigins);await send('AFFILIATE_ARM',{marketplaceId:recipe.id});});});
+element('affiliate-start').addEventListener('click',()=>{void act(()=>send('AFFILIATE_START',{marketplaceId:affiliateMarket()?.id}));});
+element('affiliate-enrich').addEventListener('click',()=>{void act(()=>send('AFFILIATE_ENRICH'));});
+element('affiliate-refresh').addEventListener('click',()=>{void act(()=>send('AFFILIATE_REFRESH'));});
+element('affiliate-reset').addEventListener('click',()=>{void act(()=>send('AFFILIATE_RESET'));});
 element('proof-batch').addEventListener('change',render);
 element('proof-load').addEventListener('click',()=>{void act(()=>send('PROOF_MARKETS'));});
 element('proof-marketplace').addEventListener('change',()=>{element<HTMLInputElement>('proof-url').value=proofMarket()?.testUrl||'';element<HTMLInputElement>('proof-consent').checked=false;render();});
