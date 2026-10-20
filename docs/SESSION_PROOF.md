@@ -24,3 +24,9 @@ Não há geração de links, alteração de ofertas, agendamento ou retentativa 
 Em 19/10/2026, uma captura explícita do Mercado Livre importou 42 cookies no container e permitiu extrair título e preço de um produto anteriormente redirecionado para login. A resposta foi HTTP 200, estado `available`, com preço de R$ 749,99. O backend registrou `extension.session_proof.available` na auditoria. Nenhum cookie foi incluído nesta documentação ou no resultado público.
 
 O resultado valida um acesso autenticado naquele momento. Não mede duração da sessão, renovação, estabilidade em lotes ou limites de acesso; os jobs continuam sem integração com essa sessão.
+
+## Resultado do lote de links com falha
+
+Em 19/10/2026, a prova `58faa772-27bd-4319-8542-bed4e27ed3fe` testou cinco links do Mercado Livre anteriormente classificados com falha no enriquecimento. A auditoria confirmou cinco respostas `technical_failure/incomplete`, nenhuma `available`, e o encerramento normal do lote. A duração total foi de aproximadamente 159 segundos, com acessos sequenciais e 20 segundos entre tentativas. Os registros de enriquecimento permaneceram intactos. Os pipelines do backend e da extensão passaram.
+
+Em uma tentativa individual anterior, o usuário observou redirecionamento para `/captcha/wall/logged`, com 38 cookies importados e HTTP 302 → 200. Isso comprova a apresentação de um desafio naquele acesso, mas não comprova sozinho a URL final das cinco tentativas do lote. `incomplete` indica ausência de campos obrigatórios; o popup mostra URL final e campos ausentes por item para distinguir os casos. A captura que funcionou inicialmente não garantiu a extração das novas tentativas; ainda não existe validação de estabilidade ou renovação automática da sessão.

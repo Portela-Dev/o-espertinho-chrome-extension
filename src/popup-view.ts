@@ -151,7 +151,7 @@ function renderProof(view:View,busy:boolean){
   const batch=test.batch;
   element('proof-result').textContent=(test.error||'Lote '+(test.status==='running'?'em andamento':'finalizado'))+': '+batch.completed+'/'+batch.total+' · intervalo '+batch.intervalMs/1000+' s\n'+batch.items.map((item,index)=>{
    const r=item.result,price=r?.priceCents==null?'':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(r.priceCents/100);
-   return (index+1)+'. '+(item.error||r?.status||'sem resultado')+(r?.reason?' ('+r.reason+')':'')+' '+price+'\n'+(r?.title||'')+'\n'+item.url+'\nHTTP: '+(r?.navigationStatuses.join(' → ')||'sem resposta')+' · Cookies: '+(r?.cookiesImported??0);
+   return (index+1)+'. '+(item.error||r?.status||'sem resultado')+(r?.reason?' ('+r.reason+')':'')+' '+price+'\n'+(r?.title||'')+'\n'+item.url+'\nURL final: '+(r?.finalUrl||'sem resposta')+'\nCampos ausentes: '+(r?.missing.join(', ')||'nenhum')+'\nHTTP: '+(r?.navigationStatuses.join(' → ')||'sem resposta')+' · Cookies: '+(r?.cookiesImported??0);
   }).join('\n\n');return;
  }
  element('proof-result').textContent=!test?'Faça login na aba do marketplace antes de capturar.':test.status==='running'?'Teste em andamento no container…':test.error||('Último teste: '+(test.result?.status??test.status)+(test.result?.reason?' ('+test.result.reason+')':'')+'\n'+(test.result?.title||'')+'\nURL final: '+(test.result?.finalUrl||'')+'\nCookies importados: '+(test.result?.cookiesImported??0)+' · HTTP: '+(test.result?.navigationStatuses.join(' → ')||'sem resposta'));
