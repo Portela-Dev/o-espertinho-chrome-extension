@@ -244,7 +244,9 @@ export class CatalogRuntime {
         else
             await this.headers.clear();
         await this.navigation.focus();
-        this.state.message = 'Faça login se necessário. Se a receita usa header de requisição, gere um link manualmente nesta aba para prepará-lo.';
+        this.state.message = recipe?.steps.some(step => step.type === 'extract' && step.source === 'requestHeader')
+            ? 'Faça login se necessário e gere um link manualmente nesta aba para preparar o header exigido pela receita.'
+            : 'Aba preparada. Faça login se necessário; os valores de sessão serão obtidos automaticamente conforme a receita.';
         await this.save();
     }
     private async focusProcessing() {

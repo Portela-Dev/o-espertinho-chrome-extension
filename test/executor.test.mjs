@@ -56,6 +56,20 @@ test("receita usa sessão somente na origem e devolve apenas o link", async () =
   assert.equal(JSON.stringify(result).includes("private-session-value"), false);
 });
 
+test('token configurado no DOM é relido a cada conversão e ausência impede a chamada', async () => {
+  const {recipe,sent}=setup();
+  recipe.steps[0].selector='meta[name="csrf-token"]';
+  const meta=document.querySelector('meta');meta.name='csrf-token';
+  assert.ok((await executeRecipe(recipe,item)).affiliateUrl);
+  meta.content='renewed-session-value';
+  assert.ok((await executeRecipe(recipe,item)).affiliateUrl);
+  assert.equal(sent[1].options.headers['X-CSRF'],'renewed-session-value');
+  meta.remove();
+  const result=await executeRecipe(recipe,item);
+  assert.equal(result.needsLogin,true);assert.equal(sent.length,2);
+  assert.doesNotMatch(JSON.stringify(result),/private-session-value|renewed-session-value/);
+});
+
 test('request header variables stay local to the same-origin conversion and only the link is returned',async()=>{const {recipe,sent}=setup();recipe.steps[0]={type:'extract',source:'requestHeader',name:'csrf',key:'x-csrf-token',sourceUrl:'https://shop.test/convert'};const result=await executeRecipe(recipe,item,{csrf:'PRIVATE-HEADER'});assert.equal(sent[0].options.headers['X-CSRF'],'PRIVATE-HEADER');assert.ok(result.affiliateUrl);assert.equal(JSON.stringify(result).includes('PRIVATE-HEADER'),false);});
 test("campos e botões usam os valores configurados e cookies/storage permanecem locais", async () => {
   const { recipe, sent } = setup();

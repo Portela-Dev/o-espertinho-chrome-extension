@@ -52,6 +52,10 @@ export function renderCatalog(view: CatalogView, busy: boolean) {
         }));
     if (selected && [...select.options].some(o => o.value === selected))
         select.value = selected;
+    const recipe = view.markets.find(m => m.id === select.value)?.config?.recipe;
+    el('session-hint').textContent = recipe?.steps.some(step => step.type === 'extract' && step.source === 'requestHeader')
+        ? 'Esta receita exige observar um header: prepare a aba e gere um link manualmente nela antes de converter.'
+        : 'Faça login na aba de processamento, se necessário. Os valores de sessão são obtidos automaticamente conforme a receita, sem gerar um link manualmente.';
     if(document.activeElement!==el('retry-failed'))el<HTMLInputElement>('retry-failed').checked=view.retryFailed??false;
     renderQueue(view,select.value);
     const run = view.run, active = !!run && !['completed', 'failed', 'cancelled'].includes(run.status);

@@ -12,7 +12,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
  const directory=await mkdtemp(join(tmpdir(),'espertinho-native-')),extension=join(directory,'extension');
  let context,server,marketServer;let marketOrigin,challenge=false;const received=[];let run,item;
  const discovery={rendering:{frameSelector:'',readySelector:'.card',timeoutMs:1000,settleDelayMs:0},extraction:{itemSelector:'.card',linkSelector:'a',linkAttribute:'href'},pagination:{mode:'next',nextSelector:'.next',disabledSelector:'',endSelector:'',missingNextAction:'finish',noProgressLimit:1,waitAfterMs:100},limits:{maxPages:2,maxItems:10,requestIntervalMs:100}};
- const recipe={id:'fixture',name:'Fixture',loginUrl:'https://shop.example.com/product',allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],batchSize:1,intervalMs:100,steps:[{type:'request',url:'https://shop.example.com/convert',method:'POST',body:{url:'{{originalUrl}}'},responsePath:'link'}]};
+ const recipe={id:'fixture',name:'Fixture',loginUrl:'https://shop.example.com/product',allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],batchSize:1,intervalMs:100,steps:[{type:'extract',source:'dom',name:'csrf',selector:'meta[name="csrf-token"]',attribute:'content'},{type:'request',url:'https://shop.example.com/convert',method:'POST',headers:{'X-CSRF-Token':'{{csrf}}'},body:{url:'{{originalUrl}}'},responsePath:'link'}]};
  const settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,categorySeparator:'>',blockRules:[{kind:'challenge',match:'selector',value:'.human-check'}],recipe};
  const profile={rules:[{field:'title',selectors:['h1'],mode:'text',required:true},{field:'price',selectors:['.price'],mode:'text',required:true},{field:'category',selectors:['nav a'],mode:'text'}]};
  const snapshot={settings,profile,market:{allowedHosts:['shop.example.com'],normalizationRules:[]}};
@@ -39,11 +39,14 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   const cert=spawnSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',keyFile,'-out',certFile,'-days','1','-subj','/CN=shop.example.com'],{encoding:'utf8',windowsHide:true});assert.equal(cert.status,0,'OpenSSL deve estar disponível para o certificado descartável de teste.');
   marketServer=createHttpsServer({key:await readFile(keyFile),cert:await readFile(certFile)},(req,res)=>{
    const url=new URL(req.url,marketOrigin);
-   if(url.pathname==='/convert'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({link:marketOrigin+'/product?affiliate=fixture'}));return;}
+   if(url.pathname==='/convert'){
+    if(req.headers['x-csrf-token']!=='TEST_ONLY_CSRF'){res.writeHead(403);res.end('{}');return;}
+    res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({link:marketOrigin+'/product?affiliate=fixture'}));return;
+   }
    const html=challenge?'<div class="human-check">Intervenção no ambiente de teste</div>':url.pathname.startsWith('/list')?'<div class="card"><a href="'+(url.pathname==='/list'?'/product?ref=test':'/product2?ref=test')+'">Product</a></div>'+(url.pathname==='/list'?'<button class="next" onclick="location.href=&quot;/list2&quot;">Next</button>':''):'<nav><a>Eletrônicos</a><a>Áudio</a></nav><h1>Produto controlado</h1><div class="price">R$ 123,45</div>';
-   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<!doctype html><html lang="pt-BR"><head><title>Fixture</title></head><body>'+html+'</body></html>');
+   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<!doctype html><html lang="pt-BR"><head><title>Fixture</title><meta name="csrf-token" content="TEST_ONLY_CSRF"></head><body>'+html+'</body></html>');
   });await new Promise(r=>marketServer.listen(0,'127.0.0.1',r));marketOrigin='https://shop.example.com:'+marketServer.address().port;
-  recipe.loginUrl=marketOrigin+'/product';recipe.allowedOrigins=[marketOrigin];recipe.affiliateOrigins=[marketOrigin];recipe.steps[0].url=marketOrigin+'/convert';snapshot.market.allowedHosts=['shop.example.com:'+marketServer.address().port];
+  recipe.loginUrl=marketOrigin+'/product';recipe.allowedOrigins=[marketOrigin];recipe.affiliateOrigins=[marketOrigin];recipe.steps[1].url=marketOrigin+'/convert';snapshot.market.allowedHosts=['shop.example.com:'+marketServer.address().port];
   context=await chromium.launchPersistentContext(join(directory,'profile'),{channel:'chromium',headless:true,chromiumSandbox:true,args:['--disable-extensions-except='+extension,'--load-extension='+extension,'--host-resolver-rules=MAP shop.example.com 127.0.0.1','--ignore-certificate-errors']});
   const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');
   const backendUrl='http://localhost:'+server.address().port;

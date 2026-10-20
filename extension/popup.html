@@ -16,7 +16,7 @@
         <h2 id="workspace-title">Manter catálogo</h2>
         <label for="marketplace">Marketplace</label><select id="marketplace"></select>
         <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar aba / fazer login</button></div>
-        <p class="hint">Use a aba de processamento para o login. Se a receita exigir um header de sessão, gere um link manualmente nessa aba antes de converter.</p>
+        <p id="session-hint" class="hint">Use a aba de processamento para o login. Os valores de sessão são obtidos conforme a receita configurada.</p>
         <label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100">
         <label><input id="retry-failed" type="checkbox"> Incluir extrações com falha</label>
         <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-prices">4 — Atualizar preços</button></div>
