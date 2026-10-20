@@ -19,3 +19,7 @@ O teste e os links convertidos têm validade de 30 minutos no backend, em memór
 Receitas aceitam passos declarativos de leitura, preenchimento, clique comum e requisição. Não contêm JavaScript remoto ou adaptadores por marketplace. `extract` com `source: requestHeader` usa `key` para o nome do header, `sourceUrl` para a chamada observada e `name` para a variável local. `request` usa templates como `{{csrf}}` e `{{originalUrl}}`, além de `responsePath` para o campo JSON do link.
 
 No teste inicial com um link de afiliado já existente, o job obteve título, preço e uma imagem; descrição, especificações e árvore de origem vieram vazias com os seletores cadastrados. Conversão bem-sucedida não garante que a página de destino ofereça todos os dados necessários. Resultados incompletos não devem confirmar categorias ou vincular produtos automaticamente.
+
+## Resultado real em 19/10/2026
+
+A prova `c3865094-1f60-4479-b864-0df0f233a309` converteu três links do Mercado Livre na extensão e gerou a execução de enriquecimento `2999c7e3-0e6b-4681-83e3-186cf5aea409`. O job concluiu os três itens em aproximadamente 58 segundos, sem receber sessão do navegador. Os produtos eram kit de pneus (R$ 549,99), kit de câmeras (R$ 198,93) e ventilador de teto (R$ 275,08), com uma imagem por item. Os preços são apenas os observados naquele acesso. Descrição, especificações e categoria de origem ficaram vazias com o perfil atual. A identidade original dos links foi preservada. Nada foi publicado ou classificado automaticamente.
