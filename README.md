@@ -33,6 +33,8 @@ Faça login na aba de processamento quando necessário. A receita pode extrair o
 
 Login, CAPTCHA, acesso negado ou limite são detectados por regras de URL, seletores ou texto e pausam o processamento. Resolva manualmente na mesma aba e clique Continuar; a extensão verifica novamente. Não há resolução automática de desafios ou troca de identidade para evitar bloqueio.
 
+Uma regra de estado unavailable é um resultado válido: ao encontrar o indicador configurado, a extração encerra a espera sem exigir preço. Login e desafios têm prioridade caso vários indicadores coincidam. A ausência de preço sem esse indicador continua sendo falha técnica, preservando a última disponibilidade conhecida. Cadastre a regra em Admin → Marketplaces → Execução pela extensão → Detecção de estados; nenhum seletor é fixo no executor.
+
 Painel pode ser fechado sem perder progresso. Use Carregar execuções para retomar uma execução própria ou prévia solicitada no admin; a lista tem paginação e tamanho selecionável. Pausar/cancelar é explícito. Reservas e respostas pendentes são persistidas; resultados repetidos são idempotentes no backend. Uma retomada invalida reservas antigas e reextrai o item ainda não confirmado.
 
 O computador e o Chrome precisam estar disponíveis. Suspensão, abas congeladas/descartadas, perda de rede ou janela fechada podem pausar a execução. Não existe garantia de processamento com janela minimizada. Iframes configurados não são suportados nesta versão e causam falha controlada; documento principal, links de próximo, templates de URL, carregar mais e rolagem usam configurações limitadas.
