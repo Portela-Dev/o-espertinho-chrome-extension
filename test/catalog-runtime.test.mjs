@@ -8,7 +8,7 @@ function fixture(options={}){
  const browser={runtime:{id:'a'.repeat(32),getManifest:()=>({version:'0.2.0'})},storage:{local:{setAccessLevel:async()=>{},get:async()=>({state:saved}),set:async({state})=>{saved=structuredClone(state);}},session:{get:async()=>({}),setAccessLevel:async()=>{},set:async()=>{},remove:async()=>{}}},alarms:{create:async()=>{}},permissions:{contains:async()=>true},windows:{create:async()=>({id:9,tabs:[{id:4,windowId:9}]}),update:async()=>{}},tabs:{get:async()=>({id:4,windowId:9,url:'https://shop.example.com',status:'complete'}),update:async()=>{},create:async()=>({id:4})},scripting:{executeScript:async call=>[{result:call.func.name==='checkPageState'?(options.blocked?.()??null):(options.result??{affiliateUrl:'https://shop.example.com/p?affiliate=1'})}]}};
  const fetch=async(url,requestOptions)=>{const path=new URL(url).pathname.replace('/api/extension','');const body=requestOptions.body?JSON.parse(requestOptions.body):undefined;calls.push({path,body});
   if(path==='/catalog/config')return Response.json({marketplaces:[market]});
-  if(path==='/catalog/runs'){run={id:'run',status:'queued',step:body.step,total:1,completed:0,failed:0,snapshot:{market:{allowedHosts:['shop.example.com']},settings,profile:null}};return Response.json(run);}
+  if(path==='/catalog/runs'){run={id:'run',marketplace_id:'shop',status:'queued',step:body.step,total:1,completed:0,failed:0,snapshot:{market:{allowedHosts:['shop.example.com']},settings,profile:null}};return Response.json(run);}
   if(path.endsWith('/claim'))return Response.json({item:{id:'item',lease_token:'lease',payload:{url:'https://shop.example.com/p',originalUrl:'https://shop.example.com/p',...options.payload}},snapshot:run.snapshot,step:run.step});
   if(path.endsWith('/heartbeat'))return Response.json({ok:true});
   if(path.endsWith('/results')){run.status='completed';run.completed=1;return Response.json({accepted:true});}
@@ -17,8 +17,40 @@ function fixture(options={}){
   if(path==='/auth/logout')return Response.json({ok:true});
   throw Error('unexpected '+path);
  };
- return {runtime:new CatalogRuntime(browser),fetch,calls,saved:()=>saved};
+ return {runtime:new CatalogRuntime(browser),browser,fetch,calls,saved:()=>saved};
 }
+
+for(const priorStatus of ['waiting_for_human','running'])test('reabrir janela fechada preserva execução e exige continuar: '+priorStatus,async()=>{
+ let blocked='login';const f=fixture({blocked:()=>blocked}),original=globalThis.fetch;globalThis.fetch=f.fetch;
+ try{
+  await f.runtime.init();await f.runtime.handle({type:'REFRESH'});
+  await f.runtime.handle({type:'START',marketplaceId:'shop',step:'enrich'});
+  for(let i=0;i<800&&f.saved().run?.status!=='waiting_for_human';i++)await new Promise(r=>setTimeout(r,5));
+  assert.equal(f.saved().run.status,'waiting_for_human');
+  f.runtime.state.run.status=priorStatus;
+  const runId=f.saved().run.id;let exists=false,created=0;
+  f.browser.tabs.get=async()=>{if(!exists)throw Error('No tab with id');return {id:7,windowId:12,status:'complete',url:'https://shop.example.com'};};
+  f.browser.windows.create=async()=>{exists=true;created++;return {id:12,tabs:[{id:7,windowId:12}]};};
+  await f.runtime.handle({type:'FOCUS'});
+  assert.equal(created,1);assert.equal(f.saved().tabId,7);assert.equal(f.saved().windowId,12);
+  assert.equal(f.saved().run.id,runId);assert.equal(f.saved().run.status,priorStatus==='running'?'paused_by_user':'waiting_for_human');
+  assert.match(f.saved().message,/Continuar/);assert.equal(f.calls.some(c=>c.path.endsWith('/results')),false);
+  await f.runtime.handle({type:'FOCUS'});assert.equal(created,1);
+  blocked=null;await f.runtime.handle({type:'RESUME'});await finished(f);
+  assert.equal(f.calls.filter(c=>c.path==='/catalog/runs').length,1);
+ }finally{globalThis.fetch=original;}
+});
+
+test('abrir janela sem execução cria uma janela própria e não inicia lote',async()=>{
+ const f=fixture(),original=globalThis.fetch;globalThis.fetch=f.fetch;
+ try{
+  await f.runtime.init();await f.runtime.handle({type:'REFRESH'});
+  f.runtime.state.marketplaceId='shop';
+  await f.runtime.handle({type:'FOCUS'});
+  assert.equal(f.saved().tabId,4);assert.equal(f.saved().windowId,9);
+  assert.equal(f.calls.some(c=>c.path==='/catalog/runs'),false);
+ }finally{globalThis.fetch=original;}
+});
 test('migração de storage descarta POCs e preserva autenticação; conversão salva somente URL',async()=>{
  const f=fixture(),original=globalThis.fetch;globalThis.fetch=f.fetch;
  try{await f.runtime.init();assert.equal(f.saved().version,2);assert.equal(f.saved().proofTest,undefined);assert.equal(f.saved().auth.token,auth.token);

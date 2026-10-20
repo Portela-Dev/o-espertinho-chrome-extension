@@ -74,12 +74,20 @@ export class CatalogNavigation {
         const state = this.state();
         if (!state.tabId || !state.windowId)
             throw new Error('tab_closed');
-        await this.browser.tabs.update(state.tabId, {
-            active: true
-        });
-        await this.browser.windows.update(state.windowId, {
-            focused: true
-        });
+        try {
+            const tab = await this.browser.tabs.get(state.tabId);
+            if (tab.windowId !== state.windowId)
+                throw new Error('tab_closed');
+            await this.browser.tabs.update(state.tabId, {
+                active: true
+            });
+            await this.browser.windows.update(state.windowId, {
+                focused: true
+            });
+        }
+        catch {
+            throw new Error('tab_closed');
+        }
     }
     async inspect(rules: BlockRule[]) {
         const results = await this.browser.scripting.executeScript({

@@ -62,7 +62,15 @@ test('Chromium real executa os quatro passos configuráveis em janela própria, 
   assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.status),'waiting_for_human');assert.equal(received.length,before);
   await assert.rejects(worker.evaluate(()=>globalThis.catalogTest.handle({type:'RESUME'})),/intervenção/);
   // Only our controlled fixture is changed. No real login or CAPTCHA is solved by this test.
-  challenge=false;await worker.evaluate(async()=>{await chrome.tabs.reload(globalThis.catalogTest.state.tabId);});await new Promise(r=>setTimeout(r,300));
+  challenge=false;
+  const previousWindow=await worker.evaluate(()=>globalThis.catalogTest.state.windowId);
+  const previousRun=await worker.evaluate(()=>globalThis.catalogTest.state.run.id);
+  await worker.evaluate(async()=>{await chrome.windows.remove(globalThis.catalogTest.state.windowId);});
+  await worker.evaluate(()=>globalThis.catalogTest.handle({type:'FOCUS'}));
+  assert.notEqual(await worker.evaluate(()=>globalThis.catalogTest.state.windowId),previousWindow);
+  assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.id),previousRun);
+  assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.status),'waiting_for_human');
+  assert.equal(received.length,before);
   await worker.evaluate(()=>globalThis.catalogTest.handle({type:'RESUME'}));
   for(let i=0;i<100;i++){if(await worker.evaluate(()=>globalThis.catalogTest.state.run.status)==='completed')break;await new Promise(r=>setTimeout(r,50));}
   assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.status),'completed');

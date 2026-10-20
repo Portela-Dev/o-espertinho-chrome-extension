@@ -198,7 +198,9 @@ export class CatalogRuntime {
             throw new Error('Prepare o marketplace da execução atual.');
         if (this.state.tabId) {
             try {
-                await this.browser.tabs.get(this.state.tabId);
+                const tab = await this.browser.tabs.get(this.state.tabId);
+                if (tab.windowId !== this.state.windowId)
+                    throw new Error('tab_closed');
             }
             catch {
                 delete this.state.tabId;
@@ -214,6 +216,25 @@ export class CatalogRuntime {
             await this.headers.clear();
         await this.navigation.focus();
         this.state.message = 'Faça login se necessário. Se a receita usa header de requisição, gere um link manualmente nesta janela para prepará-lo.';
+        await this.save();
+    }
+    private async focusProcessing() {
+        try {
+            await this.navigation.focus();
+            return;
+        }
+        catch (error) {
+            if (!(error instanceof Error) || error.message !== 'tab_closed')
+                throw error;
+        }
+        const run = this.state.run;
+        const active = !!run && !['completed', 'failed', 'cancelled'].includes(run.status);
+        if (active && ['queued', 'running'].includes(run.status))
+            await this.action('pause');
+        await this.prepare(this.market(active ? run.marketplace_id : this.state.marketplaceId));
+        this.state.message = active
+            ? 'Janela reaberta. Confira a sessão e clique em Continuar para retomar a mesma execução.'
+            : 'Janela de processamento aberta. Faça login se necessário.';
         await this.save();
     }
     async handle(command: CatalogCommand) {
@@ -260,7 +281,7 @@ export class CatalogRuntime {
                 break;
             case 'RUNS': return this.api('/catalog/runs?page=' + Math.max(1, command.page ?? 1) + '&pageSize=' + Math.min(50, Math.max(1, command.pageSize ?? 10)));
             case 'FOCUS':
-                await this.navigation.focus();
+                await this.focusProcessing();
                 break;
             case 'PAUSE':
                 await this.action('pause');

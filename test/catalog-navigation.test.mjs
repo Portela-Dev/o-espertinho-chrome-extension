@@ -8,6 +8,8 @@ test('janela exclusiva não captura aba do usuário e navegação recusa destino
  assert.equal(calls[0].focused,false);await nav.wait(['https://shop.example.com'],500);
  await assert.rejects(nav.ensure('https://other.example.com/p',['https://shop.example.com']),/permission/);
  browser.tabs.get=async()=>{throw Error('closed');};await assert.rejects(nav.ensure('https://shop.example.com/p',['https://shop.example.com']),/tab_closed/);
+ await assert.rejects(nav.focus(),/tab_closed/);
+ browser.tabs.get=async()=>({id:4,windowId:99});await assert.rejects(nav.focus(),/tab_closed/);
 });
 test('detector distingue login, desafio e indisponibilidade sem interagir com a página',()=>{
  const win=new Window({url:'https://shop.example.com/login'});globalThis.document=win.document;globalThis.location=win.location;
