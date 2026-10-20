@@ -38,7 +38,9 @@ O ZIP da extensão e o ZIP `o-espertinho-local-ai-*.zip` são separados no artef
 
 `npm run test:ai` testa OAuth com chaves RSA descartáveis, scopes, renovação, revogação, isolamento HTTP/CORS/Host, limites e respostas SSE incompletas. Não usa sua conta. `npm run check` inclui estes testes. `npm run test:native` valida o painel contra um auxiliar simulado em Chromium temporário; nenhuma conta ChatGPT ou sessão pessoal é usada.
 
-Homologação com a conta real: pendente do login e da análise pelo administrador. Nunca envie tokens ou cookies em mensagens de suporte. Informe somente a mensagem sanitizada que aparece no painel.
+Homologação com a conta real: o administrador confirmou que a integração com auxiliar funcionou em 20/10/2026. Nunca envie tokens ou cookies em mensagens de suporte. Informe somente a mensagem sanitizada que aparece no painel.
+
+Uma segunda prova, sem auxiliar, está descrita em `AI-DIRECT.md`; ela não inicia nem substitui automaticamente esta primeira prova.
 
 Referências oficiais consultadas em 20/10/2026:
 

@@ -1,4 +1,5 @@
 import {captureAiOffer,localAiRequest} from './local-ai.js';
+import {launchDirectAi} from './direct-ai-launcher.js';
 const el=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
 const option=(label:string,value:string)=>{const node=document.createElement('option');node.textContent=label;node.value=value;return node;};
 export function setupLocalAi(notify:(message:string,kind?:'error'|'success')=>void){
@@ -58,6 +59,7 @@ export function setupLocalAi(notify:(message:string,kind?:'error'|'success')=>vo
   await request('/analyze',{model:el<HTMLSelectElement>('ai-model').value,offer,categories:el<HTMLTextAreaElement>('ai-categories').value.split('\n').map(s=>s.trim()).filter(Boolean),products});el<HTMLInputElement>('ai-consent').checked=false;await status();
  });
  on('ai-cancel',async()=>{await request('/cancel');el('ai-result').textContent='Análise cancelada.';await status();});
+ on('ai-direct',async()=>{await launchDirectAi();});
  el('ai-model').addEventListener('change',render);
  el('ai-proof').addEventListener('toggle',()=>{if((el('ai-proof') as HTMLDetailsElement).open)void status().catch(()=>{});});
  render();

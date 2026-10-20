@@ -21,7 +21,7 @@ function fixture(){
   }
   throw Error('Unexpected endpoint');
  }});
- const login=async()=>{const url=new URL(session.begin('http://127.0.0.1:18765/auth/callback'));session.pendingNonce=url.searchParams.get('nonce');await session.callback(new URLSearchParams({state:url.searchParams.get('state'),client_id:clientId,code:'one-time-code'}));return url;};
+ const login=async()=>{const url=new URL(await session.begin('http://127.0.0.1:18765/auth/callback'));session.pendingNonce=url.searchParams.get('nonce');await session.callback(new URLSearchParams({state:url.searchParams.get('state'),client_id:clientId,code:'one-time-code'}));return url;};
  return {session,requests,persisted,login,advance:()=>{current+=3590000;},refreshes:()=>refreshes};
 }
 test('OAuth usa PKCE e nonce, valida assinatura e mantém tokens fora dos registros/status',async()=>{
@@ -30,7 +30,7 @@ test('OAuth usa PKCE e nonce, valida assinatura e mantém tokens fora dos regist
  assert.doesNotMatch(JSON.stringify(f.session.status())+f.persisted.join(''),/private-access-token|private-refresh-token|id_token|access_token|refresh_token/);
  assert.equal((await f.session.models())[0].id,'fixture-model');assert.equal((await f.session.models()).length,1);
  f.advance();assert.deepEqual(await Promise.all([f.session.token(),f.session.token()]),['renewed-private-token','renewed-private-token']);assert.equal(f.refreshes(),1);
- assert.equal(new URL(f.session.begin('http://127.0.0.1:18765/auth/callback',clientId)).searchParams.get('client_id'),clientId);
+ assert.equal(new URL(await f.session.begin('http://127.0.0.1:18765/auth/callback',clientId)).searchParams.get('client_id'),clientId);
  assert.equal((await f.session.signout()).revoked,true);await assert.rejects(()=>f.session.token(),/Entre com ChatGPT/);
 });
 test('identidade rejeita audience, nonce, issuer, assinatura e expiração inválidos',async()=>{
@@ -39,10 +39,10 @@ test('identidade rejeita audience, nonce, issuer, assinatura e expiração invá
  const valid=jwt({});await assert.rejects(()=>verifyIdentity(valid.slice(0,-8)+'AAAAAAAA',options),/não passou/);assert.equal((await verifyIdentity(valid,options)).subject,'user-fixture');
 });
 test('callback rejeita state falso, cancelamento e registro incompleto; escopo ausente bloqueia análise',async()=>{
- const f=fixture(),start=new URL(f.session.begin('http://127.0.0.1:18765/auth/callback'));
+ const f=fixture(),start=new URL(await f.session.begin('http://127.0.0.1:18765/auth/callback'));
  await assert.rejects(()=>f.session.callback(new URLSearchParams({state:'wrong'})),/inválido/);
  await assert.rejects(()=>f.session.callback(new URLSearchParams({state:start.searchParams.get('state'),error:'access_denied'})),/recusada/);
- const again=new URL(f.session.begin('http://127.0.0.1:18765/auth/callback'));await assert.rejects(()=>f.session.callback(new URLSearchParams({state:again.searchParams.get('state'),code:'code'})),/incompleto/);
+ const again=new URL(await f.session.begin('http://127.0.0.1:18765/auth/callback'));await assert.rejects(()=>f.session.callback(new URLSearchParams({state:again.searchParams.get('state'),code:'code'})),/incompleto/);
  await f.login();f.session.active.scope='openid';await assert.rejects(()=>f.session.token(),/não autorizou/);
  f.session.fetcher=async()=>{throw Error('offline')};assert.equal((await f.session.signout()).revoked,false);assert.equal(f.session.status().connected,false);
 });

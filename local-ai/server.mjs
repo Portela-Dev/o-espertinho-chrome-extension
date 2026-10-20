@@ -44,7 +44,7 @@ export function createLocalServer({session,pairCode=randomBytes(18).toString('ba
    if(url.pathname==='/status'){send(res,200,{...session.status(),analysis:job});return;}
    if(url.pathname==='/login'){
     if(job?.status==='running')throw new LocalError('Aguarde ou cancele a análise antes de trocar de conta.');
-    send(res,200,{url:session.begin('http://'+host+'/auth/callback',data.accountId||undefined)});return;
+    send(res,200,{url:await session.begin('http://'+host+'/auth/callback',data.accountId||undefined)});return;
    }
    if(url.pathname==='/logout'){
     jobController?.abort();job=null;const result=await session.signout();send(res,200,result);return;

@@ -43,6 +43,8 @@ O computador e o Chrome precisam estar disponíveis. Suspensão, abas congeladas
 
 O painel tem uma prova de login oficial e análise de uma oferta com auxiliar Node.js local. Execute `npm run ai:helper`, vincule o código exibido no terminal e use **Continue with ChatGPT**. Tokens ficam somente em memória do auxiliar; o backend não recebe credenciais ou análises desta prova. Veja [instruções, testes e limites](docs/AI-LOCAL.md). O artefato inclui um ZIP separado do auxiliar, sem dependências externas.
 
+A segunda prova pode ser aberta por **Testar sem auxiliar — abrir aba de IA** no mesmo painel, com o auxiliar desligado. A sessão fica apenas na memória de uma aba interna, sem enviar credenciais ChatGPT ao backend. O retorno OAuth é observado pelo Chrome, sem servidor HTTP local; veja [o procedimento e as limitações experimentais](docs/AI-DIRECT.md).
+
 ## Segurança e limites do catálogo
 
 Em Admin → Exploração → Perfis, a paginação por rolagem permite avançar por distância ou ir até o fim do conteúdo carregado. A segunda opção repete a ida ao fim quando novos cards aumentam a página e aguarda os tempos de hidratação configurados. Só encerra por falta de progresso após as tentativas configuradas no fim da página, sem novos links nem aumento de altura. Funciona também com um contêiner de rolagem configurado, sem código específico por marketplace.

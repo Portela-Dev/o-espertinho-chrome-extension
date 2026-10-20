@@ -30,6 +30,8 @@
         <details><summary>Retomar execução ou prévia solicitada no admin</summary><button type="button" id="load-runs" class="secondary">Carregar execuções</button><ul id="runs"></ul><label for="runs-size">Itens por página</label><select id="runs-size"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select><div class="actions"><button type="button" id="runs-previous" class="secondary">Anterior</button><span id="runs-page"></span><button type="button" id="runs-next" class="secondary">Próxima</button></div></details>
       </section>
       <details id="ai-proof"><summary>Assistente IA local — prova de conceito</summary>
+        <button id="ai-direct" type="button" class="secondary">Testar sem auxiliar — abrir aba de IA</button>
+        <p class="hint">Segunda prova experimental. Abra este painel sobre uma oferta para trazer os metadados para a aba de teste. Desligue o auxiliar antes de testar o login direto.</p>
         <p class="hint">Analisa uma oferta com sua conta ChatGPT. O resultado fica nesta prova e não altera o catálogo. O uso consome os limites do seu plano.</p>
         <p class="hint">Inicie o auxiliar com <code>npm run ai:helper</code> na pasta da extensão. Copie o código de vínculo mostrado no terminal.</p>
         <label for="ai-code">Código de vínculo do auxiliar</label><input id="ai-code" type="password" autocomplete="new-password" maxlength="100">

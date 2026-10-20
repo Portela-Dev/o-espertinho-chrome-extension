@@ -38,6 +38,7 @@ for(const name of (await readdir(new URL('local-ai/',root))).filter(name=>name.e
 }
 helperFiles['package.json']=Buffer.from(JSON.stringify({name:'o-espertinho-local-ai',private:true,type:'module',engines:{node:'>=24'},scripts:{'ai:helper':'node local-ai/start.mjs'}},null,2));
 helperFiles['README.md']=await readFile(new URL('docs/AI-LOCAL.md',root));
+for(const name of ['openai-session.mjs','analysis.mjs'])helperFiles['extension/shared/'+name]=await readFile(new URL('extension/shared/'+name,root));
 const helperFilename=`o-espertinho-local-ai-${manifest.version}.zip`,helperZip=zipSync(helperFiles,{level:9});
 await writeFile(new URL(helperFilename,output),helperZip);
 await writeFile(

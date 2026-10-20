@@ -74,6 +74,8 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
   assert.ok(helperName);const helperZip=await readFile(new URL(helperName,directory)),helper=unzipSync(helperZip);
   assert.match(checksums,new RegExp(createHash('sha256').update(helperZip).digest('hex')));
   assert.ok(helper['local-ai/start.mjs']);assert.ok(helper['README.md']);assert.equal(JSON.parse(strFromU8(helper['package.json'])).scripts['ai:helper'],'node local-ai/start.mjs');
+  assert.ok(helper['extension/shared/openai-session.mjs']);assert.ok(helper['extension/shared/analysis.mjs']);
+  for(const path of ['direct-ai.html','direct-ai-return.html','direct-ai-page.js','shared/openai-session.mjs','shared/analysis.mjs'])assert.ok(files[path],path);
   assert.ok(!Object.keys(files).some(path=>path.startsWith('local-ai/')));
   assert.ok(!Object.keys(helper).some(path=>/registrations|\.env|node_modules/.test(path)));
   const popup = strFromU8(files[manifest.side_panel.default_path.split("?")[0]]);

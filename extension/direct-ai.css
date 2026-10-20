@@ -1,0 +1,7 @@
+body { width: auto; }
+main { max-width: 850px; margin: 0 auto; }
+section p { margin-bottom: 12px; }
+textarea { width: 100%; padding: 10px; resize: vertical; color: var(--select-color); background: var(--select-background); border: 1px solid var(--select-border); border-radius: 8px; font: inherit; }
+output { display: block; margin: 14px 0 8px; }
+.toast p { overflow-wrap: anywhere; margin: 0; }
+@media (max-width: 500px) { main { padding: 16px; } section { padding: 16px; } }

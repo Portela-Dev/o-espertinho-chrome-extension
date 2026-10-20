@@ -9,10 +9,12 @@ import {join,resolve,relative} from 'node:path';
 import {chromium} from 'playwright';
 import {discoverPage} from '../dist/catalog-discovery.js';
 import {createLocalServer} from '../local-ai/server.mjs';
+import {generateKeyPairSync,sign} from 'node:crypto';
+import {DIRECT_CALLBACK} from '../dist/direct-ai.js';
 
 test('Chromium real executa os quatro passos configuráveis em aba própria na mesma janela, sem sessão no backend', {skip:process.env.TEST_NATIVE_BROWSER!=='1',timeout:90000},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'espertinho-native-')),extension=join(directory,'extension');
- let context,server,marketServer,aiLocal;let marketOrigin,challenge=false;const received=[],visited=[];let run,item;
+ let context,server,marketServer,aiLocal;let marketOrigin,challenge=false;const received=[],visited=[],backendTraffic=[];let run,item;
  const discovery={rendering:{frameSelector:'',readySelector:'.card',timeoutMs:1000,settleDelayMs:0},extraction:{itemSelector:'.card',linkSelector:'a',linkAttribute:'href'},pagination:{mode:'next',nextSelector:'.next',disabledSelector:'',endSelector:'',missingNextAction:'finish',noProgressLimit:1,waitAfterMs:100},limits:{maxPages:2,maxItems:10,requestIntervalMs:100}};
  const recipe={id:'fixture',name:'Fixture',loginUrl:'https://shop.example.com/product',allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],batchSize:1,intervalMs:100,steps:[{type:'extract',source:'dom',name:'csrf',selector:'meta[name="csrf-token"]',attribute:'content'},{type:'request',url:'https://shop.example.com/convert',method:'POST',headers:{'X-CSRF-Token':'{{csrf}}'},body:{url:'{{originalUrl}}'},responsePath:'link'}]};
  const settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,categorySeparator:'>',blockRules:[{kind:'challenge',match:'selector',value:'.human-check'}],recipe};
@@ -24,9 +26,10 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   const aiAddress=await aiLocal.listen();
   await writeFile(join(extension,'local-ai.js'),(await readFile(join(extension,'local-ai.js'),'utf8')).replace('http://127.0.0.1:18765','http://127.0.0.1:'+aiAddress.port));
   await writeFile(join(extension,'background.js'),(await readFile(join(extension,'background.js'),'utf8'))+'\nglobalThis.catalogTest=runtime;\n');
-  const manifest=JSON.parse(await readFile(join(extension,'manifest.json'),'utf8'));manifest.host_permissions.push('https://shop.example.com/*','http://localhost/*','http://127.0.0.1/*');await writeFile(join(extension,'manifest.json'),JSON.stringify(manifest));
+  const manifest=JSON.parse(await readFile(join(extension,'manifest.json'),'utf8'));manifest.host_permissions.push('https://shop.example.com/*','http://localhost/*','http://127.0.0.1/*','https://auth.openai.com/*','https://api.openai.com/*');await writeFile(join(extension,'manifest.json'),JSON.stringify(manifest));
   server=createServer(async(req,res)=>{
    const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=chunks.length?JSON.parse(Buffer.concat(chunks)):undefined;
+   backendTraffic.push({url:req.url,body,authorization:req.headers.authorization});
    const path=req.url.split('?')[0].replace('/api/extension','');let data={};
    if(path==='/catalog/config')data={marketplaces:[{id:'fixture',name:'Fixture',catalog_executor:'extension',website_url:marketOrigin,allowedOrigins:[marketOrigin],config:settings}]};
    else if(path==='/catalog/stats')data={marketplaceId:'fixture',retryFailed:new URL(req.url,'http://localhost').searchParams.get('retryFailed')==='true',convert:{pending:0,completed:1,total:1},enrich:{pending:0,completed:1,total:1},prices:{pending:1,total:1},observedAt:new Date().toISOString()};
@@ -146,6 +149,48 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   assert.equal(await panel.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await panel.screenshot({path:'reports/local-ai-panel.png',fullPage:true});
   assert.doesNotMatch(JSON.stringify(received),/native-test-pair|fixture-model|needs_review/);
+  // No helper remains for the direct proof. Official endpoints below are simulated,
+  // while the browser really navigates to an unserved loopback callback.
+  await aiLocal.close();aiLocal=undefined;
+  const keys=generateKeyPairSync('rsa',{modulusLength:2048});let directNonce='',responses=0;const directStages=[];
+  await context.route('https://auth.openai.com/**',async route=>{
+   const url=new URL(route.request().url());
+   directStages.push(url.pathname);
+   if(url.pathname==='/api/accounts/authorize'){
+    directNonce=url.searchParams.get('nonce');
+    await route.fulfill({status:302,headers:{location:DIRECT_CALLBACK+'?'+new URLSearchParams({state:url.searchParams.get('state'),code:'DIRECT_TEST_CODE',client_id:'oaiapp_native_direct'})}});return;
+   }
+   if(url.pathname==='/.well-known/openid-configuration'){await route.fulfill({json:{issuer:'https://auth.openai.com',jwks_uri:'https://auth.openai.com/.well-known/jwks.json',revocation_endpoint:'https://auth.openai.com/revoke'}});return;}
+   if(url.pathname==='/.well-known/jwks.json'){await route.fulfill({json:{keys:[{...keys.publicKey.export({format:'jwk'}),kid:'direct-fixture',alg:'RS256'}]}});return;}
+   if(url.pathname==='/api/accounts/oauth/token'){
+    const header=Buffer.from(JSON.stringify({alg:'RS256',kid:'direct-fixture'})).toString('base64url'),body=Buffer.from(JSON.stringify({iss:'https://auth.openai.com',aud:'oaiapp_native_direct',sub:'native-direct-user',email:'direct@example.test',exp:Date.now()/1000+3600,nonce:directNonce})).toString('base64url'),input=header+'.'+body;
+    await route.fulfill({json:{id_token:input+'.'+sign('sha256',Buffer.from(input),keys.privateKey).toString('base64url'),access_token:'DIRECT_NATIVE_PRIVATE_ACCESS',refresh_token:'DIRECT_NATIVE_PRIVATE_REFRESH',scope:'openid chatgpt.tokens.use.direct',token_type:'Bearer',expires_in:3600}});return;
+   }
+   if(url.pathname==='/revoke'){await route.fulfill({status:200,body:''});return;}
+   await route.abort();
+  });
+  await context.route('https://api.openai.com/**',async route=>{
+   const url=new URL(route.request().url());
+   assert.equal(route.request().headers().authorization,'Bearer DIRECT_NATIVE_PRIVATE_ACCESS');
+   if(url.pathname==='/v1/models'){await route.fulfill({json:{models:[{slug:'direct-fixture',display_name:'Modelo direto de teste',visibility:'list'}]}});return;}
+   if(url.pathname==='/v1/responses'){
+    responses++;const input=route.request().postDataJSON();assert.equal(input.store,false);assert.equal(input.stream,true);
+    await route.fulfill({contentType:'text/event-stream',body:'data: '+JSON.stringify({type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({action:'needs_review',category:'Áudio',productId:null,product:null,reason:'Análise direta simulada sem auxiliar.'})}]}]}})+'\n\n'});return;
+   }
+   await route.abort();
+  });
+  const direct=await context.newPage();await direct.goto(new URL('direct-ai.html',worker.url()).href);
+  await direct.locator('#direct-login').click();
+  try{await direct.locator('#direct-status').filter({hasText:'Conta conectada diretamente'}).waitFor({timeout:20000});}
+  catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#direct-notice').textContent(),callback:await direct.locator('#direct-callback-status').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
+  await direct.locator('#direct-callback-status').filter({hasText:'reconhecido'}).waitFor();
+  await direct.locator('#direct-models').click();await direct.locator('#direct-model option').filter({hasText:'Modelo direto de teste'}).waitFor({state:'attached'});
+  await direct.locator('#direct-title').fill('Oferta direta de teste');await direct.locator('#direct-consent').check();await direct.locator('#direct-analyze').click();
+  await direct.locator('#direct-result').filter({hasText:'Análise direta simulada sem auxiliar'}).waitFor();assert.equal(responses,1);
+  const storage=await worker.evaluate(async()=>({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
+  assert.doesNotMatch(JSON.stringify(storage)+JSON.stringify(backendTraffic),/DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/);
+  await direct.setViewportSize({width:390,height:1000});assert.equal(await direct.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await direct.screenshot({path:'reports/direct-ai-page.png',fullPage:true});
+  await direct.locator('#direct-logout').click();await direct.locator('#direct-status').filter({hasText:'desconectado'}).waitFor();
  }finally{
   await context?.close();await aiLocal?.close();if(server)await new Promise(r=>server.close(r));if(marketServer)await new Promise(r=>marketServer.close(r));
   if(relative(resolve(tmpdir()),resolve(directory)).startsWith('..'))throw Error('Diretório de teste inválido.');
