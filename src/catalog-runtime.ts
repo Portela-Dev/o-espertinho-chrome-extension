@@ -105,7 +105,7 @@ export class CatalogRuntime {
   const checkpoint=item.payload.checkpoint;
   const sameTab=!!this.state.tabId;
   if(step==='discover'&&checkpoint)url=checkpoint.url;
-  await this.navigation.ensure(url,origins,!(step==='convert'&&sameTab)&&!(step==='discover'&&checkpoint&&sameTab&&['load_more','scroll'].includes(item.payload.config.pagination.mode)));
+  await this.navigation.ensure(url,origins,!(step==='convert'&&sameTab)&&!(step==='discover'&&checkpoint&&sameTab&&(['load_more','scroll'].includes(item.payload.config.pagination.mode)||checkpoint.advance)));
   await this.navigation.wait(origins,settings.timeoutMs);
   assertActive();const block=await this.navigation.inspect(settings.blockRules);if(block&&block!=='unavailable')return {blocked:block};
   const inject=async(func:any,args:any[])=>{assertActive();const values=await this.browser.scripting.executeScript({target:{tabId:this.state.tabId!},world:'ISOLATED',func,args});const value=values[0]?.result;if(value===undefined)throw Error('incomplete');return value as any;};
@@ -117,7 +117,7 @@ export class CatalogRuntime {
   if(step==='discover'){
    const config=item.payload.config,page=(checkpoint?.page??0)+1;
    if(config.rendering.frameSelector)throw Error('configuration');
-   if(checkpoint&&['load_more','scroll'].includes(config.pagination.mode)){if(!sameTab)throw Error('incomplete');const advance=await inject(discoverPage,[{config,rules:settings.blockRules,action:'advance',page}]);if(advance.blocked)return advance;}
+   if(checkpoint&&(['load_more','scroll'].includes(config.pagination.mode)||checkpoint.advance)){if(!sameTab)throw Error('incomplete');const advance=await inject(discoverPage,[{config,rules:settings.blockRules,action:'advance',page}]);if(advance.blocked)return advance;await sleep(Math.max(50,config.pagination.waitAfterMs));await this.navigation.wait(origins,settings.timeoutMs);}
    const result=await inject(discoverPage,[{config,rules:settings.blockRules,action:'read',page}]);if(result.blocked)return result;
    if(result.invalid&&discoveryPolicy(config,'invalidItem',5).action!=='skip_item')throw Error('invalidItem');
    const links=result.links.filter((value:string)=>{try{return origins.includes(new URL(value).origin);}catch{return false;}});
@@ -126,7 +126,7 @@ export class CatalogRuntime {
    const noProgress=seen.includes(fingerprint)?(checkpoint?.noProgress??0)+1:0;
    const done=result.done||(['next','url'].includes(config.pagination.mode)&&seen.includes(fingerprint))||page>=config.limits.maxPages||found>=config.limits.maxItems||noProgress>=config.pagination.noProgressLimit;
    if(links.length!==result.links.length&&discoveryPolicy(config,'invalidItem',5).action!=='skip_item')throw Error('invalidItem');
-   return {outcome:'success',links:links.slice(0,Math.max(0,config.limits.maxItems-(checkpoint?.found??0))),done,checkpoint:{url:result.nextUrl??result.url,page,seen:[...seen,fingerprint].slice(-1000),found:Math.min(found,config.limits.maxItems),noProgress}};
+   return {outcome:'success',links:links.slice(0,Math.max(0,config.limits.maxItems-(checkpoint?.found??0))),done,checkpoint:{url:result.nextUrl??result.url,page,seen:[...seen,fingerprint].slice(-1000),found:Math.min(found,config.limits.maxItems),noProgress,advance:!done&&config.pagination.mode==='next'&&!result.nextUrl}};
   }
   return inject(extractCatalogProduct,[{profile:snapshot.profile,settings,originalUrl:item.payload.originalUrl,allowedOrigins:origins}]);
  }
@@ -144,6 +144,7 @@ export class CatalogRuntime {
    try{return await this.execute(claim);}catch(error){
     const message=error instanceof Error?error.message:'navigation';
     if(['permission','tab_closed','interrupted','access_denied'].includes(message))throw error;
+    if(message==='limit')return {outcome:'technical_failure',reason:'incomplete',failureType:'limit'};
     const kind=failureKind(message),policy=discoveryPolicy(config,kind,attempt);
     if(policy.retry){await sleep(policy.delayMs);continue;}
     if(policy.action==='skip_page'&&config.pagination.mode==='url'){

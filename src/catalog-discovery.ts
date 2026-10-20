@@ -9,8 +9,8 @@ export async function discoverPage(input:{config:any;rules:any[];action:'read'|'
  if(input.action==='advance'){
   const p=config.pagination;
   if(p.mode==='scroll'){const scroller=p.scrollContainerSelector?document.querySelector(p.scrollContainerSelector):window;if(!scroller)throw Error('configuration');scroller.scrollBy(0,p.scrollStepPx);}
-  else{const next=document.querySelector<HTMLElement>(p.nextSelector);if(!next)return {end:true};next.click();}
-  await wait(config.pagination.waitAfterMs);return {advanced:true};
+  else{const next=document.querySelector<HTMLElement>(p.nextSelector);if(!next)return {end:true};setTimeout(()=>next.click(),0);}
+  return {advanced:true};
  }
  const end=Date.now()+config.rendering.timeoutMs;
  while(Date.now()<end){const block=blocked();if(block)return {blocked:block};if(document.querySelector(config.rendering.readySelector||config.extraction.itemSelector))break;await wait(200);}
@@ -18,6 +18,7 @@ export async function discoverPage(input:{config:any;rules:any[];action:'read'|'
  const block=blocked();if(block)return {blocked:block};
  const cards=Array.from(document.querySelectorAll(config.extraction.itemSelector));
  if(!cards.length)throw Error('emptyPage');
+ if(cards.length>500)throw Error('limit');
  const links:string[]=[];let invalid=0;
  for(const card of cards.slice(0,500)){
   const el=config.extraction.linkSelector===':scope'?card:card.querySelector(config.extraction.linkSelector);

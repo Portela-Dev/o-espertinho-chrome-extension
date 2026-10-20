@@ -39,7 +39,7 @@ test('Chromium real executa os quatro passos configuráveis em janela própria, 
   marketServer=createHttpsServer({key:await readFile(keyFile),cert:await readFile(certFile)},(req,res)=>{
    const url=new URL(req.url,marketOrigin);
    if(url.pathname==='/convert'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({link:marketOrigin+'/product?affiliate=fixture'}));return;}
-   const html=challenge?'<div class="human-check">Intervenção no ambiente de teste</div>':url.pathname.startsWith('/list')?'<div class="card"><a href="/product?ref=test">Product</a></div>'+(url.pathname==='/list'?'<a class="next" href="/list2">Next</a>':''):'<nav><a>Eletrônicos</a><a>Áudio</a></nav><h1>Produto controlado</h1><div class="price">R$ 123,45</div>';
+   const html=challenge?'<div class="human-check">Intervenção no ambiente de teste</div>':url.pathname.startsWith('/list')?'<div class="card"><a href="/product?ref=test">Product</a></div>'+(url.pathname==='/list'?'<button class="next" onclick="location.href=&quot;/list2&quot;">Next</button>':''):'<nav><a>Eletrônicos</a><a>Áudio</a></nav><h1>Produto controlado</h1><div class="price">R$ 123,45</div>';
    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<!doctype html><html lang="pt-BR"><head><title>Fixture</title></head><body>'+html+'</body></html>');
   });await new Promise(r=>marketServer.listen(0,'127.0.0.1',r));marketOrigin='https://shop.example.com:'+marketServer.address().port;
   recipe.loginUrl=marketOrigin+'/product';recipe.allowedOrigins=[marketOrigin];recipe.affiliateOrigins=[marketOrigin];recipe.steps[0].url=marketOrigin+'/convert';snapshot.market.allowedHosts=['shop.example.com:'+marketServer.address().port];
