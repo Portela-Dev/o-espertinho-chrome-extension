@@ -5,6 +5,25 @@ const element = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 let view: View | undefined;
 let busy = false;
+const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
+document.body.classList.toggle('side-panel', isPanel);
+element<HTMLSelectElement>('display-mode').value = isPanel ? 'panel' : 'popup';
+element('apply-display-mode').addEventListener('click', () => {
+  void act(async () => {
+    const mode = element<HTMLSelectElement>('display-mode').value;
+    if (mode === (isPanel ? 'panel' : 'popup')) return;
+    if (mode === 'panel') {
+      const currentWindow = await chrome.windows.getCurrent();
+      if (currentWindow.id === undefined) throw new Error('Janela do navegador não encontrada.');
+      // Open while the user gesture is active; enabling is needed after popup mode.
+      await chrome.sidePanel.setOptions({ enabled: true });
+      await chrome.sidePanel.open({ windowId: currentWindow.id });
+    }
+    const reply = await chrome.runtime.sendMessage({ type: 'DISPLAY_MODE', mode });
+    if (reply.error) throw new Error(reply.error);
+    window.close();
+  });
+});
 async function send(type: string, extra: Record<string, unknown> = {}) {
   const reply = await chrome.runtime.sendMessage({ type, ...extra });
   if (reply.error) throw new Error(type==='PROOF_BATCH'&&reply.error==='Operação desconhecida.'?'Recarregue a extensão em chrome://extensions para atualizar o serviço de segundo plano e iniciar o lote.':reply.error);
@@ -85,7 +104,7 @@ element("settings").addEventListener("submit", (event) => {
     await send("BACKEND", { url });
   });
 });
-element('pick-elements').addEventListener('click',()=>{void act(async()=>{await launchSelectorPicker();window.close();});});
+element('pick-elements').addEventListener('click',()=>{void act(async()=>{await launchSelectorPicker();if(!isPanel)window.close();});});
 const proofMarket=()=>view?.proofMarkets?.find(m=>m.id===element<HTMLSelectElement>('proof-marketplace').value);
 const affiliateMarket=()=>view?.affiliateConfig?.marketplaces.find(m=>m.id===element<HTMLSelectElement>('affiliate-marketplace').value);
 element('affiliate-load').addEventListener('click',()=>{void act(()=>send('AFFILIATE_LOAD'));});

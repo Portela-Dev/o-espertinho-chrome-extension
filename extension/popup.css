@@ -7,7 +7,15 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; width: 400px; }
+body.side-panel { width: 100%; min-width: 0; }
 main { padding: 24px; }
+.side-panel main { padding: 16px; }
+.side-panel section { padding: 16px; }
+.side-panel header > div { min-width: 0; }
+.side-panel h1 { font-size: clamp(19px, 6vw, 25px); }
+.display-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 16px; }
+.display-controls label, .display-controls p { grid-column: 1 / -1; margin: 0; }
+.display-controls .hint { line-height: 1.5; }
 header { display: flex; align-items: center; gap: 12px; }
 header img { flex-shrink: 0; object-fit: contain; }
 h1 { margin: 3px 0 0; font-size: 25px; letter-spacing: -1px; }

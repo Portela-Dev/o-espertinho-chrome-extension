@@ -9,7 +9,8 @@
     "alarms",
     "scripting",
     "activeTab",
-    "webRequest"
+    "webRequest",
+    "sidePanel"
   ],
   "host_permissions": [
     "http://localhost/*"
@@ -27,13 +28,15 @@
   },
   "action": {
     "default_title": "O Espertinho",
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/fox-v4-16.png",
       "32": "icons/fox-v4-32.png",
       "48": "icons/fox-v4-48.png",
       "128": "icons/fox-v4-128.png"
     }
+  },
+  "side_panel": {
+    "default_path": "popup.html?view=panel"
   },
   "background": {
     "service_worker": "background.js",

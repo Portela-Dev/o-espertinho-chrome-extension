@@ -6,6 +6,8 @@ Extensão Chrome Manifest V3 em TypeScript, com autenticação real no O Esperti
 
 ## Testar localmente
 
+Ao clicar no ícone, a extensão abre por padrão no **painel lateral**, que permanece aberto enquanto você navega e seleciona elementos da página. Em **Visualização**, escolha **Popup** e clique em **Aplicar** para voltar ao formato compacto; depois clique no ícone para abri-lo. No popup, escolha **Painel lateral** e aplique para abrir o painel novamente. A preferência é salva neste perfil do Chrome e restaurada quando o navegador reinicia. Login, filas e progresso continuam compartilhados entre as duas visualizações. A largura do painel pode ser ajustada arrastando sua borda no Chrome.
+
 Requisito: Node.js 24 e Chrome. O backend precisa estar na branch que implementa `/api/extension`, com a migration `019_extension_access.sql` aplicada.
 
 No backend (`1-backend`):

@@ -161,6 +161,14 @@ test("eventos da interface enviam comandos e apresentam erros da API", async () 
     window.close=()=>{closed++;};
     el('pick-elements').click();await tick();assert.equal(injections,1);assert.equal(closed,1);
     chrome.tabs.query=async()=>[{id:12,url:'chrome://extensions'}];el('pick-elements').click();await tick();assert.equal(el('error').hidden,false);
+    let panelWindow;
+    chrome.windows = { getCurrent: async () => ({ id: 42 }) };
+    chrome.sidePanel = { setOptions: async () => {}, open: async options => { panelWindow = options.windowId; } };
+    el('display-mode').value = 'panel';
+    el('apply-display-mode').click();await tick();
+    assert.equal(panelWindow, 42);
+    assert.ok(messages.some(message => message.type === 'DISPLAY_MODE' && message.mode === 'panel'));
+    assert.equal(closed, 2);
     await tick();
   } finally {
     globalThis.setInterval = originalInterval;

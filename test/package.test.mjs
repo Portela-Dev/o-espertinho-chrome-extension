@@ -27,7 +27,9 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
   const manifest = JSON.parse(strFromU8(files["manifest.json"]));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, "module");
-  assert.deepEqual(manifest.permissions, ["storage", "alarms", "scripting", "activeTab", "webRequest"]);
+  assert.deepEqual(manifest.permissions, ["storage", "alarms", "scripting", "activeTab", "webRequest", "sidePanel"]);
+  assert.equal(manifest.action.default_popup, undefined);
+  assert.equal(manifest.side_panel.default_path, "popup.html?view=panel");
   assert.deepEqual(manifest.optional_permissions,['cookies']);
   assert.equal(manifest.host_permissions.length, 1);
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
@@ -42,7 +44,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
   );
 
   for (const path of [
-    manifest.action.default_popup,
+    manifest.side_panel.default_path.split("?")[0],
     manifest.background.service_worker,
     "popup.js",
     "popup.css",
@@ -68,7 +70,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
     checksums,
     `${createHash("sha256").update(zip).digest("hex")}  ${filename}\n`,
   );
-  const popup = strFromU8(files[manifest.action.default_popup]);
+  const popup = strFromU8(files[manifest.side_panel.default_path.split("?")[0]]);
   assert.match(popup, /src="popup\.js"/);
   assert.doesNotMatch(popup, /<script(?![^>]*\bsrc=)[^>]*>/i);
 });
