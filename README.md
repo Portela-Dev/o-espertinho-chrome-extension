@@ -45,6 +45,6 @@ Receitas suportam extract, request GET/POST na mesma origem, fill e click, com v
 
 Playwright é dependência somente de testes e não entra no ZIP. O teste nativo usa perfil temporário, certificado descartável e flags exclusivamente de teste; não acessa perfil pessoal, banco ou sessões reais. A API de fixture não substitui os testes SQL do backend. O CI instala Chromium e executa esse teste além dos unitários.
 
-SonarQube permanece no runner Windows windows-portela-dev; validação/pacote ficam em ubuntu-latest. Projeto Sonar: o-espertinho-chrome-extension. Configurações: SONAR_ENABLED, SONAR_HOST_URL e SONAR_TOKEN. Nenhum deploy acontece em PR.
+SonarQube permanece no runner Windows windows-portela-dev; validação/pacote ficam em ubuntu-22.04, preservando a sandbox do Chromium. Projeto Sonar: o-espertinho-chrome-extension. Configurações: SONAR_ENABLED, SONAR_HOST_URL e SONAR_TOKEN. Nenhum deploy acontece em PR.
 
 Documentos em docs/SESSION_PROOF.md e docs/AFFILIATE_PROOF.md são registros históricos de provas encerradas, sem rotas/telas no runtime atual. O plano principal e os aceites operacionais ficam no workspace e em 1-backend/docs.
