@@ -39,12 +39,12 @@ test("build valida backend e versao e nao inclui source maps de teste na produca
     assert.equal(build("http://remote.test").status, 1);
     assert.equal(build("http://localhost:3000", ["--coverage"]).status, 0);
     assert.match(
-      await readFile(join(temp, "dist/runtime.js"), "utf8"),
+      await readFile(join(temp, "dist/catalog-runtime.js"), "utf8"),
       /sourceMappingURL=data:/,
     );
     assert.equal(build("https://api.test").status, 0);
     assert.doesNotMatch(
-      await readFile(join(temp, "dist/runtime.js"), "utf8"),
+      await readFile(join(temp, "dist/catalog-runtime.js"), "utf8"),
       /sourceMappingURL/,
     );
     const manifest = JSON.parse(

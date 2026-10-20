@@ -10,124 +10,31 @@
   </head>
   <body>
     <main>
-      <header>
-        <img
-          src="icons/fox-v4-128.png"
-          width="64"
-          height="64"
-          alt="Mascote do O Espertinho"
-       >
-        <div>
-          <p class="eyebrow">Seu próximo achado começa aqui</p>
-          <h1>O Espertinho</h1>
-        </div>
-      </header>
+      <header><img src="icons/fox-v4-128.png" width="64" height="64" alt="Mascote do O Espertinho"><div><p class="eyebrow">Seu próximo achado começa aqui</p><h1>O Espertinho</h1></div></header>
       <div class="display-controls">
-        <label class="display-switch">
-          <span>Popup</span>
-          <input type="checkbox" role="switch" id="display-mode" aria-label="Usar painel lateral" aria-describedby="display-hint">
-          <span>Painel lateral</span>
-        </label>
-        <p id="display-hint" class="hint">Sua preferência será usada ao clicar no ícone. O popup fecha ao interagir com a página.</p>
+        <label class="display-switch"><span>Popup</span><input type="checkbox" role="switch" aria-checked="false" id="display-mode" aria-label="Usar painel lateral" aria-describedby="display-hint"><span>Painel lateral</span></label>
+        <p id="display-hint" class="hint">O popup fecha ao interagir com a página. O painel permanece aberto.</p>
       </div>
       <p id="error" class="error" role="alert" hidden></p>
-      <section aria-labelledby="status-title">
-        <span class="badge" id="mode">Conexão local</span>
-        <h2 id="status-title">Gerar links de afiliados</h2>
-        <p id="account">Conta desconectada</p>
-        <output id="status" aria-live="polite"
-          >Conectando ao serviço da extensão…</output
-        >
-        <div class="actions">
-          <button type="button" id="login">Entrar no O Espertinho</button>
-          <button type="button" id="logout" class="secondary" hidden>
-            Sair
-          </button>
-        </div>
-      </section>
+      <section aria-labelledby="account-title"><h2 id="account-title">Conta do O Espertinho</h2><p id="account">Conta desconectada</p><output id="status" aria-live="polite">Conectando…</output><div class="actions"><button type="button" id="login">Entrar no O Espertinho</button><button type="button" id="logout" class="secondary" hidden>Sair</button></div></section>
       <section id="workspace" aria-labelledby="workspace-title" hidden>
-        <h2 id="workspace-title">Links pendentes</h2>
-        <label for="marketplace">Marketplace</label>
-        <select id="marketplace"></select>
-        <div class="actions">
-          <button type="button" id="open" class="secondary">
-            Abrir marketplace
-          </button>
-          <button type="button" id="refresh" class="secondary">
-            Atualizar fila
-          </button>
-        </div>
-        <progress
-          id="progress"
-          max="1"
-          value="0"
-          aria-label="Progresso da geração"
-        ></progress>
-        <p id="counts"></p>
-        <p id="current"></p>
-        <div class="actions">
-          <button type="button" id="start">Gerar links pendentes</button>
-          <button type="button" id="pause" class="secondary" disabled>
-            Pausar
-          </button>
-        </div>
-        <ul id="results" aria-label="Resultados dos links"></ul>
-        <button type="button" id="reset" class="secondary" hidden>
-          Reiniciar demonstração
-        </button>
+        <h2 id="workspace-title">Manter catálogo</h2>
+        <label for="marketplace">Marketplace</label><select id="marketplace"></select>
+        <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar janela / fazer login</button></div>
+        <p class="hint">Use a janela de processamento para o login. Se a receita exigir um header de sessão, gere um link manualmente nessa janela antes de converter.</p>
+        <label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100">
+        <label><input id="retry-failed" type="checkbox"> Incluir extrações com falha</label>
+        <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-prices">4 — Atualizar preços</button></div>
+        <p class="hint">Etapas manuais e independentes. Revise categorias e produtos e publique pelo admin.</p>
+        <h3>Execução atual</h3><output id="run-status" aria-live="polite">Nenhuma execução selecionada.</output>
+        <progress id="progress" max="1" value="0" aria-label="Progresso da execução"></progress>
+        <p id="counts" class="hint"></p>
+        <div class="actions"><button type="button" id="pause" class="secondary">Pausar</button><button type="button" id="resume">Continuar</button><button type="button" id="cancel" class="secondary">Cancelar execução</button><button type="button" id="focus" class="secondary">Abrir janela de processamento</button></div>
+        <details><summary>Retomar execução ou prévia solicitada no admin</summary><button type="button" id="load-runs" class="secondary">Carregar execuções</button><ul id="runs"></ul><label for="runs-size">Itens por página</label><select id="runs-size"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select><div class="actions"><button type="button" id="runs-previous" class="secondary">Anterior</button><span id="runs-page"></span><button type="button" id="runs-next" class="secondary">Próxima</button></div></details>
       </section>
-      <section id="affiliate-proof" aria-labelledby="affiliate-proof-title" hidden>
-        <h2 id="affiliate-proof-title">Conversão antes do enriquecimento</h2>
-        <p class="hint">Teste com até 3 links. Somente os links gerados vão ao backend; cookies e headers de sessão ficam no navegador.</p>
-        <button type="button" id="affiliate-load" class="secondary">Carregar receitas cadastradas</button>
-        <label for="affiliate-marketplace">Marketplace do teste</label>
-        <select id="affiliate-marketplace"></select>
-        <button type="button" id="affiliate-arm" class="secondary">Preparar aba do marketplace</button>
-        <p class="hint">Depois de preparar a aba, gere um link manualmente pelo site para observar o header configurado. Não é necessário copiar cookies ou tokens.</p>
-        <p id="affiliate-header" role="status"></p>
-        <button type="button" id="affiliate-start">Converter até 3 links</button>
-        <button type="button" id="affiliate-enrich" class="secondary">Iniciar enriquecimento dos convertidos</button>
-        <button type="button" id="affiliate-refresh" class="secondary">Atualizar resultado do teste</button>
-        <button type="button" id="affiliate-reset" class="secondary">Novo teste</button>
-        <output id="affiliate-result" aria-live="polite"></output>
-      </section>
-      <section id="session-proof" aria-labelledby="proof-title" hidden>
-        <h2 id="proof-title">Prova de sessão no container</h2>
-        <p class="hint">Somente para administrador no ambiente de teste. A sessão é enviada ao backend e descartada após o teste, sem salvar cookies no banco.</p>
-        <button type="button" id="proof-load" class="secondary">Carregar marketplaces cadastrados</button>
-        <label for="proof-marketplace">Marketplace da prova</label>
-        <select id="proof-marketplace"></select>
-        <button type="button" id="proof-open" class="secondary">Abrir marketplace</button>
-        <p class="hint">Se você já estiver logado na loja, use a sessão atual. Abra a extensão nessa aba e capture a sessão.</p>
-        <label for="proof-url">Link HTTPS para testar</label>
-        <input id="proof-url" type="url">
-        <label><input type="checkbox" id="proof-batch"> Testar até 5 links com falha no enriquecimento deste marketplace</label>
-        <p class="hint">No lote, o backend escolhe os links com falha. Os acessos são sequenciais, com pelo menos 20 segundos entre eles, sem alterar os registros de enriquecimento.</p>
-        <p id="proof-domains" class="hint"></p>
-        <label><input type="checkbox" id="proof-storage"> Incluir armazenamento local da aba (opcional)</label>
-        <label><input type="checkbox" id="proof-consent"> Autorizo enviar temporariamente os cookies destes domínios e o armazenamento selecionado para este teste.</label>
-        <button type="button" id="proof-capture">Capturar sessão e testar</button>
-        <output id="proof-result" aria-live="polite"></output>
-      </section>
-      <section aria-labelledby="picker-title">
-        <h2 id="picker-title">Seletores da página</h2>
-        <p class="hint">Inspecione elementos, escolha pais ou filhos e copie seletores CSS. Funciona localmente, sem enviar a página ao backend.</p>
-        <button type="button" id="pick-elements">Selecionar elementos na aba atual</button>
-      </section>
-      <details>
-        <summary>Configurações</summary>
-        <form id="settings">
-          <label for="backend">URL do backend</label>
-          <input id="backend" name="backend" type="url" required>
-          <button type="submit" class="secondary" id="save-backend">
-            Salvar endereço
-          </button>
-          <p class="hint">
-            O endereço padrão vem de BACKEND_URL. Saia da conta para alterá-lo.
-          </p>
-        </form>
-      </details>
-      <footer>Versão <span id="version">—</span></footer>
+      <section aria-labelledby="picker-title"><h2 id="picker-title">Selecionar elementos</h2><p>Selecione e componha seletores na página atual. Pause o processamento antes de inspecionar.</p><button type="button" id="pick-elements">Selecionar elementos na aba atual</button></section>
+      <details><summary>Configuração da conexão</summary><form id="settings"><label for="backend">URL do backend</label><input id="backend" type="url" required><button type="submit" id="save-backend">Salvar conexão</button></form></details>
+      <footer>Versão <span id="version"></span></footer>
     </main>
   </body>
 </html>

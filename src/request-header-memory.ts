@@ -31,7 +31,7 @@ export class RequestHeaderMemory {
   const memory=(await this.browser.storage.session.get(storageKey))[storageKey] as Memory|undefined;
   const needed=recipe.steps.filter(s=>s.type==='extract'&&s.source==='requestHeader');
   if(!needed.length)return {};
-  if(!memory||memory.recipeId!==recipe.id||memory.expiresAt<Date.now()||needed.some(s=>s.type!=='extract'||!Object.hasOwn(memory.values,s.name)||typeof memory.values[s.name]!=='string'||!memory.values[s.name]||!memory.captures.some(c=>c.name===s.name&&c.url===new URL(s.sourceUrl!).origin+new URL(s.sourceUrl!).pathname&&c.header===s.key!.toLowerCase())))throw new Error('Gere um link manualmente na aba preparada para observar o header de sessão.');
+  if(memory?.recipeId!==recipe.id||memory.expiresAt<Date.now()||needed.some(s=>s.type!=='extract'||!Object.hasOwn(memory.values,s.name)||typeof memory.values[s.name]!=='string'||!memory.values[s.name]||!memory.captures.some(c=>c.name===s.name&&c.url===new URL(s.sourceUrl!).origin+new URL(s.sourceUrl!).pathname&&c.header===s.key!.toLowerCase())))throw new Error('Gere um link manualmente na aba preparada para observar o header de sessão.');
   return memory.values;
  }
  async ready(recipe:Recipe){try{await this.values(recipe);return true;}catch{return false;}}

@@ -1,3 +1,5 @@
+> Histórico de POC encerrada. Este procedimento não faz parte da extensão atual. Use o README e o plano de migração. Não exporte sessões de marketplace.
+
 # Conversão local antes do enriquecimento
 
 Prova de desenvolvimento com até três links descobertos que falharam no enriquecimento. Não usa a captura de cookies da prova anterior. A sessão permanece no Chrome: o executor chama o endpoint de conversão na mesma origem da aba, com `credentials: include`. Apenas o link final ou `conversion_failed` chega ao backend.

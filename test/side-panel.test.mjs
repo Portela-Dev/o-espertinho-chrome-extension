@@ -11,7 +11,7 @@ test('selecionar elementos mantém painel aberto e alternância solicita popup a
   let injected = 0, closed = 0;
   const messages = [];
   const view = { backendUrl: 'http://localhost:3000', pairing: false,
-    progress: { status: 'idle', success: 0, failed: 0, total: 0, message: '' }, version: '0.2.0' };
+    markets: [], message: '', version: '0.2.0' };
   globalThis.chrome = {
     runtime: { sendMessage: async message => { messages.push(message); return { value: view }; } },
     tabs: { query: async () => [{ id: 12, url: 'https://shop.test/products' }] },

@@ -91,7 +91,7 @@ export async function executeRecipe(
   function requestHeaders(step: Extract<Step, { type: "request" }>) {
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(step.headers ?? {})) {
-      if (/^(cookie|host|origin|referer|proxy-|sec-)/i.test(key)) {
+      if (/^(cookie|authorization|host|origin|referer|proxy-|sec-)/i.test(key)) {
         throw new Error("Header reservado.");
       }
       headers[key] = render(value);
