@@ -1,6 +1,6 @@
 # O Espertinho — extensão Chrome
 
-Extensão Manifest V3/TypeScript para quatro etapas manuais de manutenção do catálogo, usando receitas e seletores do backend, sem implementação fixa por marketplace.
+Extensão Manifest V3/TypeScript para seis etapas manuais de manutenção do catálogo, usando receitas e seletores do backend, sem implementação fixa por marketplace.
 
 ## Instalar e conectar
 
@@ -41,7 +41,7 @@ O computador e o Chrome precisam estar disponíveis. Suspensão, abas congeladas
 
 ## IA do catálogo (teste)
 
-Login com ChatGPT, modelos e análise de uma oferta ficam no painel lateral da extensão. Apenas a autorização abre uma aba; ela fecha após o retorno. Não há auxiliar, servidor local ou aba separada de análise. Tokens ficam exclusivamente na memória do painel, sem envio ao backend. Fechar/recarregar o painel exige novo login. Veja [instruções e limites](docs/AI.md).
+Login com ChatGPT, modelos e análise de uma oferta ficam no painel lateral da extensão. Apenas a autorização abre uma aba; ela fecha após o retorno. Não há auxiliar, servidor local ou aba separada de análise. Tokens ficam exclusivamente na memória do painel, sem envio das credenciais ao backend. Fechar/recarregar o painel exige novo login. Veja [instruções e limites](docs/AI.md).
 
 ## Segurança e limites do catálogo
 

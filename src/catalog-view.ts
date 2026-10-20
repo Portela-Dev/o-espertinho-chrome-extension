@@ -16,7 +16,7 @@ const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as
 export const runLabel = (status: string) => ({
     queued: 'Aguardando início', running: 'Em execução', paused_by_user: 'Pausada', waiting_for_human: 'Intervenção humana necessária', paused_technical: 'Pausa técnica', completed: 'Concluída', failed: 'Falha', cancelled: 'Cancelada'
 } as Record<string, string>)[status] ?? status;
-export const stepLabel=(step:string)=>({discover:'1 — Extrair links',convert:'2 — Gerar links de afiliados',enrich:'3 — Extrair informações dos produtos',prices:'4 — Atualizar preços',preview:'Prévia manual',selector_test:'Teste de seletores'} as Record<string,string>)[step]??step;
+export const stepLabel=(step:string)=>({discover:'1 — Extrair links',convert:'2 — Gerar links de afiliados',enrich:'3 — Extrair informações dos produtos',category:'4 — Categorizar produtos',product:'5 — Catalogar produtos',prices:'6 — Analisar Preços',preview:'Prévia manual',selector_test:'Teste de seletores'} as Record<string,string>)[step]??step;
 function renderQueue(view:CatalogView,marketplaceId:string){
     const stats=view.stats?.marketplaceId===marketplaceId?view.stats:undefined;
     for(const step of ['convert','enrich','prices'] as const){

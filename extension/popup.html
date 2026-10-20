@@ -18,9 +18,11 @@
         <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar aba / fazer login</button></div>
         <p id="session-hint" class="hint">Use a aba de processamento para o login. Os valores de sessão são obtidos conforme a receita configurada.</p>
         <label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100" aria-describedby="limit-hint">
-        <p id="limit-hint" class="hint">Etapa 1: quantidade de vitrines. Limites de links e páginas por vitrine são definidos no admin, em Exploração → Perfis. Etapas 2 a 4: quantidade de links ou ofertas. Os contadores dos botões mostram o catálogo já salvo, sem limitar o total por este campo.</p>
+        <p id="limit-hint" class="hint">Etapa 1: quantidade de vitrines. Limites de links e páginas por vitrine são definidos no admin, em Exploração → Perfis. Etapas 2 a 6: quantidade de links ou ofertas. Os contadores dos botões mostram o catálogo já salvo, sem limitar o total por este campo.</p>
         <label><input id="retry-failed" type="checkbox"> Incluir extrações com falha</label>
-        <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-prices">4 — Atualizar preços</button></div>
+        <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-category" disabled>4 — Categorizar produtos · entre no ChatGPT</button><button type="button" id="step-product" disabled>5 — Catalogar produtos · entre no ChatGPT</button><hr class="workflow-divider"><button type="button" id="step-prices">6 — Analisar Preços</button></div>
+        <label><input id="ai-workflow-consent" type="checkbox"> Autorizo analisar os itens deste lote e seus candidatos usando meu plano ChatGPT. As sugestões aguardam confirmação no admin.</label>
+        <output id="ai-batch-status" aria-live="polite"></output><progress id="ai-batch-progress" hidden max="1" value="0" aria-label="Progresso da revisão por IA"></progress><button id="ai-batch-cancel" type="button" class="secondary" hidden>Cancelar revisão por IA</button>
         <p id="queue-counts" class="hint" aria-live="polite"></p>
         <p class="hint">Etapas manuais e independentes. Revise categorias e produtos e publique pelo admin.</p>
         <h3>Execução atual</h3><output id="run-status" aria-live="polite">Nenhuma execução selecionada.</output>
@@ -29,16 +31,16 @@
         <div class="actions"><button type="button" id="pause" class="secondary">Pausar</button><button type="button" id="resume">Continuar</button><button type="button" id="cancel" class="secondary">Cancelar execução</button><button type="button" id="focus" class="secondary">Abrir aba de processamento</button></div>
         <details><summary>Retomar execução ou prévia solicitada no admin</summary><button type="button" id="load-runs" class="secondary">Carregar execuções</button><ul id="runs"></ul><label for="runs-size">Itens por página</label><select id="runs-size"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select><div class="actions"><button type="button" id="runs-previous" class="secondary">Anterior</button><span id="runs-page"></span><button type="button" id="runs-next" class="secondary">Próxima</button></div></details>
       </section>
-      <details id="ai-panel"><summary>IA do catálogo (teste)</summary>
+      <details id="ai-panel"><summary>IA do catálogo</summary>
         <div id="ai-popup-hint"><p class="hint">Use o painel lateral para manter a sessão aberta durante o login e a análise.</p><button id="ai-open-panel" type="button" class="secondary">Abrir painel para usar IA</button></div>
         <div id="ai-panel-content" hidden>
         <p class="hint">Os tokens ficam apenas na memória deste painel. Fechar, recarregar ou trocar para popup exige novo login. Apenas a autorização abre uma aba, fechada ao retornar.</p>
-        <p class="hint">O resultado não altera o catálogo. Nenhuma credencial ChatGPT ou análise é enviada ao backend. O uso consome os limites do seu plano.</p>
+        <p class="hint">As etapas 4 e 5 enviam sugestões ao backend para sua confirmação no admin. Credenciais ChatGPT ficam somente no painel. O uso consome os limites do seu plano.</p>
    <label for="direct-account">Conta ChatGPT</label><select id="direct-account"><option value="">Adicionar outra conta</option></select>
    <div class="actions"><button id="direct-login" type="button">Continue with ChatGPT</button><button id="direct-logout" type="button" class="secondary">Desconectar ChatGPT</button></div>
-   <output id="direct-status" aria-live="polite">ChatGPT desconectado.</output><p id="direct-account-info"></p><p id="direct-callback-status" class="hint"></p>
+   <output id="direct-status" aria-live="polite">ChatGPT desconectado.</output><p id="direct-account-info"></p><p id="ai-usage" class="hint"></p><a href="https://chatgpt.com/#settings/Usage" target="_blank" rel="noopener noreferrer">Gerenciar uso no ChatGPT ↗</a><p id="direct-callback-status" class="hint"></p>
    <button id="direct-models" type="button" class="secondary">Carregar modelos da minha conta</button><label for="direct-model">Modelo</label><select id="direct-model"></select>
-  <h3>Analisar uma oferta</h3><p>Os campos são editáveis. A sugestão não altera categorias, produtos ou publicações.</p>
+  <h3>Analisar uma oferta</h3><p>Análise avulsa: os campos são editáveis e o resultado fica neste painel. Ela não altera o catálogo nem envia a sugestão ao backend.</p>
    <button id="direct-capture" type="button" class="secondary">Capturar dados básicos da aba atual</button>
    <label for="direct-title">Nome</label><input id="direct-title" type="text" maxlength="500">
    <label for="direct-brand">Marca (opcional)</label><input id="direct-brand" type="text" maxlength="200">

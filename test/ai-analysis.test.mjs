@@ -19,3 +19,11 @@ test('resposta incompleta, limite, JSON inválido e produto inventado não geram
  assert.throws(()=>analysisInput({offer:{title:''}}));assert.throws(()=>analysisInput({...input,products:Array(31).fill(input.products[0])}));
  const created=validateSuggestion({...suggestion,action:'create_new',productId:null,product:{name:'X',description:'',brand:''}},input);assert.equal(created.product.name,'X');
 });
+
+ test('tarefas independentes preservam categoria confirmada e usam prompt do admin sem dados da oferta como instruções',async()=>{
+  let body;const session={models:async()=>[{id:'fixture'}],token:async()=>'private',fetcher:async(_url,options)=>{body=JSON.parse(options.body);return complete(JSON.stringify({action:'needs_review',category:'Áudio',productId:null,product:null,reason:'Revisar'}));}};
+  await analyze(session,{...input,task:'category',instructions:'Prefira categorias específicas.',model:'fixture'},new AbortController().signal);
+  assert.match(body.instructions,/Prefira categorias específicas/);assert.match(body.instructions,/somente categoria/);assert.equal(JSON.parse(body.input[0].content).instructions,undefined);
+  assert.throws(()=>validateSuggestion({...suggestion,action:'link_existing'},{...input,task:'category'}),/somente uma categoria/);
+  assert.throws(()=>validateSuggestion(suggestion,{...input,task:'product'}),/preservar/);
+ });

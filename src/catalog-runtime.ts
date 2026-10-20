@@ -14,6 +14,7 @@ class BackendError extends Error {
 }
 type CatalogCommand = {
     type: string;
+    operation?:string;payload?:any;
     marketplaceId?: string;
     step?: CatalogStep;
     url?: string;
@@ -276,6 +277,18 @@ export class CatalogRuntime {
             this.state.hostWindowId=command.hostWindowId;
         }
         switch (command.type) {
+            case 'AI_REVIEW': {
+                const paths:Record<string,string>={config:'/catalog/ai/config',queue:'/catalog/ai/queue',context:'/catalog/ai/context',result:'/catalog/ai/suggestions',release:'/catalog/ai/release'};
+                if(!command.operation||!Object.hasOwn(paths,command.operation))throw new Error('Operação de IA inválida.');
+                const p=command.payload??{};
+                if(['config','queue'].includes(command.operation)){
+                    if(typeof p.marketplaceId!=='string'||!/^[a-z][a-z0-9_-]{1,39}$/.test(p.marketplaceId))throw new Error('Marketplace inválido.');
+                    const params=new URLSearchParams({marketplaceId:p.marketplaceId});
+                    if(command.operation==='queue'){if(!['category','product'].includes(p.task)||!Number.isInteger(p.limit)||p.limit<1||p.limit>10000)throw new Error('Fila de IA inválida.');params.set('task',p.task);params.set('limit',String(p.limit));}
+                    return this.api(paths[command.operation]+'?'+params);
+                }
+                return this.api(paths[command.operation],p);
+            }
             case 'STATE': break;
             case 'FILTER':
                 this.state.marketplaceId=this.market(command.marketplaceId).id;

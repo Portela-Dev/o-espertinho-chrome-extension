@@ -1,4 +1,4 @@
-# IA do catálogo no painel — prova de conceito
+# IA do catálogo no painel
 
 A implementação antiga com auxiliar Node.js e a aba de análise foram removidas. Não há serviço local, porta em escuta, pareamento ou pacote adicional.
 
@@ -17,12 +17,20 @@ Tokens OAuth, PKCE e resultados ficam apenas na memória deste documento do pain
 
 O retorno de login é observado pelo Chrome no loopback 127.0.0.1:18766/auth/callback, sem servidor nessa porta. Somente a aba criada pela tentativa, frame principal, origem/caminho e state exatos são aceitos. PKCE S256, nonce, assinatura da identidade, issuer, audience, validade e escopos são verificados. A aba de login é fechada sem retransmitir o retorno a outra página.
 
-As chamadas são diretas aos endpoints oficiais de autenticação, modelos e Responses da OpenAI. Renovação é serializada. Erros são sanitizados. Captura da página lê apenas metadados públicos limitados; não lê cookies, storage ou scripts arbitrários. O backend recebe apenas a consulta de permissão da conta Espertinho, nunca credenciais ou análises ChatGPT desta prova.
+As chamadas são diretas aos endpoints oficiais de autenticação, modelos e Responses da OpenAI. Renovação é serializada. Erros são sanitizados. Captura da página lê apenas metadados públicos limitados; não lê cookies, storage ou scripts arbitrários. O backend recebe a consulta de permissão e, nos passos 4 e 5, as sugestões estruturadas para revisão. Credenciais ChatGPT nunca são enviadas ao backend; análises avulsas permanecem no painel.
 
-A sugestão não altera categorias, produtos ou publicações. categoryExists depende das categorias fornecidas no formulário; não consulta o banco. Vinculação usa somente IDs candidatos fornecidos. Cor, tamanho e tensão, isoladamente, não distinguem produtos.
+A análise avulsa não altera categorias, produtos ou publicações. Os passos 4 e 5 enviam sugestões ao backend para confirmação na revisão. categoryExists depende das categorias fornecidas no formulário; não consulta o banco. Vinculação usa somente IDs candidatos fornecidos. Cor, tamanho e tensão, isoladamente, não distinguem produtos.
 
 ## Validação
 
-Login e análise direta de uma oferta foram confirmados pelo administrador na prova anterior, com o auxiliar desligado (tênis Kappa Park 2.0). O teste em Chromium real passou com login, fechamento da aba de autorização, modelos, análise, desconexão e verificação de ausência de credenciais no storage/backend. A repetição com a conta real no painel integrado foi confirmada pelo administrador em 20/10/2026: análise da oferta Creatina Monohidratada Growth Supplements 250 g, retornando create_new com categoria e dados do produto. Nenhuma alteração no catálogo foi executada. Testes automatizados usam identidades e respostas simuladas, sem acessar a conta real. Esta prova mantém o retorno OAuth experimental já validado, sujeito às condições e limites da conta e da integração.
+Login e análise direta de uma oferta foram confirmados pelo administrador na prova anterior, com o auxiliar desligado (tênis Kappa Park 2.0). O teste em Chromium real passou com login, fechamento da aba de autorização, modelos, análise, desconexão e verificação de ausência de credenciais no storage/backend. A repetição com a conta real no painel integrado foi confirmada pelo administrador em 20/10/2026: análise da oferta Creatina Monohidratada Growth Supplements 250 g, retornando create_new com categoria e dados do produto. Nenhuma alteração no catálogo foi executada. Testes automatizados usam identidades e respostas simuladas, sem acessar a conta real. A integração mantém o retorno OAuth experimental já validado, sujeito às condições e limites da conta e da integração.
 
 Execute npm run check, npm run test:native e npm run package. O artefato contém apenas o ZIP da extensão e instruções/checksum.
+
+## Fluxo de revisão integrado
+
+Ative cada tarefa e cadastre suas instruções em Admin → Revisão → Configurações de IA. Clique em Atualizar configurações na extensão. Após conectar ChatGPT, carregar e selecionar um modelo, autorize o envio do lote e execute 4 — Categorizar produtos ou 5 — Catalogar produtos. Categorias devem ser confirmadas no site antes da catalogação. Os contadores mostram confirmações no admin, não meras sugestões. O passo 6 — Analisar Preços fica separado por divisor.
+
+Os candidatos vêm do backend, filtrados e limitados. O painel envia apenas o resultado estruturado, nunca credenciais OpenAI. Falhas interrompem o lote e liberam o contexto; cancelar não aplica nada no catálogo. Para retentar uma sugestão válida, descarte-a no admin. Fechar abruptamente o painel pode exigir aguardar a reserva expirar em até 10 minutos.
+
+O painel informa análises e tokens reportados nesta sessão, com atalho Gerenciar uso no ChatGPT. A integração não dispõe de um saldo documentado para uma barra percentual da conta.

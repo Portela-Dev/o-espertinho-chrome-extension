@@ -13,7 +13,7 @@ import {DIRECT_CALLBACK} from '../dist/ai-controller.js';
 
 test('Chromium real executa os quatro passos configuráveis em aba própria na mesma janela, sem sessão no backend', {skip:process.env.TEST_NATIVE_BROWSER!=='1',timeout:90000},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'espertinho-native-')),extension=join(directory,'extension');
- let context,server,marketServer;let marketOrigin,challenge=false;const received=[],visited=[],backendTraffic=[];let run,item;
+ let context,server,marketServer;let marketOrigin,challenge=false;const received=[],visited=[],backendTraffic=[],aiSuggestions=[];let run,item;
  const discovery={rendering:{frameSelector:'',readySelector:'.card',timeoutMs:1000,settleDelayMs:0},extraction:{itemSelector:'.card',linkSelector:'a',linkAttribute:'href'},pagination:{mode:'next',nextSelector:'.next',disabledSelector:'',endSelector:'',missingNextAction:'finish',noProgressLimit:1,waitAfterMs:100},limits:{maxPages:2,maxItems:10,requestIntervalMs:100}};
  const recipe={id:'fixture',name:'Fixture',loginUrl:'https://shop.example.com/product',allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],batchSize:1,intervalMs:100,steps:[{type:'extract',source:'dom',name:'csrf',selector:'meta[name="csrf-token"]',attribute:'content'},{type:'request',url:'https://shop.example.com/convert',method:'POST',headers:{'X-CSRF-Token':'{{csrf}}'},body:{url:'{{originalUrl}}'},responsePath:'link'}]};
  const settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,categorySeparator:'>',blockRules:[{kind:'challenge',match:'selector',value:'.human-check'}],recipe};
@@ -29,6 +29,11 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    const path=req.url.split('?')[0].replace('/api/extension','');let data={};
    if(path==='/catalog/config')data={marketplaces:[{id:'fixture',name:'Fixture',catalog_executor:'extension',website_url:marketOrigin,allowedOrigins:[marketOrigin],config:settings}]};
    else if(path==='/catalog/stats')data={marketplaceId:'fixture',retryFailed:new URL(req.url,'http://localhost').searchParams.get('retryFailed')==='true',convert:{pending:0,completed:1,total:1},enrich:{pending:0,completed:1,total:1},prices:{pending:1,total:1},observedAt:new Date().toISOString()};
+   else if(path==='/catalog/ai/config')data={settings:{version:1,categoryEnabled:true,productEnabled:true},category:{completed:0,total:1},product:{completed:0,total:1}};
+   else if(path==='/catalog/ai/queue')data={items:[{id:'test-link',title:'Oferta aguardando revisão'}]};
+   else if(path==='/catalog/ai/context')data={requestId:crypto.randomUUID(),task:body.task,instructions:'Use a categoria Áudio',offer:{title:'Produto controlado',description:'Descrição',brand:'Marca',sourceCategory:'Áudio'},categories:['Áudio'],products:[]};
+   else if(path==='/catalog/ai/suggestions'){aiSuggestions.push(body);data={ok:true};}
+   else if(path==='/catalog/ai/release')data={ok:true};
    else if(path==='/catalog/runs'&&req.method==='POST'){
     run={id:crypto.randomUUID(),marketplace_id:'fixture',step:body.step,status:'queued',total:1,completed:0,failed:0,snapshot};
     item={id:crypto.randomUUID(),lease_token:crypto.randomUUID(),payload:{url:body.step==='discover'?marketOrigin+'/list':['enrich','prices'].includes(body.step)?marketOrigin+'/affiliate-product':marketOrigin+'/product',originalUrl:marketOrigin+'/product',config:discovery}};data=run;
@@ -118,10 +123,10 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   assert.doesNotMatch(JSON.stringify(received),/TEST_ONLY|cookies|refreshToken/);
   const panel=await context.newPage();await panel.setViewportSize({width:400,height:1000});
   await panel.goto(new URL('popup.html?view=panel',worker.url()).href);
-  await panel.locator('#run-status').filter({hasText:'4 — Atualizar preços'}).waitFor();
+  await panel.locator('#run-status').filter({hasText:'6 — Analisar Preços'}).waitFor();
   assert.equal(await panel.locator('#step-convert').textContent(),'2 — Gerar links de afiliados · Gerados: 1 / 1');
   assert.equal(await panel.locator('#step-enrich').textContent(),'3 — Extrair informações dos produtos · Extraídos: 1 / 1');
-  assert.equal(await panel.locator('#step-prices').textContent(),'4 — Atualizar preços · Pendentes (24h): 1 / 1');
+  assert.equal(await panel.locator('#step-prices').textContent(),'6 — Analisar Preços · Pendentes (24h): 1 / 1');
   assert.equal(await panel.locator('#display-mode').getAttribute('aria-label'),'Usar popup');
   assert.equal(await panel.locator('#display-icon-popup').isVisible(),true);
   assert.equal(await panel.locator('#display-icon-panel').isVisible(),false);
@@ -172,6 +177,12 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   await direct.locator('#direct-models').click();await direct.locator('#direct-model option').filter({hasText:'Modelo direto de teste'}).waitFor({state:'attached'});
   await direct.locator('#direct-title').fill('Oferta direta de teste');await direct.locator('#direct-consent').check();await direct.locator('#direct-analyze').click();
   await direct.locator('#direct-result').filter({hasText:'Análise direta simulada sem auxiliar'}).waitFor();assert.equal(responses,1);assert.equal(context.pages().length,pagesBefore);
+  await direct.locator('#ai-workflow-consent').check();await direct.locator('#limit').fill('1');
+  await direct.locator('#step-category').click();await direct.locator('#ai-batch-status').filter({hasText:'Concluída — confirme no admin'}).waitFor();
+  assert.equal(aiSuggestions.length,1);assert.equal(aiSuggestions[0].suggestion.action,'needs_review');
+  await direct.locator('#ai-workflow-consent').check();await direct.locator('#step-product').click();
+  await direct.waitForFunction(()=>document.getElementById('ai-batch-status').textContent.includes('Catalogação por IA · Concluída'));
+  assert.equal(aiSuggestions.length,2);assert.equal(context.pages().length,pagesBefore);
   const storage=await worker.evaluate(async()=>({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
   assert.doesNotMatch(JSON.stringify(storage)+JSON.stringify(backendTraffic),/DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/);
   await direct.setViewportSize({width:390,height:1000});assert.equal(await direct.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await direct.screenshot({path:'reports/ai-panel.png',fullPage:true});

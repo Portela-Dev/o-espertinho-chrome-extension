@@ -43,7 +43,7 @@ jobs:
         run: npm run check
       - name: Preparar Chromium para teste da extensão
         run: npx --no-install playwright install --with-deps chromium
-      - name: Validar quatro etapas e IA no painel em Chromium real
+      - name: Validar fluxo do catálogo e IA no painel em Chromium real
         run: npm run test:native
       - name: Publicar cobertura dos testes
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

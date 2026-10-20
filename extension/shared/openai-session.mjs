@@ -52,7 +52,7 @@ export class OpenAISession {
   this.pending={verifier,state,nonce,redirectUri,registration,expiresAt:this.now()+300000,generation:++this.generation};this.loginError='';
   const url=new URL(AUTH+'/api/accounts/authorize');
   const values={client_id:registration?.clientId??'dynamic_agent_client',ext_agent_host_id:this.hostId,response_type:'code',redirect_uri:redirectUri,scope:'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct',resource:API,state,nonce,code_challenge_method:'S256',code_challenge:base64(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)))};
-  if(!registration)values.agent_name_hint='O Espertinho — Assistente local';
+  if(!registration)values.agent_name_hint='O Espertinho — Revisão de catálogo';
   for(const [key,value] of Object.entries(values))url.searchParams.set(key,value);
   return url.href;
  }

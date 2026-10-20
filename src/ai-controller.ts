@@ -41,7 +41,7 @@ export class AiController {
  status(){
   const account=this.session.status();
   if(this.phase==='waiting_for_login'&&!account.loginPending){this.phase='failed';this.error=account.error||'A tentativa de login expirou. Inicie novamente.';}
-  return {...account,phase:this.phase,error:this.error||account.error,models:this.modelsList,result:this.result,callbackObserved:this.callbackObserved};
+  return {...account,usage:(this.session as any).usage??{requests:0,totalTokens:0},phase:this.phase,error:this.error||account.error,models:this.modelsList,result:this.result,callbackObserved:this.callbackObserved};
  }
  async login(accountId?:string){
   if(this.phase==='analyzing'||this.processing)throw new LocalError('Conclua ou cancele a operação atual antes de entrar novamente.');
@@ -90,12 +90,12 @@ export class AiController {
   this.phase='analyzing';this.error='';this.result=null;const operation=++this.operation;this.controller=new AbortController();
   try{
    const result=await analyze(this.session,body,AbortSignal.any([this.controller.signal,AbortSignal.timeout(120000)]));
-   if(operation===this.operation){this.result=result;this.phase='completed';}
+   if(operation===this.operation){this.result=result;this.phase='completed';return result;}throw new LocalError('Análise cancelada.');
   }catch(error){if(operation===this.operation){this.phase='failed';this.error=safeError(error);throw new LocalError(this.error);}}
  }
  cancelAnalysis(){this.operation++;this.controller?.abort();this.controller=undefined;if(this.phase==='analyzing'){this.phase=this.session.active?'connected':'idle';this.error='Análise cancelada.';}}
  async logout(){
-  this.cancelAnalysis();await this.cancelLogin();this.modelsList=[];this.result=null;this.error='';this.phase='idle';return this.session.signout();
+  this.cancelAnalysis();await this.cancelLogin();this.modelsList=[];this.result=null;this.error='';this.phase='idle';(this.session as any).usage=undefined;return this.session.signout();
  }
  dispose(){
   this.cancelAnalysis();void this.cancelLogin();this.session.active=null;

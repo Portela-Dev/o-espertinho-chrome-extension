@@ -5,6 +5,7 @@ import { renderCatalog, runLabel,stepLabel, type CatalogView } from './catalog-v
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let view: CatalogView | undefined, busy = false, page = 1, total = 0;
 let notificationTimer: ReturnType<typeof setTimeout> | undefined;
+let aiBusy=false;
 let lastBackgroundError = '', lastPollingError = '';
 function hideNotification() {
     clearTimeout(notificationTimer);
@@ -23,7 +24,7 @@ function notify(message: string, kind: 'error' | 'success' = 'error') {
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Não foi possível concluir.';
 element('dismiss-notification').addEventListener('click', hideNotification);
 const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
-void setupAiPanel(notify,isPanel).catch(()=>notify('Não foi possível iniciar a IA no painel.'));
+void setupAiPanel(notify,isPanel,undefined,{view:()=>view,busy:value=>{aiBusy=value;render();}}).catch(()=>notify('Não foi possível iniciar a IA no painel.'));
 document.body.classList.toggle('side-panel', isPanel);
 function syncDisplayIcon() {
     const button=element<HTMLButtonElement>('display-mode'),label=isPanel?'Usar popup':'Abrir painel lateral';
@@ -33,16 +34,16 @@ function syncDisplayIcon() {
 }
 syncDisplayIcon();
 function render() {
-    element<HTMLButtonElement>('display-mode').disabled=busy;
+    element<HTMLButtonElement>('display-mode').disabled=busy||aiBusy;
     if (view) {
-        renderCatalog(view, busy);
+        renderCatalog(view, busy||aiBusy);
         const message = [view.error, view.statsError].filter(Boolean).join(' ');
         if (message && message !== lastBackgroundError) notify(message);
         lastBackgroundError = message;
     }
 }
 async function act(callback: () => Promise<unknown>) {
-    if (busy)
+    if (busy||aiBusy)
         return;
     busy = true;
     hideNotification();
@@ -70,6 +71,7 @@ async function request(type: string, extra: Record<string, unknown> = {}) {
 async function send(type: string, extra: Record<string, unknown> = {}) {
     view = await request(type, extra);
     render();
+    if(type==='REFRESH')document.dispatchEvent(new window.Event('catalog-config-updated'));
     if (type === 'REFRESH' && !view?.error && !view?.statsError) notify('Configurações atualizadas.', 'success');
 }
 element('display-mode').addEventListener('click', () => {
