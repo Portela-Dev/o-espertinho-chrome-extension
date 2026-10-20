@@ -147,7 +147,7 @@ function originsValid(origins: unknown): origins is string[] {
   );
 }
 
-function validateRecipe(recipe: Recipe) {
+export function validateRecipe(recipe: Recipe) {
   if (
     !recipe ||
     typeof recipe.id !== "string" ||
@@ -170,7 +170,7 @@ function validateRecipe(recipe: Recipe) {
     recipe.batchSize > 10 ||
     !Number.isInteger(recipe.intervalMs) ||
     recipe.intervalMs < 100 ||
-    recipe.intervalMs > 60000
+    recipe.intervalMs > 600000
   ) {
     throw new Error("Intervalo ou tamanho de lote inválido.");
   }
