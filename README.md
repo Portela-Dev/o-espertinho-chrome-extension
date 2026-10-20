@@ -41,6 +41,10 @@ O computador e o Chrome precisam estar disponíveis. Suspensão, abas congeladas
 
 ## Segurança e limites
 
+Em Admin → Exploração → Perfis, a paginação por rolagem permite avançar por distância ou ir até o fim do conteúdo carregado. A segunda opção repete a ida ao fim quando novos cards aumentam a página e aguarda os tempos de hidratação configurados. Só encerra por falta de progresso após as tentativas configuradas no fim da página, sem novos links nem aumento de altura. Funciona também com um contêiner de rolagem configurado, sem código específico por marketplace.
+
+O total descoberto considera URLs únicas após normalização. Releituras dos mesmos cards e retomadas não somam novos itens; o backend conserva essa contagem e aplica o limite de itens únicos. Login e desafios continuam pausando o processamento para intervenção manual.
+
 Cookies, Authorization, tokens CSRF e storage do marketplace não são enviados ao backend. Sessão é enviada apenas pelo próprio navegador à origem do marketplace. Há permissão obrigatória apenas para o host da API e permissões opcionais por domínio de navegação. A antiga permissão cookies e as POCs de exportação de sessão foram removidas do pacote.
 
 Receitas suportam extract, request GET/POST na mesma origem, fill e click, com variáveis locais e responsePath. Headers reservados são recusados. Não há eval, scripts remotos ou código por loja. Receitas complexas não suportadas devem permanecer pendentes, sem fallback específico.

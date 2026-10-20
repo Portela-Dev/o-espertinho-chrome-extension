@@ -7,6 +7,7 @@ import {mkdtemp,mkdir,cp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,relative} from 'node:path';
 import {chromium} from 'playwright';
+import {discoverPage} from '../dist/catalog-discovery.js';
 
 test('Chromium real executa os quatro passos configuráveis em aba própria na mesma janela, sem sessão no backend', {skip:process.env.TEST_NATIVE_BROWSER!=='1',timeout:90000},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'espertinho-native-')),extension=join(directory,'extension');
@@ -39,6 +40,10 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   const cert=spawnSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',keyFile,'-out',certFile,'-days','1','-subj','/CN=shop.example.com'],{encoding:'utf8',windowsHide:true});assert.equal(cert.status,0,'OpenSSL deve estar disponível para o certificado descartável de teste.');
   marketServer=createHttpsServer({key:await readFile(keyFile),cert:await readFile(certFile)},(req,res)=>{
    const url=new URL(req.url,marketOrigin);
+   if(url.pathname==='/scroll-list'){
+    res.writeHead(200,{'Content-Type':'text/html'});
+    res.end('<!doctype html><div class="card"><a href="/a">A</a></div><div id="space" style="height:2400px"></div><script>let added=false;addEventListener("scroll",()=>{if(!added&&scrollY+innerHeight>=document.scrollingElement.scrollHeight-2){added=true;document.body.insertAdjacentHTML("afterbegin",\'<div class="card"><a href="/b">B</a></div>\');document.getElementById("space").style.height="3600px";}});</script>');return;
+   }
    if(['/product','/affiliate-product'].includes(url.pathname))visited.push({step:run?.step,path:url.pathname});
    if(url.pathname==='/convert'){
     if(req.headers['x-csrf-token']!=='TEST_ONLY_CSRF'){res.writeHead(403);res.end('{}');return;}
@@ -70,6 +75,16 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
     await worker.evaluate(async owner=>chrome.tabs.update(owner.tabId,{active:true}),owner);
    }else assert.equal(current.tab.active,true);
   }
+  const lazy=await context.newPage();await lazy.goto(marketOrigin+'/scroll-list');
+  const scrolling={...discovery,pagination:{...discovery.pagination,mode:'scroll',scrollStrategy:'bottom',scrollContainerSelector:''}};
+  const read=()=>lazy.evaluate(discoverPage,{config:scrolling,rules:[],action:'read',page:1});
+  assert.equal((await read()).links.length,1);
+  await lazy.evaluate(discoverPage,{config:scrolling,rules:[],action:'advance',page:2});
+  await lazy.waitForFunction(()=>document.querySelectorAll('.card').length===2);
+  let lazyResult=await read();assert.equal(lazyResult.links.length,2);assert.ok(lazyResult.scroll.position+lazyResult.scroll.viewport<lazyResult.scroll.height);
+  await lazy.evaluate(discoverPage,{config:scrolling,rules:[],action:'advance',page:3});
+  await lazy.waitForFunction(()=>scrollY+innerHeight>=document.scrollingElement.scrollHeight-2);
+  lazyResult=await read();assert.ok(lazyResult.scroll.position+lazyResult.scroll.viewport>=lazyResult.scroll.height-2);await lazy.close();
   const before=received.length;challenge=true;
   await worker.evaluate(()=>globalThis.catalogTest.handle({type:'START',step:'prices',marketplaceId:'fixture'}));
   for(let i=0;i<100;i++){if(await worker.evaluate(()=>globalThis.catalogTest.state.run.status)==='waiting_for_human')break;await new Promise(r=>setTimeout(r,50));}
@@ -90,7 +105,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   for(let i=0;i<100;i++){if(await worker.evaluate(()=>globalThis.catalogTest.state.run.status)==='completed')break;await new Promise(r=>setTimeout(r,50));}
   assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.status),'completed');
   assert.equal(received.filter(r=>r.step==='discover').length,2);
-  assert.deepEqual(received.filter(r=>r.step==='discover').at(-1).links,[marketOrigin+'/product2?ref=test']);
+  assert.deepEqual(received.filter(r=>r.step==='discover').at(-1).links,[marketOrigin+'/product2']);
   assert.ok(received.some(r=>r.step==='convert'&&r.affiliateUrl.includes('affiliate=fixture')));
   assert.equal(received.find(r=>r.step==='enrich').data.priceCents,12345);
   assert.deepEqual(received.find(r=>r.step==='enrich').sourceCategoryPath,['Eletrônicos','Áudio']);

@@ -29,7 +29,10 @@ export async function discoverPage(input: {
                 const scroller = p.scrollContainerSelector ? document.querySelector(p.scrollContainerSelector) : window;
                 if (!scroller)
                     throw new Error('configuration');
-                scroller.scrollBy(0, p.scrollStepPx);
+                if (p.scrollStrategy === 'bottom') {
+                    const height = scroller === window ? document.scrollingElement!.scrollHeight : (scroller as Element).scrollHeight;
+                    scroller.scrollTo({top:height,behavior:'instant'});
+                } else scroller.scrollBy({top:p.scrollStepPx,behavior:'instant'});
             }
             else {
                 const next = document.querySelector<HTMLElement>(p.nextSelector);
@@ -43,6 +46,12 @@ export async function discoverPage(input: {
             return {
                 advanced: true
             };
+        },
+        scrollState() {
+            const selector = config.pagination.scrollContainerSelector;
+            const node = selector ? document.querySelector(selector) : document.scrollingElement;
+            if (!node) throw new Error('configuration');
+            return {position:selector ? node.scrollTop : window.scrollY,height:node.scrollHeight,viewport:selector ? node.clientHeight : window.innerHeight};
         },
         async ready() {
             const end = Date.now() + config.rendering.timeoutMs;
@@ -129,6 +138,7 @@ export async function discoverPage(input: {
             blocked: block
         };
     return {
-        ...reader.links(), ...reader.next(), url: location.href
+        ...reader.links(), ...reader.next(), url: location.href,
+        ...(config.pagination.mode === 'scroll' ? {scroll:reader.scrollState()} : {})
     };
 }

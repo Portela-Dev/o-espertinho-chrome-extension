@@ -524,7 +524,7 @@ export class CatalogRuntime {
         }
     }
     private linkIdentity(links: string[], rules: any[]) {
-        return links.map(value => {
+        return [...new Set(links.map(value => {
             const u = new URL(value);
             u.search = '';
             u.hash = '';
@@ -536,20 +536,20 @@ export class CatalogRuntime {
                     u.pathname = u.pathname.slice(0, at) || '/';
             }
             return u.href;
-        }).sort((a,b)=>a.localeCompare(b,'en')).join('\n');
+        }))].sort((a,b)=>a.localeCompare(b,'en'));
     }
     private async discoveryCheckpoint(claim: CatalogClaim, result: any, links: string[]) {
         const { config, checkpoint } = claim.item!.payload, page = (checkpoint?.page ?? 0) + 1;
-        const identity = this.linkIdentity(links, claim.snapshot.market.normalizationRules ?? []);
-        const fingerprint = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(identity))), seen = checkpoint?.seen ?? [], found = (checkpoint?.found ?? 0) + links.length;
-        const repeated = seen.includes(fingerprint), noProgress = repeated ? (checkpoint?.noProgress ?? 0) + 1 : 0;
+        const normalized = this.linkIdentity(links, claim.snapshot.market.normalizationRules ?? []);
+        const fingerprint = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized.join('\n')))), seen = checkpoint?.seen ?? [];
+        const repeated = seen.includes(fingerprint);
         const repeatedPage = ['next', 'url'].includes(config.pagination.mode) && repeated;
-        const limit = page >= config.limits.maxPages || found >= config.limits.maxItems;
-        const done = result.done || repeatedPage || limit || noProgress >= config.pagination.noProgressLimit;
+        const done = result.done || repeatedPage || page >= config.limits.maxPages;
         const advance = !done && config.pagination.mode === 'next' && !result.nextUrl;
         return {
-            outcome: 'success', links: links.slice(0, Math.max(0, config.limits.maxItems - (checkpoint?.found ?? 0))), done, checkpoint: {
-                url: result.nextUrl ?? result.url, page, seen: [...seen, fingerprint].slice(-1000), found: Math.min(found, config.limits.maxItems), noProgress, advance
+            outcome: 'success', links: normalized, done, checkpoint: {
+                url: result.nextUrl ?? result.url, page, seen: [...seen, fingerprint].slice(-1000), found: checkpoint?.found ?? 0, noProgress: checkpoint?.noProgress ?? 0, advance,
+                ...(config.pagination.mode === 'scroll' ? {scroll:result.scroll} : {})
             }
         };
     }

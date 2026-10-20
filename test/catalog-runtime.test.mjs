@@ -105,7 +105,7 @@ test('descoberta usa checkpoint e envia apenas URLs; extração e preço mantêm
  globalThis.fetch=f.fetch;
  try{
   await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'discover'});await finished(f);
-  const data=f.calls.find(c=>c.path.endsWith('/results')).body;assert.deepEqual(data.links,['https://shop.example.com/p?ref=one']);assert.equal(data.checkpoint.advance,false);assert.equal(data.data,undefined);
+  const data=f.calls.find(c=>c.path.endsWith('/results')).body;assert.deepEqual(data.links,['https://shop.example.com/p']);assert.equal(data.checkpoint.advance,false);assert.equal(data.data,undefined);
   for(const step of ['enrich','prices']){
    const g=fixture({payload:{url:'https://shop.example.com/affiliate',originalUrl:'https://shop.example.com/p'},result:{outcome:'success',data:{title:'Produto',priceCents:12000},sourceCategoryPath:['Tecnologia']}});globalThis.fetch=g.fetch;
    await g.runtime.init();await g.runtime.handle({type:'REFRESH'});await g.runtime.handle({type:'START',marketplaceId:'shop',step});await finished(g);
