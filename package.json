@@ -16,7 +16,9 @@
     "check": "npm run typecheck && npm run validate:html && npm run test:coverage",
     "build:coverage": "node scripts/build.mjs --coverage",
     "test:coverage": "c8 node scripts/test-suite.mjs",
-    "test:native": "node scripts/native-test.mjs"
+    "test:native": "node scripts/native-test.mjs",
+    "ai:helper": "node local-ai/start.mjs",
+    "test:ai": "node --test test/local-ai*.test.mjs"
   },
   "devDependencies": {
     "@types/chrome": "0.3.5",

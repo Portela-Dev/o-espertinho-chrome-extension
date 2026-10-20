@@ -43,7 +43,7 @@ jobs:
         run: npm run check
       - name: Preparar Chromium para teste da extensão
         run: npx --no-install playwright install --with-deps chromium
-      - name: Validar quatro etapas em Chromium real
+      - name: Validar quatro etapas e prova IA local em Chromium real
         run: npm run test:native
       - name: Publicar cobertura dos testes
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -72,7 +72,7 @@ jobs:
         run: |
           {
             echo '### O Espertinho — extensão Chrome'
-            echo 'Baixe o artefato desta execução. Ele contém o ZIP da extensão, SHA256SUMS e INSTALAR.txt.'
+            echo 'Baixe o artefato desta execução. Ele contém os ZIPs da extensão e do auxiliar IA local, SHA256SUMS e INSTALAR.txt.'
             echo 'Extraia o pacote e carregue a pasta com manifest.json em chrome://extensions, no modo de desenvolvedor.'
             echo 'Este workflow não executa deploy nem publica na Chrome Web Store.'
           } >> "$GITHUB_STEP_SUMMARY"

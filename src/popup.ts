@@ -1,4 +1,5 @@
 import { launchSelectorPicker } from './picker-launcher.js';
+import { setupLocalAi } from './local-ai-view.js';
 import { backendOrigin } from './contracts.js';
 import { renderCatalog, runLabel,stepLabel, type CatalogView } from './catalog-view.js';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -20,6 +21,7 @@ function notify(message: string, kind: 'error' | 'success' = 'error') {
     notificationTimer = setTimeout(hideNotification, kind === 'error' ? 10000 : 4500);
 }
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Não foi possível concluir.';
+setupLocalAi(notify);
 element('dismiss-notification').addEventListener('click', hideNotification);
 const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
 document.body.classList.toggle('side-panel', isPanel);

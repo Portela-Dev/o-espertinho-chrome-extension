@@ -29,6 +29,29 @@
         <div class="actions"><button type="button" id="pause" class="secondary">Pausar</button><button type="button" id="resume">Continuar</button><button type="button" id="cancel" class="secondary">Cancelar execução</button><button type="button" id="focus" class="secondary">Abrir aba de processamento</button></div>
         <details><summary>Retomar execução ou prévia solicitada no admin</summary><button type="button" id="load-runs" class="secondary">Carregar execuções</button><ul id="runs"></ul><label for="runs-size">Itens por página</label><select id="runs-size"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select><div class="actions"><button type="button" id="runs-previous" class="secondary">Anterior</button><span id="runs-page"></span><button type="button" id="runs-next" class="secondary">Próxima</button></div></details>
       </section>
+      <details id="ai-proof"><summary>Assistente IA local — prova de conceito</summary>
+        <p class="hint">Analisa uma oferta com sua conta ChatGPT. O resultado fica nesta prova e não altera o catálogo. O uso consome os limites do seu plano.</p>
+        <p class="hint">Inicie o auxiliar com <code>npm run ai:helper</code> na pasta da extensão. Copie o código de vínculo mostrado no terminal.</p>
+        <label for="ai-code">Código de vínculo do auxiliar</label><input id="ai-code" type="password" autocomplete="new-password" maxlength="100">
+        <button id="ai-pair" type="button" class="secondary">Vincular auxiliar local</button>
+        <output id="ai-status" aria-live="polite">Auxiliar não conectado.</output>
+        <label for="ai-account">Conta ChatGPT</label><select id="ai-account"><option value="">Adicionar outra conta</option></select>
+        <div class="actions"><button id="ai-login" type="button">Continue with ChatGPT</button><button id="ai-logout" type="button" class="secondary">Desconectar ChatGPT</button></div>
+        <button id="ai-models" type="button" class="secondary">Carregar modelos da minha conta</button>
+        <label for="ai-model">Modelo</label><select id="ai-model"></select>
+        <h3>Oferta para analisar</h3>
+        <button id="ai-capture" type="button" class="secondary">Capturar dados básicos da aba atual</button>
+        <p class="hint">Lê metadados públicos da página. Confira ou preencha os campos; a prova não usa cookies nem envia a página inteira.</p>
+        <label for="ai-title">Nome</label><input id="ai-title" type="text" maxlength="500">
+        <label for="ai-brand">Marca (opcional)</label><input id="ai-brand" type="text" maxlength="200">
+        <label for="ai-description">Descrição (opcional)</label><textarea id="ai-description" rows="4" maxlength="8000"></textarea>
+        <label for="ai-sourceCategory">Categoria de origem (opcional)</label><input id="ai-sourceCategory" type="text" maxlength="1500">
+        <label for="ai-categories">Categorias existentes (opcional, uma árvore por linha)</label><textarea id="ai-categories" rows="3" maxlength="12000" placeholder="Informática &gt; Acessórios &gt; Fones de ouvido"></textarea>
+        <details><summary>Produtos candidatos (opcional)</summary><p class="hint">Para testar vinculação, informe uma lista JSON com id, name e brand. Sem candidatos, a análise pode sugerir criar um produto ou pedir revisão.</p><label for="ai-products">Lista JSON</label><textarea id="ai-products" rows="3" maxlength="16000" placeholder='[{"id":"produto-1","name":"Nome do produto","brand":"Marca"}]'></textarea></details>
+        <label><input id="ai-consent" type="checkbox"> Autorizo enviar estes dados à OpenAI usando meu plano ChatGPT.</label>
+        <div class="actions"><button id="ai-analyze" type="button">Analisar esta oferta</button><button id="ai-cancel" type="button" class="secondary">Cancelar análise</button></div>
+        <pre id="ai-result" class="ai-result" aria-live="polite"></pre>
+      </details>
       <section aria-labelledby="picker-title"><h2 id="picker-title">Selecionar elementos</h2><p>Selecione e componha seletores na página atual. Pause o processamento antes de inspecionar.</p><button type="button" id="pick-elements">Selecionar elementos na aba atual</button></section>
       <details><summary>Configuração da conexão</summary><form id="settings"><label for="backend">URL do backend</label><input id="backend" type="url" required><button type="submit" id="save-backend">Salvar conexão</button></form></details>
       <footer>Versão <span id="version"></span></footer>

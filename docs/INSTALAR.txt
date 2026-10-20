@@ -14,6 +14,8 @@ Para remover, use "Remover" na mesma página.
 
 Após carregar, abra a extensão, conecte a conta do O Espertinho e autorize no site.
 O perfil precisa de permissão para gerar links de afiliados.
-BACKEND_URL padrão: http://localhost:3000. Backend precisa da migration 019.
-Nesta versão a fila e a conversão são demonstrativas, sem anúncios reais.
+BACKEND_URL padrão: http://localhost:3000. Aplique as migrations atuais do backend antes de usar o catálogo.
+As quatro etapas do catálogo operam sobre os dados do backend configurado.
+O assistente ChatGPT é uma prova separada: extraia o ZIP o-espertinho-local-ai em outra pasta, instale Node.js 24+ e execute npm run ai:helper nessa pasta. Consulte o README.md do auxiliar para vincular a extensão e autorizar sua própria conta.
+O assistente não salva categorias/produtos nem envia tokens ChatGPT ao backend.
 Não é um instalador automático .exe/.crx nem uma publicação na Chrome Web Store.

@@ -19,7 +19,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
 
   const directory = new URL("../artifacts/", import.meta.url);
   const filename = (await readdir(directory)).find((name) =>
-    name.endsWith(".zip"),
+    name.startsWith('o-espertinho-chrome-extension-') && name.endsWith(".zip"),
   );
   assert.ok(filename);
   const zip = await readFile(new URL(filename, directory));
@@ -67,10 +67,15 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
     assert.ok(!path.startsWith("/") && !path.split("/").includes(".."));
   }
   const checksums = await readFile(new URL("SHA256SUMS", directory), "utf8");
-  assert.equal(
-    checksums,
+  assert.ok(checksums.startsWith(
     `${createHash("sha256").update(zip).digest("hex")}  ${filename}\n`,
-  );
+  ));
+  const helperName=(await readdir(directory)).find(name=>name.startsWith('o-espertinho-local-ai-')&&name.endsWith('.zip'));
+  assert.ok(helperName);const helperZip=await readFile(new URL(helperName,directory)),helper=unzipSync(helperZip);
+  assert.match(checksums,new RegExp(createHash('sha256').update(helperZip).digest('hex')));
+  assert.ok(helper['local-ai/start.mjs']);assert.ok(helper['README.md']);assert.equal(JSON.parse(strFromU8(helper['package.json'])).scripts['ai:helper'],'node local-ai/start.mjs');
+  assert.ok(!Object.keys(files).some(path=>path.startsWith('local-ai/')));
+  assert.ok(!Object.keys(helper).some(path=>/registrations|\.env|node_modules/.test(path)));
   const popup = strFromU8(files[manifest.side_panel.default_path.split("?")[0]]);
   assert.match(popup, /src="popup\.js"/);
   assert.doesNotMatch(popup, /<script(?![^>]*\bsrc=)[^>]*>/i);
