@@ -27,7 +27,7 @@ Os botões 2 e 3 mostram pendentes elegíveis / total de links descobertos não 
 
 ## Aba, bloqueios e retomada
 
-O processamento cria uma aba própria na mesma janela em que você interage com a extensão. Navegações do lote não ativam essa aba nem substituem a sua aba atual. Preparar aba / fazer login e Abrir aba de processamento a ativam explicitamente para permitir sua interação. Uma aba própria existente de uma janela antiga pode ser movida para a janela atual; outras abas do usuário não são reutilizadas. Se a aba for fechada, use Abrir aba de processamento para recriá-la e depois Continuar para retomar a mesma execução.
+O processamento cria e ativa uma aba própria na mesma janela em que você interage com a extensão. Após a abertura, se você voltar para outra aba, as navegações seguintes do lote respeitam essa escolha e não retomam o foco. Preparar aba / fazer login e Abrir aba de processamento a ativam explicitamente para permitir sua interação. Uma aba própria existente de uma janela antiga pode ser movida para a janela atual; outras abas do usuário não são reutilizadas. Se a aba for fechada, use Abrir aba de processamento para recriá-la e depois Continuar para retomar a mesma execução.
 
 Faça login na aba de processamento quando necessário. Se a receita usa requestHeader, gere um link manualmente nessa aba: somente o header X- da chamada, aba e origem configuradas fica em storage.session confiável, com prazo de 15 minutos e limpeza ao sair. Ele nunca integra resultados enviados ao backend.
 

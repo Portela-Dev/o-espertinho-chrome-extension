@@ -45,7 +45,7 @@ export class CatalogNavigation {
                 ? await this.browser.windows.get(state.hostWindowId)
                 : await this.browser.windows.getLastFocused({windowTypes:['normal']});
             if(win.id===undefined||win.type&&win.type!=='normal')throw new Error('tab_closed');
-            tab = await this.browser.tabs.create({windowId:win.id,url:target.href,active:false});
+            tab = await this.browser.tabs.create({windowId:win.id,url:target.href,active:true});
             if (tab.id===undefined)
                 throw new Error('tab_closed');
             state.tabId = tab.id;

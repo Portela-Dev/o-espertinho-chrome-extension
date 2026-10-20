@@ -58,7 +58,13 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    while(Date.now()<deadline){status=await worker.evaluate(()=>globalThis.catalogTest.state.run.status);if(status==='completed')break;if(status.startsWith('paused')||status==='waiting_for_human')throw Error(JSON.stringify(await worker.evaluate(async()=>({message:globalThis.catalogTest.state.message,tabs:(await chrome.tabs.query({})).map(t=>({url:t.url,status:t.status,window:t.windowId}))}))));await new Promise(r=>setTimeout(r,100));}
    assert.equal(status,'completed',step);
    const current=await worker.evaluate(async owner=>({tab:await chrome.tabs.get(owner.tabId),windowId:globalThis.catalogTest.state.windowId,windows:(await chrome.windows.getAll()).length}),owner);
-   assert.equal(current.windowId,owner.windowId);assert.equal(current.windows,owner.windows);assert.equal(current.tab.url,owner.url);assert.equal(current.tab.active,true);
+   assert.equal(current.windowId,owner.windowId);assert.equal(current.windows,owner.windows);assert.equal(current.tab.url,owner.url);
+   if(step==='discover'){
+    assert.equal(current.tab.active,false);
+    assert.equal(await worker.evaluate(async()=> (await chrome.tabs.get(globalThis.catalogTest.state.tabId)).active),true);
+    // After the initial focus, let the user return to their own tab. Later navigation must respect that choice.
+    await worker.evaluate(async owner=>chrome.tabs.update(owner.tabId,{active:true}),owner);
+   }else assert.equal(current.tab.active,true);
   }
   const before=received.length;challenge=true;
   await worker.evaluate(()=>globalThis.catalogTest.handle({type:'START',step:'prices',marketplaceId:'fixture'}));

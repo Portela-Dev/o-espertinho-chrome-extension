@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Window} from 'happy-dom';
 import {CatalogNavigation,checkPageState} from '../dist/catalog-navigation.js';
-test('aba própria mantém a janela e o foco do usuário e recusa destinos não autorizados',async()=>{
+test('aba própria recebe foco ao abrir, preserva a janela e não retoma foco nas navegações seguintes',async()=>{
  const state={},calls=[];const browser={permissions:{contains:async()=>true},windows:{getLastFocused:async()=>({id:9,type:'normal'}),update:async()=>{}},tabs:{create:async options=>{calls.push(options);return {id:4,windowId:9};},get:async()=>({id:4,windowId:9,status:'complete',url:'https://shop.example.com/p'}),update:async(id,options)=>{calls.push({id,...options});} }};
  const nav=new CatalogNavigation(browser,()=>state,async()=>{});assert.equal(await nav.ensure('https://shop.example.com/p',['https://shop.example.com']),4);
- assert.deepEqual(calls[0],{windowId:9,url:'https://shop.example.com/p',active:false});await nav.wait(['https://shop.example.com'],500);
+ assert.deepEqual(calls[0],{windowId:9,url:'https://shop.example.com/p',active:true});await nav.wait(['https://shop.example.com'],500);
  await nav.ensure('https://shop.example.com/other',['https://shop.example.com']);assert.deepEqual(calls[1],{id:4,url:'https://shop.example.com/other'});
  await assert.rejects(nav.ensure('https://other.example.com/p',['https://shop.example.com']),/permission/);
  browser.tabs.get=async()=>{throw Error('closed');};await assert.rejects(nav.ensure('https://shop.example.com/p',['https://shop.example.com']),/tab_closed/);
