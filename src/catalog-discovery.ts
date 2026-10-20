@@ -17,21 +17,21 @@ export async function discoverPage(input:{config:any;rules:any[];action:'read'|'
  await wait(config.rendering.settleDelayMs);
  const block=blocked();if(block)return {blocked:block};
  const cards=Array.from(document.querySelectorAll(config.extraction.itemSelector));
- if(!cards.length)throw Error('incomplete');
+ if(!cards.length)throw Error('emptyPage');
  const links:string[]=[];let invalid=0;
  for(const card of cards.slice(0,500)){
   const el=config.extraction.linkSelector===':scope'?card:card.querySelector(config.extraction.linkSelector);
   const raw=el?.getAttribute(config.extraction.linkAttribute);
   try{if(raw)links.push(safeUrl(raw));else invalid++;}catch{invalid++;}
  }
- if(!links.length)throw Error('incomplete');
+ if(!links.length)throw Error('invalidItem');
  const p=config.pagination;
  let done=p.mode==='single'||!!(p.endSelector&&document.querySelector(p.endSelector));
  let nextUrl:string|undefined;
  if(!done&&['next','load_more'].includes(p.mode)){
   const next=document.querySelector(p.nextSelector);
   const disabled=!!next&&(next.hasAttribute('disabled')||next.getAttribute('aria-disabled')==='true'||!!(p.disabledSelector&&next.matches(p.disabledSelector)));
-  if(!next||disabled){if(!next&&p.missingNextAction==='failure')throw Error('incomplete');done=true;}
+  if(!next||disabled){if(!next&&p.missingNextAction==='failure')throw Error('pagination');done=true;}
   else{const href=next.getAttribute('href');if(p.mode==='next'&&href)nextUrl=safeUrl(href);}
  }
  if(p.mode==='url')nextUrl=safeUrl(p.urlTemplate.replaceAll('{page}',String(p.startPage+input.page*p.pageStep)));

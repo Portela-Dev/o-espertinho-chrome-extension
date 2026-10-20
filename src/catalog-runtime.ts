@@ -1,3 +1,4 @@
+import {discoveryPolicy,failureKind} from './catalog-policy.js';
 import {DEFAULT_BACKEND_URL} from './config.js';
 import {backendOrigin,validateRecipe,type Auth} from './contracts.js';
 import {RequestHeaderMemory} from './request-header-memory.js';
@@ -96,6 +97,7 @@ export class CatalogRuntime {
   if(!this.state.run)return;this.generation++;this.state.run=await this.api('/catalog/runs/'+this.state.run.id+'/action',{action,reason});await this.save();
  }
  private async execute(claim:CatalogClaim):Promise<any>{
+  const generation=this.generation;const assertActive=()=>{if(generation!==this.generation)throw Error('interrupted');};
   const {item,snapshot,step}=claim;if(!item)throw Error('incomplete');const origins=snapshot.market.allowedHosts.map((h:string)=>'https://'+h),settings=snapshot.settings;
   let url=item.payload.url;
   if(step==='convert')url=settings.recipe.loginUrl;
@@ -104,8 +106,8 @@ export class CatalogRuntime {
   if(step==='discover'&&checkpoint)url=checkpoint.url;
   await this.navigation.ensure(url,origins,!(step==='convert'&&sameTab)&&!(step==='discover'&&checkpoint&&sameTab&&['load_more','scroll'].includes(item.payload.config.pagination.mode)));
   await this.navigation.wait(origins,settings.timeoutMs);
-  const block=await this.navigation.inspect(settings.blockRules);if(block&&block!=='unavailable')return {blocked:block};
-  const inject=async(func:any,args:any[])=>{const values=await this.browser.scripting.executeScript({target:{tabId:this.state.tabId!},world:'ISOLATED',func,args});const value=values[0]?.result;if(value===undefined)throw Error('incomplete');return value as any;};
+  assertActive();const block=await this.navigation.inspect(settings.blockRules);if(block&&block!=='unavailable')return {blocked:block};
+  const inject=async(func:any,args:any[])=>{assertActive();const values=await this.browser.scripting.executeScript({target:{tabId:this.state.tabId!},world:'ISOLATED',func,args});const value=values[0]?.result;if(value===undefined)throw Error('incomplete');return value as any;};
   if(step==='convert'){
    const recipe=settings.recipe;validateRecipe(recipe);const variables=await this.headers.values(recipe);
    const result=await inject(executeRecipe,[recipe,{id:item.id,title:item.payload.title??'',originalUrl:item.payload.originalUrl},variables]);
@@ -116,14 +118,42 @@ export class CatalogRuntime {
    if(config.rendering.frameSelector)throw Error('configuration');
    if(checkpoint&&['load_more','scroll'].includes(config.pagination.mode)){if(!sameTab)throw Error('incomplete');const advance=await inject(discoverPage,[{config,rules:settings.blockRules,action:'advance',page}]);if(advance.blocked)return advance;}
    const result=await inject(discoverPage,[{config,rules:settings.blockRules,action:'read',page}]);if(result.blocked)return result;
+   if(result.invalid&&discoveryPolicy(config,'invalidItem',5).action!=='skip_item')throw Error('invalidItem');
    const links=result.links.filter((value:string)=>{try{return origins.includes(new URL(value).origin);}catch{return false;}});
    const identity=links.map((value:string)=>{const u=new URL(value);u.search='';u.hash='';for(const rule of snapshot.market.normalizationRules??[]){if(rule.type==='remove_path_suffix'){const at=u.pathname.indexOf(rule.marker);if(at>=0)u.pathname=u.pathname.slice(0,at)||'/';}}return u.href;}).sort().join('\n');
    const fingerprint=hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(identity))),seen=checkpoint?.seen??[],found=(checkpoint?.found??0)+links.length;
    const noProgress=seen.includes(fingerprint)?(checkpoint?.noProgress??0)+1:0;
-   const done=result.done||page>=config.limits.maxPages||found>=config.limits.maxItems||noProgress>=config.pagination.noProgressLimit;
+   const done=result.done||(['next','url'].includes(config.pagination.mode)&&seen.includes(fingerprint))||page>=config.limits.maxPages||found>=config.limits.maxItems||noProgress>=config.pagination.noProgressLimit;
+   if(links.length!==result.links.length&&discoveryPolicy(config,'invalidItem',5).action!=='skip_item')throw Error('invalidItem');
    return {outcome:'success',links:links.slice(0,Math.max(0,config.limits.maxItems-(checkpoint?.found??0))),done,checkpoint:{url:result.nextUrl??result.url,page,seen:[...seen,fingerprint].slice(-1000),found:Math.min(found,config.limits.maxItems),noProgress}};
   }
   return inject(extractCatalogProduct,[{profile:snapshot.profile,settings,originalUrl:item.payload.originalUrl,allowedOrigins:origins}]);
+ }
+ private async executeWithPolicy(claim:CatalogClaim):Promise<any>{
+  if(claim.step!=='discover')return this.execute(claim);
+  const config=claim.item!.payload.config,generation=this.generation;
+  const previous=claim.item!.payload.checkpoint,startedAt=claim.item!.payload.startedAt;
+  if(startedAt&&config.limits.maxDurationSeconds&&(Date.now()-Date.parse(startedAt))>config.limits.maxDurationSeconds*1000){
+   if(config.failures?.limitReached==='pause_source')return {outcome:'technical_failure',reason:'incomplete',failureType:'limit'};
+   return {outcome:'success',links:[],done:true,checkpoint:{url:previous?.url??claim.item!.payload.url,page:(previous?.page??0)+1,seen:previous?.seen??[],found:previous?.found??0,noProgress:previous?.noProgress??0}};
+  }
+
+  for(let attempt=0;attempt<=5;attempt++){
+   if(generation!==this.generation)throw Error('interrupted');
+   try{return await this.execute(claim);}catch(error){
+    const message=error instanceof Error?error.message:'navigation';
+    if(['permission','tab_closed','interrupted','access_denied'].includes(message))throw error;
+    const kind=failureKind(message),policy=discoveryPolicy(config,kind,attempt);
+    if(policy.retry){await sleep(policy.delayMs);continue;}
+    if(policy.action==='skip_page'&&config.pagination.mode==='url'){
+     const previous=claim.item!.payload.checkpoint,page=(previous?.page??0)+1;
+     const url=config.pagination.urlTemplate.replaceAll('{page}',String(config.pagination.startPage+page*config.pagination.pageStep));
+     return {outcome:'success',links:[],done:page>=config.limits.maxPages,reason:'incomplete',failureType:kind,checkpoint:{url,page,seen:previous?.seen??[],found:previous?.found??0,noProgress:previous?.noProgress??0}};
+    }
+    return {outcome:'technical_failure',reason:'incomplete',failureType:kind};
+   }
+  }
+  throw Error('incomplete');
  }
  async pump(){
   await this.init();if(this.pumping)return;this.pumping=true;
@@ -139,7 +169,7 @@ export class CatalogRuntime {
    const currentItem=claim.item;
    await this.api('/catalog/runs/'+run.id+'/heartbeat',{itemId:currentItem.id,leaseToken:currentItem.lease_token});
    const heart=setInterval(()=>{void this.api('/catalog/runs/'+run.id+'/heartbeat',{itemId:currentItem.id,leaseToken:currentItem.lease_token}).catch(()=>{});},45000);
-   let result:any;try{result=await this.execute(claim);}finally{clearInterval(heart);}
+   let result:any;try{result=await this.executeWithPolicy(claim);}finally{clearInterval(heart);}
    if(generation!==this.generation)return;
    if(result.blocked){await this.action('human',result.blocked);this.state.message='Intervenção necessária: '+result.blocked+'. Abra a janela de processamento e depois clique em Continuar.';await this.save();return;}
    this.state.pendingResult={itemId:currentItem.id,leaseToken:currentItem.lease_token,...result};await this.save();

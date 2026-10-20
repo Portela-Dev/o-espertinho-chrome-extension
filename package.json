@@ -1,6 +1,6 @@
 {
   "name": "o-espertinho-chrome-extension",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "ExtensÃ£o genÃ©rica do O Espertinho para geraÃ§Ã£o de links por configuraÃ§Ã£o.",
   "type": "module",
