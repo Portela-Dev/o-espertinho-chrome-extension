@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analysisInput,readSuggestion,analyze,validateSuggestion} from '../local-ai/analysis.mjs';
+import {analysisInput,readSuggestion,analyze,validateSuggestion} from '../extension/shared/analysis.mjs';
 const input={offer:{title:'Headset Modelo X',description:'Fone estéreo',brand:'Marca',sourceCategory:'Áudio'},categories:['Informática > Fones'],products:[{id:'p1',name:'Headset Modelo X',brand:'Marca'}]};
 const suggestion={action:'link_existing',category:'Informática > Fones',productId:'p1',product:null,reason:'Mesmo modelo e marca. Cor não distingue o produto.'};
 function stream(events){const text=events.map(e=>'data: '+JSON.stringify(e)+'\r\n\r\n').join(''),bytes=new TextEncoder().encode(text);return new Response(new ReadableStream({start(controller){for(const byte of bytes)controller.enqueue(Uint8Array.of(byte));controller.close();}}));}

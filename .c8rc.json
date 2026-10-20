@@ -3,7 +3,6 @@
   "include": [
     "src/**/*.ts",
     "scripts/**/*.mjs",
-    "local-ai/**/*.mjs",
     "extension/shared/**/*.mjs"
   ],
   "exclude": [

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign} from 'node:crypto';
-import {OpenAISession,verifyIdentity} from '../local-ai/openai-session.mjs';
+import {OpenAISession,verifyIdentity} from '../extension/shared/openai-session.mjs';
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwks={keys:[{...publicKey.export({format:'jwk'}),kid:'fixture',alg:'RS256',use:'sig'}]};
 const clientId='oaiapp_fixture',now=1800000000000;

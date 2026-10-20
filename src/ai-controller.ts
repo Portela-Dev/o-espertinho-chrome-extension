@@ -5,7 +5,7 @@ export const DIRECT_CALLBACK='http://127.0.0.1:18766/auth/callback';
 const ORIGINS=['https://auth.openai.com/*','https://api.openai.com/*','http://127.0.0.1/*'];
 const KEY='directAiRegistrationV1';
 const safeError=(error:unknown)=>error instanceof LocalError?error.message:'Não foi possível concluir a chamada direta à OpenAI. Confira sua conexão e tente novamente.';
-export class DirectAi {
+export class AiController {
  private loginTab?:number;
  private processing=false;
  private controller?:AbortController;
@@ -32,7 +32,7 @@ export class DirectAi {
   const registrations=Array.isArray(old?.registrations)?old.registrations.filter((r:any)=>typeof r?.clientId==='string'&&typeof r?.subject==='string'&&typeof r?.email==='string').slice(-20).map((r:any)=>({clientId:r.clientId,subject:r.subject,email:r.email})):[];
   const saveRegistrations=async(rows:any[])=>{await browser.storage.local.set({[KEY]:{hostId,registrations:rows.map(r=>({clientId:r.clientId,subject:r.subject,email:r.email}))}});};
   await saveRegistrations(registrations);
-  return new DirectAi(new OpenAISession({hostId,registrations,saveRegistrations}),browser);
+  return new AiController(new OpenAISession({hostId,registrations,saveRegistrations}),browser);
  }
  private async admin(){
   const reply=await this.browser.runtime.sendMessage({type:'STATE'});
@@ -66,8 +66,8 @@ export class DirectAi {
   this.processing=true;this.callbackObserved=true;this.phase='validating_identity';const generation=this.session.generation;
   const tabId=this.loginTab;
   try{
-   // Replace only the tab created by this attempt. No token or callback URL is relayed to another page.
-   await this.browser.tabs.update(tabId,{url:this.browser.runtime.getURL('direct-ai-return.html')});
+   // Close only this attempt's login tab. The panel retains the in-memory session.
+   try{await this.browser.tabs.remove(tabId);}catch{/* The callback was already captured. */}
    await this.session.callback(url.searchParams);
    if(generation===this.session.generation){this.phase='connected';this.error='';}
   }catch(error){if(generation===this.session.generation){this.phase='failed';this.error=safeError(error);}}
@@ -98,7 +98,7 @@ export class DirectAi {
   this.cancelAnalysis();await this.cancelLogin();this.modelsList=[];this.result=null;this.error='';this.phase='idle';return this.session.signout();
  }
  dispose(){
-  this.cancelAnalysis();this.session.generation++;this.session.pending=null;this.session.active=null;
+  this.cancelAnalysis();void this.cancelLogin();this.session.active=null;
   this.browser.webRequest.onBeforeRequest.removeListener(this.onRequest);this.browser.tabs.onRemoved.removeListener(this.onTabRemoved);
  }
 }

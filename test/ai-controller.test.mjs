@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign} from 'node:crypto';
-import {DirectAi,DIRECT_CALLBACK} from '../dist/direct-ai.js';
+import {AiController,DIRECT_CALLBACK} from '../dist/ai-controller.js';
 import {OpenAISession} from '../dist/shared/openai-session.mjs';
-import {launchDirectAi} from '../dist/direct-ai-launcher.js';
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 function fixture(){
  const saved={},calls=[],updates=[],messages=[],listeners={};let allowed=true,permitted=true;
@@ -24,7 +23,7 @@ function fixture(){
   throw Error('Unexpected URL');
  };
  session=new OpenAISession({hostId:'urn:uuid:test',fetcher,saveRegistrations:async registrations=>{saved.registrations=registrations;}});
- const app=new DirectAi(session,browser);
+ const app=new AiController(session,browser);
  const login=async()=>{await app.login();session.nonceFixture=session.pending.nonce;return DIRECT_CALLBACK+'?'+new URLSearchParams({state:session.pending.state,code:'test-only-code',client_id:'oaiapp_direct'});};
  return {app,session,browser,saved,calls,messages,updates,listeners,login,deny:()=>{allowed=false;},denyAdmin:()=>{permitted=false;}};
 }
@@ -33,7 +32,7 @@ test('login direto aceita somente aba, frame, callback e state próprios; nenhum
   const callback=await f.login();assert.equal(f.app.status().phase,'waiting_for_login');
   const authUrl=new URL(f.updates.find(v=>v.url?.startsWith('https:')).url);assert.equal(authUrl.searchParams.get('redirect_uri'),DIRECT_CALLBACK);assert.equal(authUrl.searchParams.get('code_challenge_method'),'S256');
   for(const details of [{tabId:88,frameId:0,url:callback},{tabId:77,frameId:2,url:callback},{tabId:77,frameId:0,url:callback.replace('18766','18765')},{tabId:77,frameId:0,url:callback.replace('/auth/callback','/wrong')},{tabId:77,frameId:0,url:callback+'&state=duplicate'}])assert.equal(await f.app.receive(details),false);
-  assert.equal(f.calls.length,0);assert.equal(await f.app.receive({tabId:77,frameId:0,url:callback}),true);assert.equal(f.app.status().connected,true);assert.equal(f.app.status().callbackObserved,true);
+  assert.equal(f.calls.length,0);assert.equal(await f.app.receive({tabId:77,frameId:0,url:callback}),true);assert.equal(f.app.status().connected,true);assert.equal(f.app.status().callbackObserved,true);assert.ok(f.updates.some(v=>v.removed===77));
   assert.equal(await f.app.receive({tabId:77,frameId:0,url:callback}),false);assert.equal((await f.app.models())[0].id,'fixture');
   await f.app.analyze({model:'fixture',offer:{title:'Produto'}});assert.equal(f.app.status().phase,'completed');assert.equal(f.app.status().result.action,'needs_review');
   assert.ok(f.calls.every(c=>/^https:\/\/(auth|api)\.openai\.com\//.test(c.url)));assert.ok(f.messages.every(m=>m.type==='STATE'));
@@ -49,8 +48,13 @@ test('cancelar login invalida a tentativa e fechar a aba de login deixa erro con
   f.deny();await assert.rejects(()=>f.app.login(),/Autorize/);
  }finally{f.app.dispose();assert.equal(f.listeners.request,undefined);}
 });
-test('launcher compartilha só os campos da oferta e abre uma página interna; create salva somente registro não secreto',async()=>{
+test('create salva somente registro não secreto',async()=>{
  const f=fixture();f.app.dispose();
- await launchDirectAi(f.browser);assert.equal(f.saved.directAiOfferDraft.title,'Produto');assert.match(f.updates.at(-1).url,/direct-ai.html$/);
- const app=await DirectAi.create(f.browser);try{assert.match(f.saved.directAiRegistrationV1.hostId,/^urn:uuid:/);assert.equal(app.status().connected,false);assert.doesNotMatch(JSON.stringify(f.saved.directAiRegistrationV1),/token|verifier|nonce/);}finally{app.dispose();}
+ const app=await AiController.create(f.browser);try{assert.match(f.saved.directAiRegistrationV1.hostId,/^urn:uuid:/);assert.equal(app.status().connected,false);assert.doesNotMatch(JSON.stringify(f.saved.directAiRegistrationV1),/token|verifier|nonce/);}finally{app.dispose();}
+});
+
+test('encerrar painel invalida login e fecha somente a aba de autorização criada pela sessão',async()=>{
+ const f=fixture();const callback=await f.login();f.app.dispose();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.session.pending,null);assert.equal(f.session.active,null);assert.equal(f.listeners.request,undefined);assert.equal(f.listeners.removed,undefined);
+ assert.deepEqual(f.updates.filter(v=>v.removed!==undefined),[{removed:77}]);assert.equal(await f.app.receive({tabId:77,frameId:0,url:callback}),false);
 });

@@ -39,11 +39,9 @@ Painel pode ser fechado sem perder progresso. Use Carregar execuções para reto
 
 O computador e o Chrome precisam estar disponíveis. Suspensão, abas congeladas/descartadas, perda de rede ou janela fechada podem pausar a execução. Não existe garantia de processamento com janela minimizada. Iframes configurados não são suportados nesta versão e causam falha controlada; documento principal, links de próximo, templates de URL, carregar mais e rolagem usam configurações limitadas.
 
-## Assistente ChatGPT local (prova de conceito)
+## IA do catálogo (teste)
 
-O painel tem uma prova de login oficial e análise de uma oferta com auxiliar Node.js local. Execute `npm run ai:helper`, vincule o código exibido no terminal e use **Continue with ChatGPT**. Tokens ficam somente em memória do auxiliar; o backend não recebe credenciais ou análises desta prova. Veja [instruções, testes e limites](docs/AI-LOCAL.md). O artefato inclui um ZIP separado do auxiliar, sem dependências externas.
-
-A segunda prova pode ser aberta por **Testar sem auxiliar — abrir aba de IA** no mesmo painel, com o auxiliar desligado. A sessão fica apenas na memória de uma aba interna, sem enviar credenciais ChatGPT ao backend. O retorno OAuth é observado pelo Chrome, sem servidor HTTP local; veja [o procedimento e as limitações experimentais](docs/AI-DIRECT.md).
+Login com ChatGPT, modelos e análise de uma oferta ficam no painel lateral da extensão. Apenas a autorização abre uma aba; ela fecha após o retorno. Não há auxiliar, servidor local ou aba separada de análise. Tokens ficam exclusivamente na memória do painel, sem envio ao backend. Fechar/recarregar o painel exige novo login. Veja [instruções e limites](docs/AI.md).
 
 ## Segurança e limites do catálogo
 

@@ -1,22 +1,3 @@
-const LOCAL='http://127.0.0.1:18765';
-const KEY='localAiConnection';
-export async function localAiRequest(path:string,body:Record<string,unknown>={},browser:typeof chrome=chrome){
- if(!['/pair','/status','/login','/logout','/models','/analyze','/cancel'].includes(path))throw new Error('Operação local inválida.');
- if(!await browser.permissions.contains({origins:['http://127.0.0.1/*']}))throw new Error('Autorize a conexão com o auxiliar local.');
- await browser.storage.session.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
- const stored=(await browser.storage.session.get(KEY))[KEY],key=typeof stored==='string'?stored:'';
- if(path!=='/pair'&&!key)throw new Error('Vincule o auxiliar com o código exibido no terminal.');
- let response:Response;
- try{response=await fetch(LOCAL+path,{method:'POST',headers:{'Content-Type':'application/json',...(path==='/pair'?{}:{'X-Espertinho-Local':key})},body:JSON.stringify(body),credentials:'omit',redirect:'error',signal:AbortSignal.timeout(30000)});}
- catch{throw new Error('Auxiliar local indisponível. Execute npm run ai:helper na pasta da extensão.');}
- const value=await response.json();
- if(!response.ok){if(response.status===401)await browser.storage.session.remove(KEY);throw new Error(value.error||'Falha no auxiliar local.');}
- if(path==='/pair'){
-  if(typeof value.key!=='string')throw new Error('Resposta de vínculo inválida.');
-  await browser.storage.session.set({[KEY]:value.key});return {paired:true};
- }
- return value;
-}
 // Only structured, bounded product metadata is read; no cookies, scripts, or page storage leave the tab.
 export function readOfferMetadata(){
  const meta=(name:string)=>document.querySelector<HTMLMetaElement>(`meta[property="${name}"],meta[name="${name}"]`)?.content??'';

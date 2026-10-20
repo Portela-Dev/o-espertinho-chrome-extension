@@ -32,18 +32,9 @@ await mkdir(output, { recursive: true });
 const filename = `o-espertinho-chrome-extension-${manifest.version}.zip`;
 const zip = zipSync(files, { level: 9 });
 await writeFile(new URL(filename, output), zip);
-const helperFiles={};
-for(const name of (await readdir(new URL('local-ai/',root))).filter(name=>name.endsWith('.mjs'))){
-  helperFiles['local-ai/'+name]=[await readFile(new URL('local-ai/'+name,root)),{mtime:new Date('2020-01-01T00:00:00Z')}];
-}
-helperFiles['package.json']=Buffer.from(JSON.stringify({name:'o-espertinho-local-ai',private:true,type:'module',engines:{node:'>=24'},scripts:{'ai:helper':'node local-ai/start.mjs'}},null,2));
-helperFiles['README.md']=await readFile(new URL('docs/AI-LOCAL.md',root));
-for(const name of ['openai-session.mjs','analysis.mjs'])helperFiles['extension/shared/'+name]=await readFile(new URL('extension/shared/'+name,root));
-const helperFilename=`o-espertinho-local-ai-${manifest.version}.zip`,helperZip=zipSync(helperFiles,{level:9});
-await writeFile(new URL(helperFilename,output),helperZip);
 await writeFile(
   new URL("SHA256SUMS", output),
-  `${createHash("sha256").update(zip).digest("hex")}  ${filename}\n${createHash("sha256").update(helperZip).digest("hex")}  ${helperFilename}\n`,
+  `${createHash("sha256").update(zip).digest("hex")}  ${filename}\n`,
 );
 await writeFile(
   new URL("INSTALAR.txt", output),

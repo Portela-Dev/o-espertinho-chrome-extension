@@ -8,13 +8,12 @@ import {tmpdir} from 'node:os';
 import {join,resolve,relative} from 'node:path';
 import {chromium} from 'playwright';
 import {discoverPage} from '../dist/catalog-discovery.js';
-import {createLocalServer} from '../local-ai/server.mjs';
 import {generateKeyPairSync,sign} from 'node:crypto';
-import {DIRECT_CALLBACK} from '../dist/direct-ai.js';
+import {DIRECT_CALLBACK} from '../dist/ai-controller.js';
 
 test('Chromium real executa os quatro passos configuráveis em aba própria na mesma janela, sem sessão no backend', {skip:process.env.TEST_NATIVE_BROWSER!=='1',timeout:90000},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'espertinho-native-')),extension=join(directory,'extension');
- let context,server,marketServer,aiLocal;let marketOrigin,challenge=false;const received=[],visited=[],backendTraffic=[];let run,item;
+ let context,server,marketServer;let marketOrigin,challenge=false;const received=[],visited=[],backendTraffic=[];let run,item;
  const discovery={rendering:{frameSelector:'',readySelector:'.card',timeoutMs:1000,settleDelayMs:0},extraction:{itemSelector:'.card',linkSelector:'a',linkAttribute:'href'},pagination:{mode:'next',nextSelector:'.next',disabledSelector:'',endSelector:'',missingNextAction:'finish',noProgressLimit:1,waitAfterMs:100},limits:{maxPages:2,maxItems:10,requestIntervalMs:100}};
  const recipe={id:'fixture',name:'Fixture',loginUrl:'https://shop.example.com/product',allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],batchSize:1,intervalMs:100,steps:[{type:'extract',source:'dom',name:'csrf',selector:'meta[name="csrf-token"]',attribute:'content'},{type:'request',url:'https://shop.example.com/convert',method:'POST',headers:{'X-CSRF-Token':'{{csrf}}'},body:{url:'{{originalUrl}}'},responsePath:'link'}]};
  const settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,categorySeparator:'>',blockRules:[{kind:'challenge',match:'selector',value:'.human-check'}],recipe};
@@ -22,9 +21,6 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
  const snapshot={settings,profile,market:{allowedHosts:['shop.example.com'],normalizationRules:[]}};
  try{
   await cp(new URL('../dist/',import.meta.url),extension,{recursive:true});
-  aiLocal=createLocalServer({port:0,pairCode:'native-test-pair',session:{status:()=>({connected:true,account:{email:'fixture@example.test',planEnabled:true},accounts:[],loginPending:false,error:''}),models:async()=>[{id:'fixture-model',name:'Modelo de teste'}]},analysis:async()=>({action:'needs_review',category:'Teste',reason:'Resultado simulado de teste; nenhuma conta real foi acessada.'})});
-  const aiAddress=await aiLocal.listen();
-  await writeFile(join(extension,'local-ai.js'),(await readFile(join(extension,'local-ai.js'),'utf8')).replace('http://127.0.0.1:18765','http://127.0.0.1:'+aiAddress.port));
   await writeFile(join(extension,'background.js'),(await readFile(join(extension,'background.js'),'utf8'))+'\nglobalThis.catalogTest=runtime;\n');
   const manifest=JSON.parse(await readFile(join(extension,'manifest.json'),'utf8'));manifest.host_permissions.push('https://shop.example.com/*','http://localhost/*','http://127.0.0.1/*','https://auth.openai.com/*','https://api.openai.com/*');await writeFile(join(extension,'manifest.json'),JSON.stringify(manifest));
   server=createServer(async(req,res)=>{
@@ -140,18 +136,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   assert.equal(toast.position,'fixed');assert.equal(toast.bottom,16);
   await panel.emulateMedia({colorScheme:'dark'});await panel.screenshot({path:'reports/catalog-error-toast.png'});
   await panel.locator('#dismiss-notification').click();assert.equal(await panel.locator('#notification').isVisible(),false);
-  await panel.locator('#ai-proof > summary').click();
-  await panel.locator('#ai-code').fill('native-test-pair');await panel.locator('#ai-pair').click();
-  await panel.locator('#ai-status').filter({hasText:'Usando seu plano ChatGPT'}).waitFor();
-  await panel.locator('#ai-models').click();await panel.locator('#ai-model option').filter({hasText:'Modelo de teste'}).waitFor({state:'attached'});
-  await panel.locator('#ai-title').fill('Oferta de teste');await panel.locator('#ai-consent').check();await panel.locator('#ai-analyze').click();
-  await panel.locator('#ai-result').filter({hasText:'Resultado simulado de teste'}).waitFor();
-  assert.equal(await panel.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  await panel.screenshot({path:'reports/local-ai-panel.png',fullPage:true});
-  assert.doesNotMatch(JSON.stringify(received),/native-test-pair|fixture-model|needs_review/);
-  // No helper remains for the direct proof. Official endpoints below are simulated,
-  // while the browser really navigates to an unserved loopback callback.
-  await aiLocal.close();aiLocal=undefined;
+  // Official endpoints are simulated; the browser navigates to an unserved callback.
   const keys=generateKeyPairSync('rsa',{modulusLength:2048});let directNonce='',responses=0;const directStages=[];
   await context.route('https://auth.openai.com/**',async route=>{
    const url=new URL(route.request().url());
@@ -179,20 +164,20 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    }
    await route.abort();
   });
-  const direct=await context.newPage();await direct.goto(new URL('direct-ai.html',worker.url()).href);
+  const direct=panel,pagesBefore=context.pages().length;await direct.locator('#ai-panel > summary').click();
   await direct.locator('#direct-login').click();
   try{await direct.locator('#direct-status').filter({hasText:'Conta conectada diretamente'}).waitFor({timeout:20000});}
-  catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#direct-notice').textContent(),callback:await direct.locator('#direct-callback-status').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
+  catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#error').textContent(),callback:await direct.locator('#direct-callback-status').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
   await direct.locator('#direct-callback-status').filter({hasText:'reconhecido'}).waitFor();
   await direct.locator('#direct-models').click();await direct.locator('#direct-model option').filter({hasText:'Modelo direto de teste'}).waitFor({state:'attached'});
   await direct.locator('#direct-title').fill('Oferta direta de teste');await direct.locator('#direct-consent').check();await direct.locator('#direct-analyze').click();
-  await direct.locator('#direct-result').filter({hasText:'Análise direta simulada sem auxiliar'}).waitFor();assert.equal(responses,1);
+  await direct.locator('#direct-result').filter({hasText:'Análise direta simulada sem auxiliar'}).waitFor();assert.equal(responses,1);assert.equal(context.pages().length,pagesBefore);
   const storage=await worker.evaluate(async()=>({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
   assert.doesNotMatch(JSON.stringify(storage)+JSON.stringify(backendTraffic),/DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/);
-  await direct.setViewportSize({width:390,height:1000});assert.equal(await direct.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await direct.screenshot({path:'reports/direct-ai-page.png',fullPage:true});
+  await direct.setViewportSize({width:390,height:1000});assert.equal(await direct.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await direct.screenshot({path:'reports/ai-panel.png',fullPage:true});
   await direct.locator('#direct-logout').click();await direct.locator('#direct-status').filter({hasText:'desconectado'}).waitFor();
  }finally{
-  await context?.close();await aiLocal?.close();if(server)await new Promise(r=>server.close(r));if(marketServer)await new Promise(r=>marketServer.close(r));
+  await context?.close();if(server)await new Promise(r=>server.close(r));if(marketServer)await new Promise(r=>marketServer.close(r));
   if(relative(resolve(tmpdir()),resolve(directory)).startsWith('..'))throw Error('Diretório de teste inválido.');
   await rm(directory,{recursive:true,force:true});
  }

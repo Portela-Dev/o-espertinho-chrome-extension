@@ -1,5 +1,5 @@
 import { launchSelectorPicker } from './picker-launcher.js';
-import { setupLocalAi } from './local-ai-view.js';
+import { setupAiPanel } from './ai-panel.js';
 import { backendOrigin } from './contracts.js';
 import { renderCatalog, runLabel,stepLabel, type CatalogView } from './catalog-view.js';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -21,9 +21,9 @@ function notify(message: string, kind: 'error' | 'success' = 'error') {
     notificationTimer = setTimeout(hideNotification, kind === 'error' ? 10000 : 4500);
 }
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Não foi possível concluir.';
-setupLocalAi(notify);
 element('dismiss-notification').addEventListener('click', hideNotification);
 const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
+void setupAiPanel(notify,isPanel).catch(()=>notify('Não foi possível iniciar a IA no painel.'));
 document.body.classList.toggle('side-panel', isPanel);
 function syncDisplayIcon() {
     const button=element<HTMLButtonElement>('display-mode'),label=isPanel?'Usar popup':'Abrir painel lateral';
