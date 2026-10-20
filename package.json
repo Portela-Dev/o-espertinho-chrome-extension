@@ -2,7 +2,7 @@
   "name": "o-espertinho-chrome-extension",
   "version": "0.2.0",
   "private": true,
-  "description": "Extens\u00c3\u00a3o gen\u00c3\u00a9rica do O Espertinho para gera\u00c3\u00a7\u00c3\u00a3o de links por configura\u00c3\u00a7\u00c3\u00a3o.",
+  "description": "ExtensÃ£o genÃ©rica do O Espertinho para geraÃ§Ã£o de links por configuraÃ§Ã£o.",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -15,7 +15,8 @@
     "test": "npm run build:coverage && node --test test/*.test.mjs",
     "check": "npm run typecheck && npm run validate:html && npm run test:coverage",
     "build:coverage": "node scripts/build.mjs --coverage",
-    "test:coverage": "c8 node scripts/test-suite.mjs"
+    "test:coverage": "c8 node scripts/test-suite.mjs",
+    "test:native": "node scripts/native-test.mjs"
   },
   "devDependencies": {
     "@types/chrome": "0.3.5",
@@ -23,6 +24,7 @@
     "fflate": "0.8.3",
     "happy-dom": "21.0.3",
     "html-validate": "11.16.4",
+    "playwright": "1.64.1",
     "typescript": "7.0.2"
   }
 }

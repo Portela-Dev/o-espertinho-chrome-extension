@@ -40,6 +40,10 @@ jobs:
         run: npm audit --audit-level=high
       - name: Validar e testar o pacote
         run: npm run check
+      - name: Preparar Chromium para teste da extensão
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Validar quatro etapas em Chromium real
+        run: npm run test:native
       - name: Publicar cobertura dos testes
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
