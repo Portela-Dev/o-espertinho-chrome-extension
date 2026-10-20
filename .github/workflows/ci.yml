@@ -22,7 +22,8 @@ defaults:
 jobs:
   build:
     name: Validar e empacotar extensão
-    runs-on: ubuntu-latest
+    # Chromium sandbox stays enabled; Ubuntu 24 AppArmor restricts downloaded browsers.
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
       - name: Obter código

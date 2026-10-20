@@ -11,7 +11,7 @@ const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 const hex=(bytes:ArrayBuffer)=>Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
 export class CatalogRuntime {
  state!:CatalogState;
- private initialization?:Promise<void>;private pumping=false;private generation=0;private timer?:ReturnType<typeof setTimeout>;
+ private initialization?:Promise<void>;private pumping=false;private generation=0;private nextRequestAt=0;private timer?:ReturnType<typeof setTimeout>;
  private headers:RequestHeaderMemory;private navigation:CatalogNavigation;
  constructor(private readonly browser:typeof chrome=chrome){this.headers=new RequestHeaderMemory(browser);this.navigation=new CatalogNavigation(browser,()=>this.state,()=>this.save());}
  async init(){this.initialization??=this.load();await this.initialization;}
@@ -22,8 +22,9 @@ export class CatalogRuntime {
   this.state.backendUrl=backendOrigin(this.state.backendUrl);await this.browser.alarms.create('worker',{periodInMinutes:0.5});await this.save();
  }
  private save(){return this.browser.storage.local.set({state:this.state});}
- private async disconnect(){this.generation++;clearTimeout(this.timer);await this.headers.clear();delete this.state.auth;delete this.state.pair;delete this.state.claim;delete this.state.pendingResult;delete this.state.run;delete this.state.nextAt;this.state.markets=[];this.state.message='Sessão encerrada. Entre novamente.';await this.save();}
+ private async disconnect(){this.generation++;clearTimeout(this.timer);await this.headers.clear();delete this.state.auth;delete this.state.pair;delete this.state.claim;delete this.state.pendingResult;delete this.state.run;delete this.state.nextAt;delete this.state.locallyPaused;this.state.markets=[];this.state.message='Sessão encerrada. Entre novamente.';await this.save();}
  private async request(path:string,body?:unknown,token?:string){
+  const delay=Math.max(0,this.nextRequestAt-Date.now());this.nextRequestAt=Math.max(Date.now(),this.nextRequestAt)+300;if(delay)await sleep(delay);
   const response=await fetch(this.state.backendUrl+'/api/extension'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Espertinho-Extension-Id':this.browser.runtime.id,...(token?{Authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body),credentials:'omit',redirect:'error',signal:AbortSignal.timeout(20000)});
   let data:any;try{data=await response.json();}catch{throw Error('Resposta inválida do backend.');}return {response,data};
  }
@@ -35,7 +36,7 @@ export class CatalogRuntime {
   if(!response.ok)throw Error(data.error??'Não foi possível concluir a operação.');return data as T;
  }
  async observeAffiliateHeaders(details:Parameters<RequestHeaderMemory['observe']>[0]){await this.init();await this.headers.observe(details);}
- private async refresh(){const config=await this.api('/catalog/config');this.state.markets=config.marketplaces;await this.save();}
+ private async refresh(){const config=await this.api('/catalog/config');this.state.markets=config.marketplaces;if(this.state.run){this.state.run=await this.api('/catalog/runs/'+this.state.run.id);if(['completed','cancelled','failed'].includes(this.state.run!.status))this.state.locallyPaused=false;}await this.save();}
  private market(id?:string):CatalogMarket{const market=this.state.markets.find(m=>m.id===(id??this.state.marketplaceId));if(!market)throw Error('Escolha um marketplace.');return market;}
  private async login(){
   const verifier=hex(crypto.getRandomValues(new Uint8Array(32)).buffer),challenge=hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));
@@ -73,10 +74,10 @@ export class CatalogRuntime {
     const market=this.market(command.marketplaceId);if(market.catalog_executor!=='extension')throw Error('Ative o executor da extensão no admin.');
     this.state.marketplaceId=market.id;
     if(command.step==='convert'){if(!market.config.recipe)throw Error('Cadastre a receita de conversão.');await this.headers.values(market.config.recipe);}
-    this.state.run=await this.api('/catalog/runs',{marketplaceId:market.id,step:command.step,requestKey:crypto.randomUUID(),limit:command.limit??100,retryFailed:command.retryFailed??false});delete this.state.claim;delete this.state.pendingResult;delete this.state.nextAt;await this.save();void this.pump();break;
+    this.state.locallyPaused=false;this.state.run=await this.api('/catalog/runs',{marketplaceId:market.id,step:command.step,requestKey:crypto.randomUUID(),limit:command.limit??100,retryFailed:command.retryFailed??false});delete this.state.claim;delete this.state.pendingResult;delete this.state.nextAt;await this.save();void this.pump();break;
    }
    case 'ATTACH':{
-    const run=await this.api<CatalogRun>('/catalog/runs/'+command.runId);if(this.state.run&&this.state.run.id!==run.id&&!['completed','cancelled','failed'].includes(this.state.run.status))throw Error('Já existe uma execução local.');this.state.run=run;await this.save();break;
+    const run=await this.api<CatalogRun>('/catalog/runs/'+command.runId);if(this.state.run&&this.state.run.id!==run.id&&!['completed','cancelled','failed'].includes(this.state.run.status))throw Error('Já existe uma execução local.');this.state.run=run;this.state.locallyPaused=false;await this.save();break;
    }
    case 'RUNS':return this.api('/catalog/runs?page='+Math.max(1,command.page??1)+'&pageSize='+Math.min(50,Math.max(1,command.pageSize??10))); 
    case 'FOCUS':await this.navigation.focus();break;
@@ -86,7 +87,7 @@ export class CatalogRuntime {
     const run=this.state.run;if(!run)throw Error('Não há execução para retomar.');
     const rules=run.snapshot.settings.blockRules;
     if(this.state.tabId){const blocked=await this.navigation.inspect(rules);if(blocked&&blocked!=='unavailable')throw Error('A página ainda exige intervenção: '+blocked);}
-    this.state.run=await this.api('/catalog/runs/'+run.id+'/action',{action:'resume'});delete this.state.claim;delete this.state.pendingResult;await this.save();void this.pump();break;
+    this.state.run=await this.api('/catalog/runs/'+run.id+'/action',{action:'resume'});this.state.locallyPaused=false;delete this.state.claim;delete this.state.pendingResult;await this.save();void this.pump();break;
    }
    default:throw Error('Operação desconhecida.');
   }
@@ -94,7 +95,7 @@ export class CatalogRuntime {
  }
  private view(){return {backendUrl:this.state.backendUrl,user:this.state.auth?.user,pairing:!!this.state.pair,markets:this.state.markets,marketplaceId:this.state.marketplaceId,run:this.state.run,message:this.state.message,version:this.browser.runtime.getManifest().version};}
  private async action(action:'pause'|'cancel'|'human'|'technical',reason=''){
-  if(!this.state.run)return;this.generation++;this.state.run=await this.api('/catalog/runs/'+this.state.run.id+'/action',{action,reason});await this.save();
+  if(!this.state.run)return;this.generation++;this.state.locallyPaused=action!=='cancel';this.state.run=await this.api('/catalog/runs/'+this.state.run.id+'/action',{action,reason});await this.save();
  }
  private async execute(claim:CatalogClaim):Promise<any>{
   const generation=this.generation;const assertActive=()=>{if(generation!==this.generation)throw Error('interrupted');};
@@ -159,7 +160,8 @@ export class CatalogRuntime {
   await this.init();if(this.pumping)return;this.pumping=true;
   try{
    if(this.state.pair)await this.poll();
-   const run=this.state.run;if(!this.state.auth||!run)return;
+   const run=this.state.run;if(!this.state.auth||!run||this.state.locallyPaused)return;
+   if(['queued','running'].includes(run.status)&&(this.state.nextAt??0)>Date.now())return;
    this.state.run=await this.api<CatalogRun>('/catalog/runs/'+run.id);
    if(!['queued','running'].includes(this.state.run.status)||((this.state.nextAt??0)>Date.now()))return;
    const generation=this.generation;
@@ -178,11 +180,11 @@ export class CatalogRuntime {
    this.state.run=await this.api('/catalog/runs/'+run.id);this.state.message='Resultado salvo.';await this.save();
   }catch(error){
    const reason=error instanceof Error?error.message:'';this.state.message=reason;
-   if(this.state.auth&&this.state.run&&['queued','running'].includes(this.state.run.status)){const code=['permission','tab_closed','incomplete'].includes(reason)?reason:'network';try{await this.action('technical',code);}catch{/* Keep checkpoint and retry only after explicit recovery. */}}
+   if(this.state.auth&&this.state.run&&['queued','running'].includes(this.state.run.status)){const code=['permission','tab_closed','incomplete'].includes(reason)?reason:'network';try{await this.action('technical',code);}catch{if(this.state.run)this.state.run.status='paused_technical';this.state.locallyPaused=true;}}
    await this.save();
   }finally{
    this.pumping=false;clearTimeout(this.timer);
-   if(this.state.auth&&this.state.run&&['queued','running'].includes(this.state.run.status))this.timer=setTimeout(()=>{void this.pump();},Math.max(100,(this.state.nextAt??0)-Date.now()));
+   if(this.state.auth&&!this.state.locallyPaused&&this.state.run&&['queued','running'].includes(this.state.run.status))this.timer=setTimeout(()=>{void this.pump();},Math.max(100,(this.state.nextAt??0)-Date.now()));
   }
  }
 }

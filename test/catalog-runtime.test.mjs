@@ -23,8 +23,20 @@ test('migração de storage descarta POCs e preserva autenticação; conversão 
  const f=fixture(),original=globalThis.fetch;globalThis.fetch=f.fetch;
  try{await f.runtime.init();assert.equal(f.saved().version,2);assert.equal(f.saved().proofTest,undefined);assert.equal(f.saved().auth.token,auth.token);
   await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'convert'});
-  for(let i=0;i<40&&f.saved().run?.status!=='completed';i++)await new Promise(r=>setTimeout(r,5));
+  for(let i=0;i<1000&&f.saved().run?.status!=='completed';i++)await new Promise(r=>setTimeout(r,5));
   const result=f.calls.find(c=>c.path.endsWith('/results'));assert.ok(result);assert.deepEqual(Object.keys(result.body).sort(),['affiliateUrl','itemId','leaseToken','outcome']);assert.equal(f.saved().run.status,'completed');
   const view=await f.runtime.handle({type:'STATE'});assert.equal(JSON.stringify(view).includes(auth.token),false);
+ }finally{globalThis.fetch=original;}
+});
+
+
+test('falha de rede pausa localmente sem repetição e logout limpa a execução anterior',async()=>{
+ const f=fixture(),original=globalThis.fetch;let requests=0;
+ globalThis.fetch=async()=>{requests++;throw Error('network unavailable');};
+ try{
+  await f.runtime.init();f.runtime.state.run={id:'run',status:'running',step:'prices',snapshot:{settings:{blockRules:[]}}};
+  await f.runtime.pump();assert.equal(f.saved().locallyPaused,true);assert.equal(f.saved().run.status,'paused_technical');
+  const count=requests;await f.runtime.pump();assert.equal(requests,count);
+  globalThis.fetch=f.fetch;await f.runtime.handle({type:'LOGOUT'});assert.equal(f.saved().run,undefined);assert.equal(f.saved().auth,undefined);assert.equal(f.saved().locallyPaused,undefined);
  }finally{globalThis.fetch=original;}
 });
