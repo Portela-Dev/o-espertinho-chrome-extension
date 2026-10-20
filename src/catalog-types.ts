@@ -10,5 +10,5 @@ export interface CatalogState {
  version:2;backendUrl:string;auth?:Auth;
  pair?:{deviceCode:string;verifier:string;expiresAt:number;verificationUrl:string;nextAt:number};
  markets:CatalogMarket[];marketplaceId?:string;retryFailed?:boolean;run?:CatalogRun;tabId?:number;windowId?:number;hostWindowId?:number;
- locallyPaused?:boolean;claim?:CatalogClaim;pendingResult?:Record<string,unknown>;nextAt?:number;message:string;
+ locallyPaused?:boolean;claim?:CatalogClaim;pendingResult?:Record<string,unknown>;nextAt?:number;message:string;error?:string;
 }

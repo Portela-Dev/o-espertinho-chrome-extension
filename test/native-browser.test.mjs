@@ -98,6 +98,14 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   assert.equal(await panel.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await mkdir('reports',{recursive:true});
   await panel.screenshot({path:'reports/catalog-panel.png',fullPage:true});
+  await panel.locator('#refresh').click();
+  await panel.locator('#success').filter({hasText:'Configurações atualizadas.'}).waitFor();
+  await panel.locator('#limit').fill('0');await panel.locator('#step-discover').click();
+  await panel.locator('#error').filter({hasText:'Informe um limite entre 1 e 10000.'}).waitFor();
+  const toast=await panel.locator('#notification').evaluate(node=>({position:getComputedStyle(node).position,bottom:innerHeight-node.getBoundingClientRect().bottom}));
+  assert.equal(toast.position,'fixed');assert.equal(toast.bottom,16);
+  await panel.emulateMedia({colorScheme:'dark'});await panel.screenshot({path:'reports/catalog-error-toast.png'});
+  await panel.locator('#dismiss-notification').click();assert.equal(await panel.locator('#notification').isVisible(),false);
  }finally{
   await context?.close();if(server)await new Promise(r=>server.close(r));if(marketServer)await new Promise(r=>marketServer.close(r));
   if(relative(resolve(tmpdir()),resolve(directory)).startsWith('..'))throw Error('Diretório de teste inválido.');

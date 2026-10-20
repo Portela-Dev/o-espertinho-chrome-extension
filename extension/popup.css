@@ -51,7 +51,11 @@ progress { margin-top: 18px; width: 100%; accent-color: #287b4d; }
 ul { list-style: none; padding: 0; max-height: 180px; overflow: auto; }
 li { font-size: 11px; padding: 8px 0; border-top: 1px solid #849a8b; overflow-wrap: anywhere; }
 a { color: inherit; }
-.error { color: #a72d20; font-size: 12px; line-height: 1.5; }
+.toast { position: fixed; z-index: 1000; bottom: 16px; left: 16px; right: 16px; max-width: 440px; margin-inline: auto; display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px 14px 16px; border-radius: 12px; box-shadow: 0 6px 24px #0004; color: #fff; background: #193a2e; }
+.toast[data-kind="error"] { background: #922b23; }
+.toast p { flex: 1; margin: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; max-height: 35vh; overflow-y: auto; }
+.toast button { flex-shrink: 0; padding: 0; width: 28px; height: 28px; border: 0; background: transparent; color: inherit; font-size: 22px; line-height: 1; }
+.toast button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 #affiliate-result { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; margin-top: 12px; }
 details { margin-top: 16px; font-size: 12px; }
 form button { margin-top: 10px; }

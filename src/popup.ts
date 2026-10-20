@@ -3,6 +3,24 @@ import { backendOrigin } from './contracts.js';
 import { renderCatalog, runLabel,stepLabel, type CatalogView } from './catalog-view.js';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let view: CatalogView | undefined, busy = false, page = 1, total = 0;
+let notificationTimer: ReturnType<typeof setTimeout> | undefined;
+let lastBackgroundError = '', lastPollingError = '';
+function hideNotification() {
+    clearTimeout(notificationTimer);
+    element('notification').hidden = true;
+    element('error').hidden = true;
+    element('success').hidden = true;
+}
+function notify(message: string, kind: 'error' | 'success' = 'error') {
+    hideNotification();
+    element(kind).textContent = message;
+    element(kind).hidden = false;
+    element('notification').dataset.kind = kind;
+    element('notification').hidden = false;
+    notificationTimer = setTimeout(hideNotification, kind === 'error' ? 10000 : 4500);
+}
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Não foi possível concluir.';
+element('dismiss-notification').addEventListener('click', hideNotification);
 const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
 document.body.classList.toggle('side-panel', isPanel);
 function syncDisplayIcon() {
@@ -14,21 +32,24 @@ function syncDisplayIcon() {
 syncDisplayIcon();
 function render() {
     element<HTMLButtonElement>('display-mode').disabled=busy;
-    if (view)
+    if (view) {
         renderCatalog(view, busy);
+        const message = [view.error, view.statsError].filter(Boolean).join(' ');
+        if (message && message !== lastBackgroundError) notify(message);
+        lastBackgroundError = message;
+    }
 }
 async function act(callback: () => Promise<unknown>) {
     if (busy)
         return;
     busy = true;
-    element('error').hidden = true;
+    hideNotification();
     render();
     try {
         await callback();
     }
     catch (error) {
-        element('error').textContent = error instanceof Error ? error.message : 'Não foi possível concluir.';
-        element('error').hidden = false;
+        notify(errorMessage(error));
     }
     finally {
         busy = false;
@@ -47,6 +68,7 @@ async function request(type: string, extra: Record<string, unknown> = {}) {
 async function send(type: string, extra: Record<string, unknown> = {}) {
     view = await request(type, extra);
     render();
+    if (type === 'REFRESH' && !view?.error && !view?.statsError) notify('Configurações atualizadas.', 'success');
 }
 element('display-mode').addEventListener('click', () => {
     void act(async () => {
@@ -167,6 +189,9 @@ element('runs-size').addEventListener('change', () => {
 await act(() => send('STATE'));
 setInterval(() => {
     if (!busy)
-        void send('STATE').catch(() => {
+        void send('STATE').then(() => { lastPollingError = ''; }).catch(error => {
+            const message = errorMessage(error);
+            if (message !== lastPollingError) notify(message);
+            lastPollingError = message;
         });
 }, 2000);

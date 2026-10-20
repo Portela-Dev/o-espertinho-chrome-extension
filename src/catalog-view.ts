@@ -9,6 +9,7 @@ export interface CatalogView {
     retryFailed?:boolean;stats?:CatalogStats;statsError?:string;
     run?: CatalogRun;
     message: string;
+    error?: string;
     version: string;
 }
 const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -23,7 +24,7 @@ function renderQueue(view:CatalogView,marketplaceId:string){
         button.textContent=stepLabel(step)+' · '+(value?`${value.pending} / ${value.total}`:'— / —');
         button.title=step==='prices'?'Sem verificação bem-sucedida nas últimas 24h / ofertas publicadas com link de afiliado. A execução manual continua permitindo verificar todas as ofertas.':'Pendentes elegíveis / total de links descobertos não arquivados. Independente do limite por execução.';
     }
-    el('queue-counts').textContent=view.statsError||'Conversão e extração: pendentes elegíveis / links não arquivados. Preços: sem verificação nas últimas 24h / ofertas publicadas.';
+    el('queue-counts').textContent='Conversão e extração: pendentes elegíveis / links não arquivados. Preços: sem verificação nas últimas 24h / ofertas publicadas.';
 }
 export function renderCatalog(view: CatalogView, busy: boolean) {
     el('account').textContent = view.user?.email ?? 'Conta desconectada';

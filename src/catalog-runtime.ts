@@ -9,6 +9,9 @@ import { executeRecipe } from './executor.js';
 import type { CatalogState, CatalogRun, CatalogStep, CatalogClaim, CatalogMarket,CatalogStats } from './catalog-types.js';
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+class BackendError extends Error {
+    constructor(message: string, readonly status: number) { super(message); }
+}
 type CatalogCommand = {
     type: string;
     marketplaceId?: string;
@@ -75,6 +78,7 @@ export class CatalogRuntime {
         delete this.state.run;
         delete this.state.nextAt;
         delete this.state.locallyPaused;
+        delete this.state.error;
         this.state.markets = [];
         this.stats=undefined;this.statsAt=0;this.statsError='';this.statsFilter='';this.statsSequence++;this.statsRequest=undefined;
         this.state.message = 'Sessão encerrada. Entre novamente.';
@@ -118,7 +122,7 @@ export class CatalogRuntime {
         if (response.status === 401 || response.status === 403)
             await this.disconnect();
         if (!response.ok)
-            throw new Error(data.error ?? 'Não foi possível concluir a operação.');
+            throw new BackendError(data.error ?? 'Não foi possível concluir a operação.', response.status);
         return data as T;
     }
     private async renew(auth:Auth){
@@ -140,10 +144,26 @@ export class CatalogRuntime {
         const config = await this.api('/catalog/config');
         this.state.markets = config.marketplaces;
         if(!this.state.markets.some(m=>m.id===this.state.marketplaceId))this.state.marketplaceId=this.state.markets[0]?.id;
-        if (this.state.run) {
-            this.state.run = await this.api('/catalog/runs/' + this.state.run.id);
-            if (['completed', 'cancelled', 'failed'].includes(this.state.run!.status))
-                this.state.locallyPaused = false;
+        this.state.message = 'Configurações atualizadas.';
+        await this.save();
+    }
+    private async syncRun() {
+        const run = this.state.run;
+        if (!run) return;
+        try {
+            const updated = await this.api<CatalogRun>('/catalog/runs/' + run.id);
+            if (this.state.run?.id === run.id) this.state.run = updated;
+        } catch (error) {
+            if (!(error instanceof BackendError) || error.status !== 404) throw error;
+            if (this.state.run?.id !== run.id) return;
+            clearTimeout(this.timer);
+            delete this.state.run;
+            delete this.state.claim;
+            delete this.state.pendingResult;
+            delete this.state.nextAt;
+            delete this.state.locallyPaused;
+            delete this.state.error;
+            this.state.message = 'A execução anterior não está mais disponível. Você pode iniciar uma nova execução.';
         }
         await this.save();
     }
@@ -248,6 +268,7 @@ export class CatalogRuntime {
     }
     async handle(command: CatalogCommand) {
         await this.init();
+        if (command.type !== 'STATE') delete this.state.error;
         if(command.hostWindowId!==undefined&&['START','PREPARE','FOCUS','ATTACH'].includes(command.type)){
             if(!Number.isInteger(command.hostWindowId)||command.hostWindowId<0)throw new Error('Janela inválida.');
             this.state.hostWindowId=command.hostWindowId;
@@ -320,6 +341,7 @@ export class CatalogRuntime {
         return this.view();
     }
     private async start(command: CatalogCommand) {
+        if (this.state.run && !['completed', 'cancelled', 'failed'].includes(this.state.run.status)) await this.syncRun();
         if (this.state.run && !['completed', 'cancelled', 'failed'].includes(this.state.run.status))
             throw new Error('Conclua ou cancele a execução atual.');
         const market = this.market(command.marketplaceId);
@@ -370,7 +392,7 @@ export class CatalogRuntime {
     }
     private view() {
         return {
-            backendUrl: this.state.backendUrl, user: this.state.auth?.user, pairing: !!this.state.pair, markets: this.state.markets, marketplaceId: this.state.marketplaceId,retryFailed:this.state.retryFailed??false,stats:this.stats,statsError:this.statsError, run: this.state.run, message: this.state.message, version: this.browser.runtime.getManifest().version
+            backendUrl: this.state.backendUrl, user: this.state.auth?.user, pairing: !!this.state.pair, markets: this.state.markets, marketplaceId: this.state.marketplaceId,retryFailed:this.state.retryFailed??false,stats:this.stats,statsError:this.statsError, error:this.state.error, run: this.state.run, message: this.state.message, version: this.browser.runtime.getManifest().version
         };
     }
     private async loadStats(force=false){
@@ -649,9 +671,11 @@ export class CatalogRuntime {
         return interval;
     }
     private async pumpRun(run: CatalogRun) {
+        if (['completed', 'cancelled', 'failed'].includes(run.status)) return;
         if (['queued', 'running'].includes(run.status) && (this.state.nextAt ?? 0) > Date.now())
             return;
-        this.state.run = await this.api<CatalogRun>('/catalog/runs/' + run.id);
+        await this.syncRun();
+        if (!this.state.run || this.state.run.id !== run.id) return;
         if (!['queued', 'running'].includes(this.state.run.status) || ((this.state.nextAt ?? 0) > Date.now()))
             return;
         const generation = this.generation;
@@ -678,7 +702,8 @@ export class CatalogRuntime {
     }
     private async pauseOnFailure(error: unknown) {
         const reason = error instanceof Error ? error.message : '';
-        this.state.message = reason;
+        this.state.error = reason || 'Não foi possível continuar o processamento.';
+        this.state.message = 'O processamento encontrou um erro. Confira a notificação e tente novamente.';
         if (this.state.auth && this.state.run && ['queued', 'running'].includes(this.state.run.status)) {
             const code = ['permission', 'tab_closed', 'incomplete'].includes(reason) ? reason : 'network';
             try {

@@ -21,6 +21,25 @@ function fixture(options={}){
  return {runtime:new CatalogRuntime(browser),browser,fetch,calls,saved:()=>saved};
 }
 
+test('atualizar configurações independe da execução salva; acompanhamento limpa somente referências locais de execução removida',async()=>{
+ const f=fixture(),original=globalThis.fetch;let lookups=0;
+ globalThis.fetch=async(url,options)=>{
+  if(url.endsWith('/catalog/runs/removed')){lookups++;return Response.json({error:'Execução não encontrada.'},{status:404});}
+  return f.fetch(url,options);
+ };
+ try{
+  await f.runtime.init();
+  f.runtime.state.run={id:'removed',marketplace_id:'shop',step:'enrich',status:'running'};
+  f.runtime.state.claim={item:{id:'old'}};f.runtime.state.pendingResult={itemId:'old'};f.runtime.state.nextAt=0;
+  const view=await f.runtime.handle({type:'REFRESH'});
+  assert.equal(lookups,0);assert.equal(view.markets[0].id,'shop');assert.equal(view.message,'Configurações atualizadas.');assert.equal(view.run.id,'removed');
+  await f.runtime.pump();
+  assert.equal(lookups,1);assert.equal(f.saved().run,undefined);assert.equal(f.saved().claim,undefined);assert.equal(f.saved().pendingResult,undefined);assert.equal(f.saved().nextAt,undefined);assert.equal(f.saved().locallyPaused,undefined);assert.ok(f.saved().auth);
+  assert.match(f.saved().message,/iniciar uma nova execução/);assert.equal(f.calls.some(c=>c.path.endsWith('/results')||c.path.endsWith('/action')),false);
+  f.runtime.state.run={id:'removed',status:'completed'};await f.runtime.pump();assert.equal(lookups,1);
+ }finally{globalThis.fetch=original;}
+});
+
 for(const priorStatus of ['waiting_for_human','running'])test('reabrir aba fechada preserva execução e exige continuar: '+priorStatus,async()=>{
  let blocked='login';const f=fixture({blocked:()=>blocked}),original=globalThis.fetch;globalThis.fetch=f.fetch;
  try{

@@ -20,11 +20,16 @@ test('tipo da execução e pendências por marketplace são exibidos sem confund
 });
 
 test('ações dos quatro passos, permissão, seletor e ícone usam mensagens internas',async()=>{
- let state=view(),closed=0,opened=0,allowed=true;const messages=[];let poll;
- globalThis.chrome={runtime:{sendMessage:async message=>{messages.push(message);return {value:state};}},permissions:{request:async()=>allowed},tabs:{query:async()=>[{id:12,url:'https://shop.example.com'}]},scripting:{executeScript:async()=>{}},windows:{getCurrent:async()=>({id:42})},sidePanel:{setOptions:async()=>{},open:async()=>{opened++;}}};
+ let state=view(),closed=0,opened=0,allowed=true,offline=false;const messages=[];let poll;
+ globalThis.chrome={runtime:{sendMessage:async message=>{messages.push(message);return offline?{error:'Backend indisponível.'}:{value:state};}},permissions:{request:async()=>allowed},tabs:{query:async()=>[{id:12,url:'https://shop.example.com'}]},scripting:{executeScript:async()=>{}},windows:{getCurrent:async()=>({id:42})},sidePanel:{setOptions:async()=>{},open:async()=>{opened++;}}};
  page.close=()=>{closed++;};const interval=globalThis.setInterval;globalThis.setInterval=fn=>{poll=fn;return 1;};const tick=()=>new Promise(r=>setImmediate(r));
  try{await import('../dist/popup.js');
   for(const id of ['login','logout','refresh','focus']){el(id).click();await tick();}
+  el('refresh').click();await tick();assert.equal(el('notification').dataset.kind,'success');assert.equal(el('success').textContent,'Configurações atualizadas.');
+  state.error='<img src=x> Falha de processamento';poll();await tick();assert.equal(el('notification').dataset.kind,'error');assert.equal(el('error').textContent,state.error);assert.equal(el('error').querySelector('img'),null);assert.equal(el('notification').closest('main'),null);
+  el('dismiss-notification').click();poll();await tick();assert.equal(el('notification').hidden,true);
+  state.error=undefined;state.statsError='Contadores indisponíveis.';poll();await tick();assert.equal(el('error').textContent,state.statsError);assert.doesNotMatch(el('queue-counts').textContent,/indisponíveis/);state.statsError=undefined;
+  offline=true;poll();await tick();assert.equal(el('error').textContent,'Backend indisponível.');el('dismiss-notification').click();poll();await tick();assert.equal(el('notification').hidden,true);offline=false;poll();await tick();
   for(const step of ['discover','convert','enrich','prices']){el('step-'+step).click();await tick();assert.ok(messages.some(m=>m.type==='START'&&m.step===step),JSON.stringify({step,messages,error:el('error').textContent,market:el('marketplace').value,limit:el('limit').value}));}
   assert.ok(messages.some(m=>m.type==='START'&&m.hostWindowId===42));
   el('retry-failed').checked=true;el('retry-failed').dispatchEvent(new page.Event('change'));await tick();assert.ok(messages.some(m=>m.type==='FILTER'&&m.retryFailed));
@@ -32,5 +37,5 @@ test('ações dos quatro passos, permissão, seletor e ícone usam mensagens int
   el('pick-elements').click();await tick();assert.equal(closed,1);
   el('display-mode').click();await tick();assert.equal(opened,1);assert.equal(closed,2);assert.ok(messages.some(m=>m.type==='DISPLAY_MODE'&&m.mode==='panel'));
   poll();await tick();
- }finally{globalThis.setInterval=interval;}
+ }finally{el('dismiss-notification').click();globalThis.setInterval=interval;}
 });

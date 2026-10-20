@@ -10,6 +10,8 @@ BACKEND_URL no .env ou variable do build define a origem da API (padrão http://
 
 O ícone da extensão abre o painel lateral por padrão. O botão de ícone no cabeçalho alterna entre painel lateral (janela com coluna lateral) e popup (janela com pequeno painel), com tooltip e nome acessível indicando o destino. A preferência é salva; o painel permanece aberto enquanto você usa a página. O seletor visual e sua composição continuam disponíveis, com edição e contagem de matches. Pause a coleta antes de inspecionar uma página.
 
+Atualizar configurações consulta somente configurações e contadores; não depende da execução salva. O acompanhamento trata uma execução removida no backend descartando apenas suas referências locais, sem encerrar a conta ou reenviar resultados antigos. Erros de ações, processamento e consulta aparecem em uma notificação fixa na parte inferior, com fechamento manual e duração de dez segundos. Mensagens repetidas do acompanhamento não reabrem continuamente a notificação. A confirmação de atualização de configurações usa a mesma apresentação, com cor de sucesso.
+
 Entre no O Espertinho e aprove no site com a conta Google autorizada. A extensão exige affiliate_links e, por etapa, discovery, catalog ou updates. Requisições são autorizadas novamente pelo backend. Sessões revogadas/expiradas interrompem o fluxo.
 
 ## Quatro etapas
