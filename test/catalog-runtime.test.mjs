@@ -72,3 +72,16 @@ test('bloqueio exige resolução e retomada explícitas na mesma execução; pai
   await f.runtime.handle({type:'LOGOUT'});await f.runtime.handle({type:'BACKEND',url:'http://localhost:4000'});assert.equal(f.saved().backendUrl,'http://localhost:4000');
  }finally{globalThis.fetch=original;}
 });
+
+test('chamadas simultâneas reutilizam uma única renovação do token de acesso',async()=>{
+ const f=fixture(),original=globalThis.fetch;let refreshes=0;
+ globalThis.fetch=async(url,options)=>{
+  if(url.endsWith('/auth/refresh')){refreshes++;return Response.json({...auth,token:'rotated-access-token'});}
+  if(options.headers.Authorization==='Bearer '+auth.token)return Response.json({error:'expired'},{status:401});
+  return f.fetch(url,options);
+ };
+ try{
+  await f.runtime.init();await Promise.all([f.runtime.handle({type:'REFRESH'}),f.runtime.handle({type:'REFRESH'})]);
+  assert.equal(refreshes,1);assert.equal(f.saved().auth.token,'rotated-access-token');
+ }finally{globalThis.fetch=original;}
+});

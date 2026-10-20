@@ -23,6 +23,7 @@ type CatalogCommand = {
 export class CatalogRuntime {
     state!: CatalogState;
     private initialization?: Promise<void>;
+    private refreshing?: Promise<boolean>;
     private pumping = false;
     private generation = 0;
     private nextRequestAt = 0;
@@ -101,23 +102,27 @@ export class CatalogRuntime {
         const { response, data } = await this.request(path, body, auth.token);
         if (generation !== this.generation)
             throw new Error('Operação interrompida.');
-        if (response.status === 401 && retry) {
-            const renewed = await this.request('/auth/refresh', {
-                refreshToken: auth.refreshToken
-            });
-            if (generation !== this.generation)
-                throw new Error('Operação interrompida.');
-            if (renewed.response.ok) {
-                this.state.auth = renewed.data as Auth;
-                await this.save();
-                return this.api(path, body, false);
-            }
+        if(response.status===401&&retry){
+            const renewed=await this.renew(auth);
+            if(generation!==this.generation)throw new Error('Operação interrompida.');
+            if(renewed)return this.api(path,body,false);
         }
         if (response.status === 401 || response.status === 403)
             await this.disconnect();
         if (!response.ok)
             throw new Error(data.error ?? 'Não foi possível concluir a operação.');
         return data as T;
+    }
+    private async renew(auth:Auth){
+        if(this.state.auth?.token!==auth.token)return true;
+        this.refreshing??=this.rotate(auth).finally(()=>{this.refreshing=undefined;});
+        return this.refreshing;
+    }
+    private async rotate(auth:Auth){
+        const renewed=await this.request('/auth/refresh',{refreshToken:auth.refreshToken});
+        if(this.state.auth?.refreshToken!==auth.refreshToken)throw new Error('Operação interrompida.');
+        if(!renewed.response.ok)return false;
+        this.state.auth=renewed.data as Auth;await this.save();return true;
     }
     async observeAffiliateHeaders(details: Parameters<RequestHeaderMemory['observe']>[0]) {
         await this.init();
