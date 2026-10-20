@@ -35,6 +35,6 @@ test('batch capture uses backend-selected failed links without requiring a manua
   if(path==='/session-proof/tests'){assert.equal(body.batchFailed,true);assert.equal(body.url,undefined);assert.equal(body.session.cookies[0].value,cookie.value);return Response.json({id:'batch-id',status:'running',expiresAt:Date.now()+900000},{status:202});}
   if(path==='/session-proof/tests/batch-id')return Response.json({id:'batch-id',status:'completed',expiresAt:Date.now()+900000,batch:{total:1,completed:1,intervalMs:20000,items:[{url:market.testUrl,error:'Falha técnica'}]}});
  };
- const view=await f.runtime.handle({type:'PROOF_CAPTURE',marketplaceId:market.id,batchFailed:true,consent:true});assert.equal(view.proofTest.status,'running');
+ const view=await f.runtime.handle({type:'PROOF_BATCH',marketplaceId:market.id,consent:true});assert.equal(view.proofTest.status,'running');
  await f.runtime.pump();assert.equal(f.saved().proofTest.batch.completed,1);assert.equal(JSON.stringify(f.saved()).includes(cookie.value),false);
 });

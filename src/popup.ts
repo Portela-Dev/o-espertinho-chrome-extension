@@ -7,7 +7,7 @@ let view: View | undefined;
 let busy = false;
 async function send(type: string, extra: Record<string, unknown> = {}) {
   const reply = await chrome.runtime.sendMessage({ type, ...extra });
-  if (reply.error) throw new Error(reply.error);
+  if (reply.error) throw new Error(type==='PROOF_BATCH'&&reply.error==='Operação desconhecida.'?'Recarregue a extensão em chrome://extensions para atualizar o serviço de segundo plano e iniciar o lote.':reply.error);
   view = reply.value as View;
   render();
 }
@@ -95,7 +95,7 @@ element('proof-capture').addEventListener('click',()=>{void act(async()=>{
  const market=proofMarket();if(!market)throw new Error('Escolha um marketplace.');
  if(!element<HTMLInputElement>('proof-consent').checked)throw new Error('Confirme o envio temporário da sessão para este teste.');
  if(!await chrome.permissions.request({permissions:['cookies'],origins:market.allowedOrigins.map(o=>o+'/*')}))throw new Error('Permissão de cookies e domínios não concedida.');
- await send('PROOF_CAPTURE',{marketplaceId:market.id,url:element<HTMLInputElement>('proof-url').value,batchFailed:element<HTMLInputElement>('proof-batch').checked,consent:true,includeStorage:element<HTMLInputElement>('proof-storage').checked});
+ await send(element<HTMLInputElement>('proof-batch').checked?'PROOF_BATCH':'PROOF_CAPTURE',{marketplaceId:market.id,url:element<HTMLInputElement>('proof-url').value,consent:true,includeStorage:element<HTMLInputElement>('proof-storage').checked});
  element<HTMLInputElement>('proof-consent').checked=false;
 });});
 await act(() => send("STATE"));

@@ -515,6 +515,7 @@ export class ExtensionRuntime {
         const market=this.proofMarket(message.marketplaceId);await this.browser.tabs.create({url:market.loginUrl});break;
       }
       case 'PROOF_CAPTURE':await this.proveSession(message);break;
+      case 'PROOF_BATCH':await this.proveSession({...message,batchFailed:true});break;
       case "OPEN":
         await this.openMarketplace(message.marketplaceId);
         break;

@@ -142,6 +142,7 @@ function renderProof(view:View,busy:boolean){
  select.disabled=busy||running;
  for(const id of ['proof-load','proof-open','proof-capture'])element<HTMLButtonElement>(id).disabled=busy||running||id!=='proof-load'&&!market;
  element<HTMLInputElement>('proof-batch').disabled=busy||running;
+ element('proof-capture').textContent=element<HTMLInputElement>('proof-batch').checked?'Capturar sessão e testar lote':'Capturar sessão e testar';
  element<HTMLInputElement>('proof-url').disabled=busy||running||element<HTMLInputElement>('proof-batch').checked;
  if(market&&!element<HTMLInputElement>('proof-url').value)element<HTMLInputElement>('proof-url').value=market.testUrl;
  element('proof-domains').textContent=market?'Domínios autorizados: '+market.cookieDomains.join(', '):'Carregue os marketplaces para começar.';
