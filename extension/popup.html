@@ -23,13 +23,12 @@
         </div>
       </header>
       <div class="display-controls">
-        <label for="display-mode">Visualização</label>
-        <select id="display-mode">
-          <option value="panel">Painel lateral</option>
-          <option value="popup">Popup</option>
-        </select>
-        <button type="button" id="apply-display-mode" class="secondary">Aplicar</button>
-        <p class="hint">Sua preferência será usada ao clicar no ícone. O popup fecha ao interagir com a página.</p>
+        <label class="display-switch">
+          <span>Popup</span>
+          <input type="checkbox" role="switch" id="display-mode" aria-label="Usar painel lateral" aria-describedby="display-hint">
+          <span>Painel lateral</span>
+        </label>
+        <p id="display-hint" class="hint">Sua preferência será usada ao clicar no ícone. O popup fecha ao interagir com a página.</p>
       </div>
       <p id="error" class="error" role="alert" hidden></p>
       <section aria-labelledby="status-title">

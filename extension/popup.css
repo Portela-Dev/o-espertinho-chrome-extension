@@ -13,8 +13,14 @@ main { padding: 24px; }
 .side-panel section { padding: 16px; }
 .side-panel header > div { min-width: 0; }
 .side-panel h1 { font-size: clamp(19px, 6vw, 25px); }
-.display-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 16px; }
-.display-controls label, .display-controls p { grid-column: 1 / -1; margin: 0; }
+.display-controls { display: grid; gap: 8px; margin-top: 16px; }
+.display-controls label, .display-controls p { margin: 0; }
+.display-switch { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.display-switch input { appearance: none; flex: 0 0 42px; width: 42px; height: 24px; margin: 0; padding: 2px; border-radius: 999px; border: 1px solid #849a8b; background: #65776b; cursor: pointer; }
+.display-switch input::before { content: ''; display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; transform: translateX(0); }
+.display-switch input:checked { background: #287b4d; }
+.display-switch input:checked::before { transform: translateX(18px); }
+.display-switch input:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .display-controls .hint { line-height: 1.5; }
 header { display: flex; align-items: center; gap: 12px; }
 header img { flex-shrink: 0; object-fit: contain; }

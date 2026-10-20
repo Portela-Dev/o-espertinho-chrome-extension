@@ -7,10 +7,10 @@ let view: View | undefined;
 let busy = false;
 const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
 document.body.classList.toggle('side-panel', isPanel);
-element<HTMLSelectElement>('display-mode').value = isPanel ? 'panel' : 'popup';
-element('apply-display-mode').addEventListener('click', () => {
+element<HTMLInputElement>('display-mode').checked = isPanel;
+element('display-mode').addEventListener('change', () => {
   void act(async () => {
-    const mode = element<HTMLSelectElement>('display-mode').value;
+    const mode = element<HTMLInputElement>('display-mode').checked ? 'panel' : 'popup';
     if (mode === (isPanel ? 'panel' : 'popup')) return;
     if (mode === 'panel') {
       const currentWindow = await chrome.windows.getCurrent();
@@ -22,7 +22,7 @@ element('apply-display-mode').addEventListener('click', () => {
     const reply = await chrome.runtime.sendMessage({ type: 'DISPLAY_MODE', mode });
     if (reply.error) throw new Error(reply.error);
     window.close();
-  });
+  }).finally(() => { element<HTMLInputElement>('display-mode').checked = isPanel; });
 });
 async function send(type: string, extra: Record<string, unknown> = {}) {
   const reply = await chrome.runtime.sendMessage({ type, ...extra });

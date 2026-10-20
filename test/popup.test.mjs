@@ -164,8 +164,8 @@ test("eventos da interface enviam comandos e apresentam erros da API", async () 
     let panelWindow;
     chrome.windows = { getCurrent: async () => ({ id: 42 }) };
     chrome.sidePanel = { setOptions: async () => {}, open: async options => { panelWindow = options.windowId; } };
-    el('display-mode').value = 'panel';
-    el('apply-display-mode').click();await tick();
+    el('display-mode').checked = true;
+    el('display-mode').dispatchEvent(new window.Event('change'));await tick();
     assert.equal(panelWindow, 42);
     assert.ok(messages.some(message => message.type === 'DISPLAY_MODE' && message.mode === 'panel'));
     assert.equal(closed, 2);
