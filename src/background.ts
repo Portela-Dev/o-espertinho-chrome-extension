@@ -1,6 +1,6 @@
-import { ExtensionRuntime } from "./runtime.js";
+import { CatalogRuntime } from "./catalog-runtime.js";
 import { restoreDisplayMode, saveDisplayMode } from "./display-mode.js";
-const runtime = new ExtensionRuntime();
+const runtime = new CatalogRuntime();
 void restoreDisplayMode().catch(() => console.error("Não foi possível restaurar a visualização da extensão."));
 chrome.webRequest.onBeforeSendHeaders.addListener(details=>{void runtime.observeAffiliateHeaders(details).catch(()=>{});},{urls:['https://*/*'],types:['xmlhttprequest']},['requestHeaders']);
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
