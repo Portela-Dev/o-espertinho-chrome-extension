@@ -17,7 +17,8 @@
         <label for="marketplace">Marketplace</label><select id="marketplace"></select>
         <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar aba / fazer login</button></div>
         <p id="session-hint" class="hint">Use a aba de processamento para o login. Os valores de sessão são obtidos conforme a receita configurada.</p>
-        <label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100">
+        <label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100" aria-describedby="limit-hint">
+        <p id="limit-hint" class="hint">Etapa 1: quantidade de vitrines. Limites de links e páginas por vitrine são definidos no admin, em Exploração → Perfis. Etapas 2 a 4: quantidade de links ou ofertas. Os contadores dos botões mostram o catálogo já salvo, sem limitar o total por este campo.</p>
         <label><input id="retry-failed" type="checkbox"> Incluir extrações com falha</label>
         <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-prices">4 — Atualizar preços</button></div>
         <p id="queue-counts" class="hint" aria-live="polite"></p>
