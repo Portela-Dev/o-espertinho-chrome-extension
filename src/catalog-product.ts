@@ -25,6 +25,21 @@ export async function extractCatalogProduct(input: {
             const cents = Math.round(Number(raw) * 100);
             return Number.isSafeInteger(cents) && cents > 0 && cents <= 100000000 ? cents : null;
         },
+        reviewNumber(value: string, count: boolean): number | null {
+            const clean = value.trim();
+            if (/^[-−]/u.test(clean)) return null;
+            const match = clean.match(/\d+(?:[.,]\d+)*/u);
+            if (!match) return null;
+            let raw = match[0];
+            const abbreviated = count && /(?:^|[\s\d])(?:mil|k)\b/iu.test(clean);
+            if (count && !abbreviated) {
+                if (!/^\d+$|^\d{1,3}(?:[.,]\d{3})+$/u.test(raw)) return null;
+                raw = raw.replace(/[.,]/gu, '');
+            } else raw = raw.replace(',', '.');
+            const number = Number(raw) * (abbreviated ? 1000 : 1);
+            if (!Number.isFinite(number) || number < 0 || number > (count ? 1000000000 : 5) || count && !Number.isInteger(number)) return null;
+            return number;
+        },
         matches(rule: any) {
             if (rule.match === 'url_contains')
                 return location.href.includes(rule.value);
@@ -115,6 +130,11 @@ export async function extractCatalogProduct(input: {
                         data[key] = reader.money(value);
                     break;
                 }
+                case 'rating':
+                case 'reviewCount':
+                    if (data[rule.field] === null)
+                        data[rule.field] = reader.reviewNumber(value, rule.field === 'reviewCount');
+                    break;
                 case 'productUrl':
                     reader.url(data, value);
                     break;
@@ -162,7 +182,7 @@ export async function extractCatalogProduct(input: {
         },
         read() {
             const data: any = {
-                title: '', brand: '', priceCents: null, originalPriceCents: null, description: '', category: '', conditions: '', externalId: '', productUrl: input.originalUrl, images: [], specifications: [], warnings: [], missing: [], evidence: [], collectedAt: new Date().toISOString()
+                title: '', brand: '', rating: null, reviewCount: null, priceCents: null, originalPriceCents: null, description: '', category: '', conditions: '', externalId: '', productUrl: input.originalUrl, images: [], specifications: [], warnings: [], missing: [], evidence: [], collectedAt: new Date().toISOString()
             };
             const categories: string[] = [];
             for (const rule of input.profile.rules)
