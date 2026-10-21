@@ -28,7 +28,7 @@ function renderQueue(view:CatalogView,marketplaceId:string){
     }
     el('queue-counts').textContent='Conversão e extração: concluídos / links não arquivados. Preços: pendentes de verificação nas últimas 24h / ofertas publicadas.';
 }
-export function renderCatalog(view: CatalogView, busy: boolean) {
+export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./review-ai-workflow.js').ReviewAiWorkflow['progress']) {
     el('account').textContent = view.user?.email ?? 'Conta desconectada';
     el('status').textContent = view.message;
     el('version').textContent = view.version;
@@ -69,6 +69,14 @@ export function renderCatalog(view: CatalogView, busy: boolean) {
     el('counts').textContent = run ? `${run.completed} concluídos · ${run.failed} falhas · ${run.total} itens` : '';
     el<HTMLProgressElement>('progress').max = Math.max(1, run?.total ?? 1);
     el<HTMLProgressElement>('progress').value = (run?.completed ?? 0) + (run?.failed ?? 0);
+    const aiShown=!!ai&&ai.status!=='idle',aiActive=aiShown&&ai.status==='running';
+    if(aiShown){
+        const processed=Math.min(ai.total,ai.completed+ai.pending+ai.failed);
+        el('run-status').textContent=(ai.task==='category'?'Categorização':'Catalogação')+' por IA · '+({running:'Em execução',completed:'Concluída',cancelled:'Cancelada',failed:'Interrompida'}[ai.status]??ai.status)+(ai.title&&aiActive?' · '+ai.title:'');
+        el('counts').textContent=processed+' / '+ai.total+(ai.task==='product'?' links processados · ':' produtos processados · ')+ai.completed+(ai.task==='category'?' categorizados':' catalogados')+' · '+ai.pending+' pendências · '+ai.failed+' falhas';
+        el<HTMLProgressElement>('progress').max=Math.max(1,ai.total);el<HTMLProgressElement>('progress').value=processed;
+    }
+    for(const id of ['pause','resume','focus'])el(id).hidden=aiShown;
     const permissions: Record<string, string> = {
         discover: 'discovery', convert: 'affiliate_links', enrich: 'catalog', prices: 'updates'
     };
@@ -77,6 +85,6 @@ export function renderCatalog(view: CatalogView, busy: boolean) {
     el<HTMLButtonElement>('prepare').disabled = busy || !!run && ['queued', 'running'].includes(run.status);
     el<HTMLButtonElement>('pause').disabled = busy || !run || !['queued', 'running'].includes(run.status);
     el<HTMLButtonElement>('resume').disabled = busy || !run || !['queued', 'paused_by_user', 'waiting_for_human', 'paused_technical'].includes(run.status);
-    el<HTMLButtonElement>('cancel').disabled = busy || !active;
+    el<HTMLButtonElement>('cancel').disabled = aiShown?!aiActive:busy || !active;
     el<HTMLButtonElement>('pick-elements').disabled = busy || !!run && ['queued', 'running'].includes(run.status);
 }

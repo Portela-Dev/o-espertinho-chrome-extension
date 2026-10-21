@@ -42,3 +42,10 @@ test('ações dos quatro passos, permissão, seletor e ícone usam mensagens int
   poll();await tick();
  }finally{el('dismiss-notification').click();globalThis.setInterval=interval;}
 });
+
+test('uma única barra exibe todos os links processados, incluindo pendências da IA',()=>{
+ const state=view();const ai={task:'product',status:'completed',total:51,completed:47,pending:4,failed:0,title:''};renderCatalog(state,false,ai);
+ assert.equal(document.querySelectorAll('progress').length,1);assert.equal(el('progress').value,51);assert.equal(el('progress').max,51);assert.match(el('counts').textContent,/51 \/ 51 links processados · 47 catalogados · 4 pendências/);assert.equal(el('cancel').disabled,true);assert.equal(el('pause').hidden,true);
+ ai.status='running';renderCatalog(state,true,ai);assert.equal(el('cancel').disabled,false);assert.equal(el('step-enrich').disabled,true);
+ renderCatalog(state,false);assert.equal(el('pause').hidden,false);
+});

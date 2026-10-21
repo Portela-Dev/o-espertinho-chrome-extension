@@ -66,3 +66,5 @@ Playwright é dependência somente de testes e não entra no ZIP. O teste nativo
 SonarQube permanece no runner Windows windows-portela-dev; validação/pacote ficam em ubuntu-22.04, preservando a sandbox do Chromium. Projeto Sonar: o-espertinho-chrome-extension. Configurações: SONAR_ENABLED, SONAR_HOST_URL e SONAR_TOKEN. Nenhum deploy acontece em PR.
 
 Documentos em docs/SESSION_PROOF.md e docs/AFFILIATE_PROOF.md são registros históricos de provas encerradas, sem rotas/telas no runtime atual. O plano principal e os aceites operacionais ficam no workspace e em 1-backend/docs.
+
+Contas Espertinho e ChatGPT são gerenciadas no topo. A IA reutiliza a única barra de Execução atual, incluindo pendências na quantidade processada, sem contá-las como links catalogados. O login e o início da tarefa substituem o antigo checkbox adicional. Não há mais seção de análise avulsa. Consulte docs/AI.md.

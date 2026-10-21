@@ -178,13 +178,11 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#error').textContent(),callback:await direct.locator('#direct-callback-status').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
   await direct.locator('#direct-callback-status').filter({hasText:'reconhecido'}).waitFor();
   await direct.locator('#direct-models').click();await direct.locator('#direct-model option').filter({hasText:'Modelo direto de teste'}).waitFor({state:'attached'});
-  await direct.locator('#direct-title').fill('Oferta direta de teste');await direct.locator('#direct-consent').check();await direct.locator('#direct-analyze').click();
-  await direct.locator('#direct-result').filter({hasText:'Análise direta simulada sem auxiliar'}).waitFor();assert.equal(responses,1);assert.equal(context.pages().length,pagesBefore);
-  await direct.locator('#ai-workflow-consent').check();await direct.locator('#limit').fill('1');
-  await direct.locator('#step-product').click();await direct.waitForFunction(()=>document.getElementById('ai-batch-status').textContent.includes('Catalogação por IA · Concluída'));
+  assert.equal(await direct.locator('progress').count(),1);assert.equal(await direct.locator('#direct-analyze').count(),0);assert.equal(await direct.locator('#ai-workflow-consent').count(),0);await direct.locator('#limit').fill('1');
+  await direct.locator('#step-product').click();await direct.waitForFunction(()=>document.getElementById('run-status').textContent.includes('Catalogação por IA · Concluída'));
   assert.equal(aiSuggestions.length,1);assert.equal(aiSuggestions[0].suggestion.action,'create_new');
-  await direct.locator('#ai-workflow-consent').check();await direct.locator('#step-category').click();
-  await direct.waitForFunction(()=>document.getElementById('ai-batch-status').textContent.includes('Categorização por IA · Concluída'));
+  await direct.locator('#step-category').click();
+  await direct.waitForFunction(()=>document.getElementById('run-status').textContent.includes('Categorização por IA · Concluída'));
   assert.equal(aiSuggestions.length,2);assert.equal(context.pages().length,pagesBefore);
   const storage=await worker.evaluate(async()=>({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
   assert.doesNotMatch(JSON.stringify(storage)+JSON.stringify(backendTraffic),/DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/);

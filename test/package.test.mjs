@@ -72,7 +72,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
   ));
   assert.equal((await readdir(directory)).filter(name=>name.endsWith('.zip')).length,1);
   assert.equal(checksums,createHash('sha256').update(zip).digest('hex')+'  '+filename+'\n');
-  for(const path of ['ai-controller.js','ai-panel.js','offer-metadata.js','shared/openai-session.mjs','shared/analysis.mjs'])assert.ok(files[path],path);
+  for(const path of ['ai-controller.js','ai-panel.js','shared/openai-session.mjs','shared/analysis.mjs'])assert.ok(files[path],path);
   assert.ok(!Object.keys(files).some(path=>/local-ai|direct-ai/.test(path)));
   const popup = strFromU8(files[manifest.side_panel.default_path.split("?")[0]]);
   assert.match(popup, /src="popup\.js"/);

@@ -12,6 +12,18 @@
     <main>
       <header><img src="icons/fox-v4-128.png" width="64" height="64" alt="Mascote do O Espertinho"><div><p class="eyebrow">Seu próximo achado começa aqui</p><h1>O Espertinho</h1></div><button type="button" id="display-mode" class="display-mode secondary" aria-label="Abrir painel lateral" title="Abrir painel lateral"><svg id="display-icon-panel" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 8v8"/></svg><svg id="display-icon-popup" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false" hidden><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><rect x="11" y="11" width="8" height="7" rx="1"/></svg></button></header>
       <section aria-labelledby="account-title"><h2 id="account-title">Conta do O Espertinho</h2><p id="account">Conta desconectada</p><output id="status" aria-live="polite">Conectando…</output><div class="actions"><button type="button" id="login">Entrar no O Espertinho</button><button type="button" id="logout" class="secondary" hidden>Sair</button></div></section>
+      <details id="ai-panel"><summary>Conta ChatGPT e modelo de IA</summary>
+        <div id="ai-popup-hint"><p class="hint">Use o painel lateral para manter a sessão aberta durante o login e a análise.</p><button id="ai-open-panel" type="button" class="secondary">Abrir painel para usar IA</button></div>
+        <div id="ai-panel-content" hidden>
+        <p class="hint">Os tokens ficam apenas na memória deste painel. Fechar, recarregar ou trocar para popup exige novo login. Apenas a autorização abre uma aba, fechada ao retornar.</p>
+        <p class="hint">O passo 4 identifica produtos e o passo 5 categoriza os novos rascunhos. Decisões válidas são aplicadas automaticamente, sem publicar. Credenciais ChatGPT ficam somente no painel. O uso consome os limites do seu plano.</p>
+   <label for="direct-account">Conta ChatGPT</label><select id="direct-account"><option value="">Adicionar outra conta</option></select>
+   <div class="actions"><button id="direct-login" type="button">Continue with ChatGPT</button><button id="direct-logout" type="button" class="secondary">Desconectar ChatGPT</button></div>
+   <output id="direct-status" aria-live="polite">ChatGPT desconectado.</output><p id="direct-account-info"></p><p id="ai-usage" class="hint"></p><a href="https://chatgpt.com/#settings/Usage" target="_blank" rel="noopener noreferrer">Gerenciar uso no ChatGPT ↗</a><p id="direct-callback-status" class="hint"></p>
+   <button id="direct-models" type="button" class="secondary">Carregar modelos da minha conta</button><label for="direct-model">Modelo</label><select id="direct-model"></select>
+        <button id="direct-cancel" type="button" class="secondary">Cancelar login</button>
+        </div>
+      </details>
       <section id="workspace" aria-labelledby="workspace-title" hidden>
         <h2 id="workspace-title">Manter catálogo</h2>
         <label for="marketplace">Marketplace</label><select id="marketplace"></select>
@@ -21,8 +33,6 @@
         <p id="limit-hint" class="hint">Etapa 1: quantidade de vitrines. Limites de links e páginas por vitrine são definidos no admin, em Exploração → Perfis. Etapas 2 a 6: quantidade de links ou ofertas. Os contadores dos botões mostram o catálogo já salvo, sem limitar o total por este campo.</p>
         <label><input id="retry-failed" type="checkbox"> Incluir extrações com falha</label>
         <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-product" disabled>4 — Catalogar produtos · entre no ChatGPT</button><button type="button" id="step-category" disabled>5 — Categorizar produtos · entre no ChatGPT</button><hr class="workflow-divider"><button type="button" id="step-prices">6 — Analisar Preços</button></div>
-        <label><input id="ai-workflow-consent" type="checkbox"> Autorizo analisar os itens deste lote e seus candidatos usando meu plano ChatGPT. As decisões válidas serão aplicadas automaticamente; publicação continua manual.</label>
-        <output id="ai-batch-status" aria-live="polite"></output><progress id="ai-batch-progress" hidden max="1" value="0" aria-label="Progresso da revisão por IA"></progress><button id="ai-batch-cancel" type="button" class="secondary" hidden>Cancelar revisão por IA</button>
         <p id="queue-counts" class="hint" aria-live="polite"></p>
         <p class="hint">Etapas manuais e independentes. Revise categorias e produtos e publique pelo admin.</p>
         <h3>Execução atual</h3><output id="run-status" aria-live="polite">Nenhuma execução selecionada.</output>
@@ -31,28 +41,6 @@
         <div class="actions"><button type="button" id="pause" class="secondary">Pausar</button><button type="button" id="resume">Continuar</button><button type="button" id="cancel" class="secondary">Cancelar execução</button><button type="button" id="focus" class="secondary">Abrir aba de processamento</button></div>
         <details><summary>Retomar execução ou prévia solicitada no admin</summary><button type="button" id="load-runs" class="secondary">Carregar execuções</button><ul id="runs"></ul><label for="runs-size">Itens por página</label><select id="runs-size"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select><div class="actions"><button type="button" id="runs-previous" class="secondary">Anterior</button><span id="runs-page"></span><button type="button" id="runs-next" class="secondary">Próxima</button></div></details>
       </section>
-      <details id="ai-panel"><summary>IA do catálogo</summary>
-        <div id="ai-popup-hint"><p class="hint">Use o painel lateral para manter a sessão aberta durante o login e a análise.</p><button id="ai-open-panel" type="button" class="secondary">Abrir painel para usar IA</button></div>
-        <div id="ai-panel-content" hidden>
-        <p class="hint">Os tokens ficam apenas na memória deste painel. Fechar, recarregar ou trocar para popup exige novo login. Apenas a autorização abre uma aba, fechada ao retornar.</p>
-        <p class="hint">O passo 4 identifica produtos e o passo 5 categoriza os novos rascunhos. Decisões válidas são aplicadas automaticamente, sem publicar. Credenciais ChatGPT ficam somente no painel. O uso consome os limites do seu plano.</p>
-   <label for="direct-account">Conta ChatGPT</label><select id="direct-account"><option value="">Adicionar outra conta</option></select>
-   <div class="actions"><button id="direct-login" type="button">Continue with ChatGPT</button><button id="direct-logout" type="button" class="secondary">Desconectar ChatGPT</button></div>
-   <output id="direct-status" aria-live="polite">ChatGPT desconectado.</output><p id="direct-account-info"></p><p id="ai-usage" class="hint"></p><a href="https://chatgpt.com/#settings/Usage" target="_blank" rel="noopener noreferrer">Gerenciar uso no ChatGPT ↗</a><p id="direct-callback-status" class="hint"></p>
-   <button id="direct-models" type="button" class="secondary">Carregar modelos da minha conta</button><label for="direct-model">Modelo</label><select id="direct-model"></select>
-  <h3>Analisar uma oferta</h3><p>Análise avulsa: os campos são editáveis e o resultado fica neste painel. Ela não altera o catálogo nem envia a sugestão ao backend.</p>
-   <button id="direct-capture" type="button" class="secondary">Capturar dados básicos da aba atual</button>
-   <label for="direct-title">Nome</label><input id="direct-title" type="text" maxlength="500">
-   <label for="direct-brand">Marca (opcional)</label><input id="direct-brand" type="text" maxlength="200">
-   <label for="direct-description">Descrição (opcional)</label><textarea id="direct-description" rows="5" maxlength="8000"></textarea>
-   <label for="direct-sourceCategory">Categoria de origem (opcional)</label><input id="direct-sourceCategory" type="text" maxlength="1500">
-   <label for="direct-categories">Categorias existentes (opcional, uma árvore por linha)</label><textarea id="direct-categories" rows="3" maxlength="12000"></textarea>
-   <details><summary>Produtos candidatos (opcional)</summary><p>Lista JSON com id, name e brand. Sem candidatos, a IA pode sugerir criação ou revisão.</p><label for="direct-products">Lista JSON</label><textarea id="direct-products" rows="4" maxlength="16000" placeholder='[{"id":"p1","name":"Nome","brand":"Marca"}]'></textarea></details>
-   <label><input id="direct-consent" type="checkbox"> Autorizo enviar estes dados à OpenAI usando meu plano ChatGPT.</label>
-   <div class="actions"><button id="direct-analyze" type="button">Analisar esta oferta</button><button id="direct-cancel" type="button" class="secondary">Cancelar operação</button></div>
-   <pre id="direct-result" class="ai-result" aria-live="polite"></pre>
-        </div>
-      </details>
       <section aria-labelledby="picker-title"><h2 id="picker-title">Selecionar elementos</h2><p>Selecione e componha seletores na página atual. Pause o processamento antes de inspecionar.</p><button type="button" id="pick-elements">Selecionar elementos na aba atual</button></section>
       <details><summary>Configuração da conexão</summary><form id="settings"><label for="backend">URL do backend</label><input id="backend" type="url" required><button type="submit" id="save-backend">Salvar conexão</button></form></details>
       <footer>Versão <span id="version"></span></footer>

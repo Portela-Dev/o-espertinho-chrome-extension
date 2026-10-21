@@ -9,9 +9,8 @@ export class ReviewAiWorkflow{
   const data=await this.transport('config',{marketplaceId});this.marketplaceId=marketplaceId;this.config=data;this.changed();return data;
  }
  cancel(){this.sequence++;if(this.busy){this.progress.status='cancelled';this.changed();}}
- async run(task:AiTask,marketplaceId:string,limit:number,model:string,consent:boolean){
+ async run(task:AiTask,marketplaceId:string,limit:number,model:string){
   if(this.busy)throw new Error('Já existe uma revisão de IA em andamento.');
-  if(!consent)throw new Error('Autorize o envio dos itens e candidatos deste lote à OpenAI.');
   if(!model)throw new Error('Escolha um modelo da conta ChatGPT.');
   if(!Number.isInteger(limit)||limit<1||limit>10000)throw new Error('Informe um limite entre 1 e 10000.');
   this.busy=true;const generation=++this.sequence;this.progress={task,completed:0,total:0,failed:0,pending:0,status:'running',title:''};this.changed();
