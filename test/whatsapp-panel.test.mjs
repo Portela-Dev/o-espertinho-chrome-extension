@@ -37,3 +37,14 @@ test('mensagem exige prévia, edição/cancelamento invalida confirmação e res
   waTabs=[];await click('wa-text-preview-button');assert.match(notices.at(-1),/aberta nesta janela/);assert.equal(calls.filter(c=>c.operation==='send_text').length,2);
  }finally{win.close();Object.assign(globalThis,old);}
 });
+
+test('editar texto durante abertura do grupo descarta a prévia atrasada sem habilitar envio',async()=>{
+ const win=new Window({url:'chrome-extension://test/popup.html'}),old={window:globalThis.window,document:globalThis.document};Object.assign(globalThis,{window:win,document:win.document});document.write(await readFile(new URL('../extension/popup.html',import.meta.url),'utf8'));
+ const calls=[],notices=[];let complete;const result=new Promise(resolve=>complete=resolve),el=id=>document.getElementById(id);
+ const browser={runtime:{sendMessage:async m=>{calls.push(m);return m.operation==='preview_text'?result:{value:{cancelled:true}};}},permissions:{request:async()=>true},tabs:{query:async()=>[{id:7,url:'https://web.whatsapp.com/'}]}};
+ try{
+  setupWhatsAppPanel(message=>notices.push(message),browser);const opt=document.createElement('option');opt.value='binding';el('wa-bindings').add(opt);el('wa-bindings').value='binding';el('wa-text').value='Texto inicial';el('wa-text-preview-button').click();await new Promise(r=>setImmediate(r));
+  el('wa-text').value='Texto alterado';el('wa-text').dispatchEvent(new win.Event('input'));complete({value:{ticket:'late-ticket',text:'Texto inicial',name:'Grupo',groupId:'120363000000001@g.us'}});for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+  assert.equal(el('wa-send-confirm').disabled,true);assert.equal(el('wa-text-preview').hidden,true);assert.match(notices.at(-1),/alterado durante/);assert.ok(calls.some(c=>c.operation==='cancel_text'));assert.equal(calls.some(c=>c.operation==='send_text'),false);
+ }finally{win.close();Object.assign(globalThis,old);}
+});

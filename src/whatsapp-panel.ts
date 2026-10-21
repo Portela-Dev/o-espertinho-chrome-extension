@@ -32,7 +32,9 @@ export function setupWhatsAppPanel(notify:(message:string,kind?:'error'|'success
  el('wa-remove').addEventListener('click',()=>action(async()=>{const id=el<HTMLSelectElement>('wa-bindings').value;if(!id)throw new Error('Selecione um grupo vinculado.');await request('remove',{id});await refresh();clear();notify('Vínculo removido.','success');}));
  el('wa-text-preview-button').addEventListener('click',()=>action(async()=>{
   invalidateText();const id=el<HTMLSelectElement>('wa-bindings').value;if(!id)throw Error('Selecione um grupo vinculado.');
-  const preview=await request('preview_text',{id,tabId:await groupTab(),text:el<HTMLTextAreaElement>('wa-text').value});
+  const submitted=el<HTMLTextAreaElement>('wa-text').value;
+  const preview=await request('preview_text',{id,tabId:await groupTab(),text:submitted});
+  if(el<HTMLSelectElement>('wa-bindings').value!==id||el<HTMLTextAreaElement>('wa-text').value!==submitted){await request('cancel_text',{ticket:preview.ticket});throw Error('Texto ou vínculo alterado durante a preparação. Gere uma nova prévia.');}
   textTicket=preview.ticket;el('wa-text-name').textContent=preview.name;el('wa-text-group').textContent=preview.groupId;el('wa-text-account').textContent='Conta: '+preview.accountFingerprint;el('wa-preview-text').textContent=preview.text;el('wa-text-preview').hidden=false;el<HTMLButtonElement>('wa-send-confirm').disabled=false;
  },true));
  el('wa-send-cancel').addEventListener('click',invalidateText);
