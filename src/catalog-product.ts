@@ -70,11 +70,56 @@ export async function extractCatalogProduct(input: {
         image(data: any, value: string) {
             try {
                 const image = new URL(value, document.baseURI);
-                if (image.protocol === 'https:' && !image.username && !image.password && data.images.length < 12 && !data.images.includes(image.href))
-                    data.images.push(image.href);
+                if (!value.trim() || image.href.length > 2000 || image.protocol !== 'https:' || image.username || image.password) return false;
+                if (data.images.length < 80 && !data.images.includes(image.href)) data.images.push(image.href);
+                return true;
             }
-            catch { /* Ignore invalid images. */
+            catch { return false; }
+        },
+        json(data: string, marker: string) {
+            const at = marker ? data.indexOf(marker) : 0;
+            if (at < 0) return null;
+            const begin = data.slice(at + marker.length).search(/[\[{]/u);
+            if (begin < 0 || begin > 300) return null;
+            const start = at + marker.length + begin;
+            let depth = 0;
+            const tokens = data.slice(start).matchAll(/"(?:[^"\\]|\\.)*"|[\[\]{}]/gu);
+            for (const token of tokens) {
+                if (token[0].startsWith('"')) continue;
+                if (token[0] === '[' || token[0] === '{') depth++;
+                else if (--depth === 0) return JSON.parse(data.slice(start, start + token.index! + 1));
             }
+            return null;
+        },
+        jsonImages(data: any, node: Element, rule: any) {
+            try {
+                const raw = rule.attribute ? node.getAttribute(rule.attribute) ?? '' : node.textContent ?? '';
+                if (raw.length > 500000) return;
+                let value = reader.json(raw, rule.jsonMarker || '');
+                for (const key of (rule.jsonPath || '').split('.').filter(Boolean)) {
+                    if (!value || !Object.hasOwn(value, key)) return;
+                    value = value[key];
+                }
+                if (!Array.isArray(value)) return;
+                for (const item of value.slice(0, 80)) {
+                    if (typeof item === 'string') reader.image(data, item);
+                    else if (item && typeof item === 'object') {
+                        for (const key of rule.imageProperties || []) {
+                            if (typeof item[key] === 'string' && reader.image(data, item[key])) break;
+                        }
+                    }
+                }
+            } catch { if (data.warnings.length < 1000) data.warnings.push('JSON de imagens inválido.'); }
+        },
+        imageNode(data: any, node: Element, rule: any, selector: string) {
+            if (rule.mode === 'json') reader.jsonImages(data, node, rule);
+            else if (rule.mode === 'attribute') {
+                for (const attribute of [rule.attribute, ...(rule.attributes || [])]) {
+                    const value = node.getAttribute(attribute);
+                    if (value && reader.image(data, value)) break;
+                }
+            } else reader.image(data, reader.value(node, rule));
+            if (data.evidence.length < 600) data.evidence.push({ field: 'images', selector });
         },
         specification(data: any, node: Element, rule: any) {
             const name = node.querySelector(rule.nameSelector || 'th')?.textContent, val = node.querySelector(rule.valueSelector || 'td')?.textContent;
@@ -110,13 +155,14 @@ export async function extractCatalogProduct(input: {
             } as Record<string, string>)[field] ?? field;
         },
         apply(data: any, categories: string[], rule: any, node: Element, selector: string) {
+            if (rule.field === 'images') {
+                reader.imageNode(data, node, rule, selector);
+                return;
+            }
             const value = reader.value(node, rule);
             if (!value && rule.mode !== 'pairs')
                 return;
             switch (rule.field) {
-                case 'images':
-                    reader.image(data, value);
-                    break;
                 case 'specifications':
                     reader.specification(data, node, rule);
                     break;
@@ -160,11 +206,13 @@ export async function extractCatalogProduct(input: {
         completeRule(data: any, categories: string[], rule: any) {
             if (rule.field === 'category')
                 return categories.length > 0;
+            if (rule.field === 'images' && rule.mode === 'json') return data.images.length > 0;
             if (['images', 'specifications'].includes(rule.field))
                 return false;
             return !!data[reader.fieldKey(rule.field)];
         },
         rule(data: any, categories: string[], rule: any) {
+            if (rule.field === 'images' && rule.imageSource === 'fallback' && data.images.length) return;
             for (const selector of rule.selectors) {
                 for (const node of reader.nodes(selector, data, rule.field))
                     reader.apply(data, categories, rule, node, selector);
