@@ -44,7 +44,7 @@ export class OpenAISession {
  }
  status(){
   if(this.pending&&this.pending.expiresAt<=this.now()){this.pending=null;this.loginError='A tentativa de login expirou. Inicie novamente.';}
-  return {connected:!!this.active,account:this.active?{email:this.active.email,subjectLabel:this.active.subject.slice(-6),planEnabled:this.active.scope.split(' ').includes('chatgpt.tokens.use.direct')}:null,accounts:this.registrations.map(r=>({id:r.clientId,label:(r.email||'Conta ChatGPT')+' · '+r.clientId.slice(-6)})),loginPending:!!this.pending,error:this.loginError};
+  return {connected:!!this.active,account:this.active?{email:this.active.email,subjectLabel:this.active.subject.slice(-6),planEnabled:this.active.scope.split(' ').includes('chatgpt.tokens.use.direct')}:null,accounts:this.registrations.map(r=>({id:r.clientId,label:r.email||'Conta ChatGPT'})),loginPending:!!this.pending,error:this.loginError};
  }
  async begin(redirectUri,accountId){
   const registration=accountId?this.registrations.find(r=>r.clientId===accountId):null;
