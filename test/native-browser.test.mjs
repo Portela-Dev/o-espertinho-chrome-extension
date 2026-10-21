@@ -124,6 +124,11 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   assert.doesNotMatch(JSON.stringify(received),/TEST_ONLY|cookies|refreshToken/);
   const panel=await context.newPage();await panel.setViewportSize({width:400,height:1000});
   await panel.goto(new URL('popup.html?view=panel',worker.url()).href);
+  await panel.locator('#workspace').waitFor();
+  assert.equal(await panel.locator('.card-collapse').count(),4);assert.equal(await panel.locator('.card-collapse[open]').count(),0);
+  for(const body of await panel.locator('.card-collapse > .card-content').all())assert.equal(await body.isVisible(),false);
+  await panel.screenshot({path:'reports/cards-collapsed.png',fullPage:true});
+  await panel.locator('#workspace > details > summary').click();
   await panel.locator('#run-status').filter({hasText:'6 — Analisar Preços'}).waitFor();
   assert.equal(await panel.locator('#step-convert').textContent(),'2 — Gerar links de afiliados · Gerados: 1 / 1');
   assert.equal(await panel.locator('#step-enrich').textContent(),'3 — Extrair informações dos produtos · Extraídos: 1 / 1');
@@ -172,14 +177,14 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    }
    await route.abort();
   });
-  const direct=panel,pagesBefore=context.pages().length;
+  const direct=panel,pagesBefore=context.pages().length;await direct.locator('#account-card > details > summary').click();
   await direct.locator('#direct-login').click();
   try{await direct.locator('#direct-status').filter({hasText:'Conectado'}).waitFor({timeout:20000});}
   catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#error').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
   await direct.locator('#direct-models').click();await direct.locator('#direct-model option').filter({hasText:'Modelo direto de teste'}).waitFor({state:'attached'});
   assert.equal(await direct.locator('progress').count(),1);assert.equal(await direct.locator('#direct-analyze').count(),0);assert.equal(await direct.locator('#ai-workflow-consent').count(),0);await direct.locator('#limit').fill('1');
-  await direct.locator('#step-product').click();await direct.waitForFunction(()=>document.getElementById('run-status').textContent.includes('Catalogação por IA · Concluída'));
-  assert.equal(aiSuggestions.length,1);assert.equal(aiSuggestions[0].suggestion.action,'create_new');
+  await direct.locator('#step-product').click();await direct.locator('#workspace > details > summary').click();assert.equal(await direct.locator('#step-product').isVisible(),false);await direct.waitForFunction(()=>document.getElementById('run-status').textContent.includes('Catalogação por IA · Concluída'));
+  assert.equal(aiSuggestions.length,1);assert.equal(aiSuggestions[0].suggestion.action,'create_new');await direct.locator('#workspace > details > summary').click();
   await direct.locator('#step-category').click();
   await direct.waitForFunction(()=>document.getElementById('run-status').textContent.includes('Categorização por IA · Concluída'));
   assert.equal(aiSuggestions.length,2);assert.equal(context.pages().length,pagesBefore);
@@ -192,6 +197,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    await direct.setViewportSize({width:390,height:1000});const model=await direct.locator('#direct-model').boundingBox(),button=await direct.locator('#direct-models').boundingBox();assert.ok(button.y-(model.y+model.height)>=12);
    await direct.screenshot({path:'reports/ai-panel-'+scheme+'.png',fullPage:true});
   }
+  await direct.locator('#account-card > details > summary').click();assert.equal(await direct.locator('#direct-model').isVisible(),false);await direct.locator('#account-card > details > summary').focus();await direct.keyboard.press('Enter');assert.equal(await direct.locator('#direct-model').inputValue(),'direct-fixture');
   await direct.locator('#direct-logout').click();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();
  }finally{
   await context?.close();if(server)await new Promise(r=>server.close(r));if(marketServer)await new Promise(r=>marketServer.close(r));

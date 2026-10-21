@@ -70,3 +70,5 @@ Documentos em docs/SESSION_PROOF.md e docs/AFFILIATE_PROOF.md são registros his
 Contas Espertinho e ChatGPT são gerenciadas no topo. A IA reutiliza a única barra de Execução atual, incluindo pendências na quantidade processada, sem contá-las como links catalogados. O login e o início da tarefa substituem o antigo checkbox adicional. Não há mais seção de análise avulsa. Consulte docs/AI.md.
 
 O card Contas reúne Google/Espertinho, ChatGPT e modelo. A interface compacta mantém somente controles, estados e contadores, sem informações de consumo ou nomes de produtos durante a IA.
+
+Os cards Contas, Manter catálogo, Selecionar elementos e Configuração da conexão iniciam recolhidos. Clique no título (ou use Enter/Espaço no teclado) para expandir. Recolher não interrompe execuções nem descarta a sessão/modelo do painel.

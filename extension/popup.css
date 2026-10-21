@@ -77,3 +77,10 @@ main > details { margin-top: 20px; }
 #ai-panel-content { min-width: 0; }
 
 .workflow-divider { width: 100%; border: 0; border-top: 1px solid var(--select-border); margin: 12px 0; }
+
+.card-collapse > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; list-style: none; cursor: pointer; border-radius: 4px; }
+.card-collapse > summary::-webkit-details-marker { display: none; }
+.card-collapse > summary::after { content: ''; flex: 0 0 8px; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
+.card-collapse[open] > summary::after { transform: rotate(45deg); }
+.card-collapse > summary:focus-visible { outline: 2px solid var(--select-accent); outline-offset: 6px; }
+.card-content { margin-top: 18px; }

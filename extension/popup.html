@@ -12,7 +12,7 @@
     <main>
       <header><img src="icons/fox-v4-128.png" width="64" height="64" alt="Mascote do O Espertinho"><div><h1>O Espertinho</h1></div><button type="button" id="display-mode" class="display-mode secondary" aria-label="Abrir painel lateral" title="Abrir painel lateral"><svg id="display-icon-panel" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 8v8"/></svg><svg id="display-icon-popup" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false" hidden><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><rect x="11" y="11" width="8" height="7" rx="1"/></svg></button></header>
       <section id="account-card" class="control-stack" aria-labelledby="account-title">
-        <h2 id="account-title">Contas</h2>
+        <details class="card-collapse"><summary><h2 id="account-title">Contas</h2></summary><div class="card-content control-stack">
         <div class="account-group control-stack">
           <h3>O Espertinho</h3><p id="account">Conta desconectada</p><output id="status" aria-live="polite">Conectando…</output>
           <div class="actions"><button type="button" id="login">Entrar com Google</button><button type="button" id="logout" class="secondary" hidden>Sair</button></div>
@@ -28,9 +28,9 @@
             <div class="actions"><button id="direct-models" type="button" class="secondary">Atualizar modelos</button></div>
           </div>
         </div>
-      </section>
+      </div></details></section>
       <section id="workspace" class="control-stack" aria-labelledby="workspace-title" hidden>
-        <h2 id="workspace-title">Manter catálogo</h2>
+        <details class="card-collapse"><summary><h2 id="workspace-title">Manter catálogo</h2></summary><div class="card-content control-stack">
         <div class="control-field"><label for="marketplace">Marketplace</label><select id="marketplace"></select></div>
         <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar aba / fazer login</button></div>
         <div class="control-field"><label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100"></div>
@@ -41,9 +41,9 @@
         <p id="counts" class="hint"></p>
         <div class="actions"><button type="button" id="pause" class="secondary">Pausar</button><button type="button" id="resume">Continuar</button><button type="button" id="cancel" class="secondary">Cancelar execução</button><button type="button" id="focus" class="secondary">Abrir aba de processamento</button></div>
         <details><summary>Retomar execução</summary><div class="control-stack details-content"><button type="button" id="load-runs" class="secondary">Carregar execuções</button><ul id="runs"></ul><div class="control-field"><label for="runs-size">Itens por página</label><select id="runs-size"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select></div><div class="actions"><button type="button" id="runs-previous" class="secondary">Anterior</button><span id="runs-page"></span><button type="button" id="runs-next" class="secondary">Próxima</button></div></div></details>
-      </section>
-      <section class="control-stack" aria-labelledby="picker-title"><h2 id="picker-title">Selecionar elementos</h2><button type="button" id="pick-elements">Selecionar elementos na aba atual</button></section>
-      <details><summary>Configuração da conexão</summary><form id="settings" class="control-stack details-content"><div class="control-field"><label for="backend">URL do backend</label><input id="backend" type="url" required></div><button type="submit" id="save-backend">Salvar conexão</button></form></details>
+      </div></details></section>
+      <section class="control-stack" aria-labelledby="picker-title"><details class="card-collapse"><summary><h2 id="picker-title">Selecionar elementos</h2></summary><div class="card-content control-stack"><button type="button" id="pick-elements">Selecionar elementos na aba atual</button></div></details></section>
+      <section aria-labelledby="connection-title"><details class="card-collapse"><summary><h2 id="connection-title">Configuração da conexão</h2></summary><div class="card-content"><form id="settings" class="control-stack details-content"><div class="control-field"><label for="backend">URL do backend</label><input id="backend" type="url" required></div><button type="submit" id="save-backend">Salvar conexão</button></form></div></details></section>
       <footer>Versão <span id="version"></span></footer>
     </main>
     <aside id="notification" class="toast" hidden aria-label="Notificação">
