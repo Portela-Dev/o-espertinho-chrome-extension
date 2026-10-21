@@ -10,9 +10,10 @@ const el=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
 const option=(label:string,value:string)=>{const node=document.createElement('option');node.textContent=label;node.value=value;return node;};
 const labels:Record<string,string>={idle:'Desconectado',waiting_for_login:'Aguardando login…',validating_identity:'Validando login…',connected:'Conectado',analyzing:'Em análise',completed:'Conectado',failed:'Falha na operação'};
 let app:AiController,busy=false,lastError='',workflow:ReviewAiWorkflow|undefined;
-let refreshing=false,refreshedAt=0,configError='';
+let refreshing=false,refreshedAt=0,configError='',lastAccountId='';
 function renderWorkflow(){
  const view=hooks?.view(),marketplaceId=view?.marketplaceId||view?.markets[0]?.id||'',state=app?.status(),config=workflow?.marketplaceId===marketplaceId?workflow.config:undefined;
+ if(workflow?.busy&&!state?.account&&workflow.progress.status==='running')workflow.cancel();
  const active=!!view?.run&&!['completed','failed','cancelled'].includes(view.run.status),permissions=view?.user?.permissions??[];
  for(const task of ['category','product'] as const){
   const button=el<HTMLButtonElement>('step-'+task),value=config?.[task];
@@ -31,8 +32,11 @@ function render(){
  if(!app)return;renderWorkflow();const state=app.status(),running=['waiting_for_login','validating_identity','analyzing'].includes(state.phase);
  el('direct-status').textContent=labels[state.phase]??state.phase;
  el('direct-account-info').textContent=state.account?.email||'';el('direct-account-info').hidden=!state.account?.email;
+ const model=el<HTMLSelectElement>('direct-model');
+ if(JSON.stringify([...model.options].map(o=>o.value))!==JSON.stringify(state.models.map((m:any)=>m.id)))model.replaceChildren(...state.models.map((m:any)=>option(m.name,m.id)));
+ model.value=state.selectedModel||'';
  const accounts=el<HTMLSelectElement>('direct-account'),selected=accounts.value;
- accounts.replaceChildren(option('Adicionar outra conta',''),...state.accounts.map((r:any)=>option(r.label,r.id)));accounts.value=selected;
+ accounts.replaceChildren(option('Adicionar outra conta',''),...state.accounts.map((r:any)=>option(r.label,r.id)));accounts.value=state.activeAccountId!==lastAccountId?(state.activeAccountId||''):selected;lastAccountId=state.activeAccountId||'';
  for(const id of ['direct-login','direct-models'])el<HTMLButtonElement>(id).disabled=busy||running||!!workflow?.busy;
  el<HTMLButtonElement>('direct-models').disabled=busy||running||!!workflow?.busy||!state.account?.planEnabled;
  el<HTMLButtonElement>('direct-cancel').hidden=!['waiting_for_login','validating_identity'].includes(state.phase);
@@ -46,11 +50,11 @@ async function act(task:()=>Promise<void>){
 }
 const on=(id:string,task:()=>Promise<void>)=>el(id).addEventListener('click',()=>{void act(task);});
 on('direct-login',async()=>{el<HTMLSelectElement>('direct-model').replaceChildren();await app.login(el<HTMLSelectElement>('direct-account').value||undefined);});
-on('direct-models',async()=>{const models=await app.models();el<HTMLSelectElement>('direct-model').replaceChildren(...models.map(m=>option(m.name,m.id)));if(!models.length)notify('Nenhum modelo foi disponibilizado para esta conta.');});
+on('direct-models',async()=>{const models=await app.models();if(models.length&&!app.status().selectedModel)await app.selectModel(models[0].id);if(!models.length)notify('Nenhum modelo foi disponibilizado para esta conta.');});
 on('direct-logout',async()=>{const result=await app.logout();el<HTMLSelectElement>('direct-model').replaceChildren();notify(result.revoked?'ChatGPT desconectado.':'Sessão local encerrada; revogação remota não confirmada. Desconecte nas configurações do ChatGPT.',result.revoked?'success':'error');});
 // Cancellation remains available while the analysis promise is pending.
 el('direct-cancel').addEventListener('click',()=>{app?.cancelAnalysis();void app?.cancelLogin().then(render);});
-el('direct-model').addEventListener('change',render);
+el('direct-model').addEventListener('change',()=>{const model=el<HTMLSelectElement>('direct-model').value;void act(()=>app.selectModel(model));});
 const cancelWorkflow=()=>{workflow?.cancel();app?.cancelAnalysis();};
 const onHide=()=>{workflow?.cancel();app?.dispose();};window.addEventListener('pagehide',onHide);
 try{app=await create();
@@ -67,6 +71,6 @@ try{app=await create();
   document.addEventListener('catalog-config-updated',()=>{void refreshWorkflow();});
  }
  render();}catch{notify('Não foi possível iniciar a sessão direta da extensão. Reabra o painel.');}
-const timer=setInterval(render,700);
+const timer=setInterval(()=>{void app?.sync().then(render).catch(()=>{});},700);
 return ()=>{document.removeEventListener('cancel-ai-review',cancelWorkflow);clearInterval(timer);window.removeEventListener('pagehide',onHide);app?.dispose();};
 }

@@ -43,7 +43,7 @@ O computador e o Chrome precisam estar disponíveis. Suspensão, abas congeladas
 
 ## IA do catálogo (teste)
 
-Login com ChatGPT, modelos e análise de uma oferta ficam no painel lateral da extensão. Apenas a autorização abre uma aba; ela fecha após o retorno. Não há auxiliar, servidor local ou aba separada de análise. Tokens ficam exclusivamente na memória do painel, sem envio das credenciais ao backend. Fechar/recarregar o painel exige novo login. Veja [instruções e limites](docs/AI.md).
+Login com ChatGPT e modelos ficam no painel lateral. Apenas a autorização abre uma aba; ela fecha após o retorno. Não há auxiliar, servidor local ou análise avulsa. Conta e modelo são restaurados inclusive após reiniciar o Chrome. Credenciais são cifradas em um cofre local da extensão, sem envio ao backend ou sincronização. Desconectar limpa a sessão e tenta revogá-la. Veja [instruções e limites](docs/AI.md).
 
 ## Segurança e limites do catálogo
 

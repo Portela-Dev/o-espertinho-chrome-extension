@@ -3,7 +3,7 @@ const unbase64=value=>Uint8Array.from(atob(value.replaceAll('-','+').replaceAll(
 
 const AUTH='https://auth.openai.com', API='https://api.openai.com/v1';
 const secret=()=>base64(crypto.getRandomValues(new Uint8Array(32)));
-export class LocalError extends Error {}
+export class LocalError extends Error {constructor(message,status=0,code=''){super(message);this.status=status;this.code=code;}}
 const fail=message=>{throw new LocalError(message);};
 const endpoint=value=>{const url=new URL(value);if(url.origin!==AUTH||url.username||url.password)fail('Endpoint de identidade inválido.');return url.href;};
 export async function verifyIdentity(jwt,{jwks,issuer,clientId,nonce,now=Date.now()}){
@@ -28,7 +28,8 @@ export class OpenAISession {
  async json(url,options={}){
   const response=await this.fetcher(url,{...options,redirect:'error',credentials:'omit',signal:options.signal??AbortSignal.timeout(20000)});
   if(!response.ok){
-   if(response.status===401)fail('A sessão ChatGPT expirou ou foi recusada. Entre novamente.');
+   if(response.status===401)throw new LocalError('A sessão ChatGPT expirou ou foi recusada. Entre novamente.',401);
+   if(response.status===400&&url.endsWith('/oauth/token')){const body=await response.json().catch(()=>({}));if(body.error==='invalid_grant')throw new LocalError('A sessão ChatGPT expirou ou foi revogada. Entre novamente.',400,'invalid_grant');}
    if(response.status===403)fail('O ChatGPT recusou esta autorização ou o acesso ao plano/modelo. Confira as permissões da conta.');
    if(response.status===429)fail('Limite de uso do ChatGPT atingido. Aguarde antes de tentar novamente.');
    fail('Não foi possível concluir a chamada oficial à OpenAI. Tente novamente.');

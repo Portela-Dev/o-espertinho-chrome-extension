@@ -149,7 +149,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   await panel.locator('#dismiss-notification').click();assert.equal(await panel.locator('#notification').isVisible(),false);
   // Official endpoints are simulated; the browser navigates to an unserved callback.
   const keys=generateKeyPairSync('rsa',{modulusLength:2048});let directNonce='',responses=0;const directStages=[];
-  await context.route('https://auth.openai.com/**',async route=>{
+  const installAiRoutes=async context=>{await context.route('https://auth.openai.com/**',async route=>{
    const url=new URL(route.request().url());
    directStages.push(url.pathname);
    if(url.pathname==='/api/accounts/authorize'){
@@ -177,7 +177,8 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    }
    await route.abort();
   });
-  const direct=panel,pagesBefore=context.pages().length;await direct.locator('#account-card > details > summary').click();
+  };await installAiRoutes(context);
+  let direct=panel;const pagesBefore=context.pages().length;await direct.locator('#account-card > details > summary').click();
   await direct.locator('#direct-login').click();
   try{await direct.locator('#direct-status').filter({hasText:'Conectado'}).waitFor({timeout:20000});}
   catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#error').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
@@ -198,7 +199,17 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    await direct.screenshot({path:'reports/ai-panel-'+scheme+'.png',fullPage:true});
   }
   await direct.locator('#account-card > details > summary').click();assert.equal(await direct.locator('#direct-model').isVisible(),false);await direct.locator('#account-card > details > summary').focus();await direct.keyboard.press('Enter');assert.equal(await direct.locator('#direct-model').inputValue(),'direct-fixture');
+  const loginsBefore=directStages.filter(s=>s==='/api/accounts/authorize').length;
+  const extensionPage=new URL('popup.html?view=panel',worker.url()).href;
+  const restart=async()=>{
+   await context.close();context=await chromium.launchPersistentContext(join(directory,'profile'),{channel:'chromium',headless:true,chromiumSandbox:true,args:['--disable-extensions-except='+extension,'--load-extension='+extension,'--host-resolver-rules=MAP shop.example.com 127.0.0.1','--ignore-certificate-errors']});
+   await installAiRoutes(context);direct=await context.newPage();await direct.goto(extensionPage);await direct.locator('#account-card > details > summary').click();
+  };
+  await restart();await direct.locator('#direct-status').filter({hasText:'Conectado'}).waitFor();await direct.waitForFunction(()=>document.getElementById('direct-model').value==='direct-fixture');assert.equal(directStages.filter(s=>s==='/api/accounts/authorize').length,loginsBefore);
   await direct.locator('#direct-logout').click();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();
+  await restart();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();assert.equal(await direct.locator('#direct-model').inputValue(),'');assert.equal(directStages.filter(s=>s==='/api/accounts/authorize').length,loginsBefore);
+  const resumedWorker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');const cleared=await resumedWorker.evaluate(async()=>await chrome.storage.local.get('directAiSessionV1'));assert.equal(cleared.directAiSessionV1.sealed,null);
+  assert.doesNotMatch(JSON.stringify(backendTraffic),/DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/);
  }finally{
   await context?.close();if(server)await new Promise(r=>server.close(r));if(marketServer)await new Promise(r=>marketServer.close(r));
   if(relative(resolve(tmpdir()),resolve(directory)).startsWith('..'))throw Error('Diretório de teste inválido.');

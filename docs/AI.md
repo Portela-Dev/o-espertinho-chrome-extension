@@ -18,7 +18,15 @@ Cancelar execução também cancela a IA e libera a reserva quando possível. Ap
 
 ## Sessão e segurança
 
-Tokens OAuth e PKCE ficam somente na memória do painel, sem auxiliar local ou serviço em escuta. Fechar/recarregar o painel ou mudar para popup exige novo login. Persistem apenas registros públicos de conta/cliente. Credenciais OpenAI não vão ao backend, storage ou logs.
+A sessão ChatGPT e o modelo selecionado são restaurados após fechar/recarregar o painel e reiniciar o Chrome. Não há auxiliar nem serviço externo. O backend nunca recebe credenciais OpenAI.
+
+O serviço de fundo da extensão mantém uma fila única para gravar credenciais, renovar tokens, consultar modelos e desconectar. A rotação salva o token substituto antes de responder ao painel, evitando concorrência entre painéis. O painel recebe apenas metadados, modelos e o access token temporário necessário à chamada direta de inferência. O callback OAuth continua validando state, PKCE, nonce, assinatura, emissor, público e identidade antes de instalar uma sessão.
+
+O cofre local usa AES-GCM com IV aleatório e autenticação da revisão. A chave não exportável pela API Web Crypto fica no IndexedDB da própria extensão; somente o texto cifrado vai para chrome.storage.local, restrito a TRUSTED_CONTEXTS. Não usa storage.sync. Isso protege contra exposição acidental do armazenamento, mas não equivale ao cofre de credenciais do sistema operacional nem protege um perfil/PC comprometido. Cookies, ID tokens, códigos OAuth e PKCE não são persistidos. Registros públicos de cliente/conta permanecem separados.
+
+Ao desconectar, o serviço de fundo elimina os dados cifrados e a seleção do modelo, mantém um marcador de versão sem segredos e tenta revogar a sessão na OpenAI. Callbacks e solicitações de sessões anteriores são recusados. A saída se propaga aos demais painéis e cancela novas análises. Uma falha de rede na revogação não restaura a sessão local; a interface informa quando a revogação remota não foi confirmada.
+
+Um token recusado/invalid_grant remove a sessão salva e exige novo login. Uma falha transitória não apaga credenciais. Modelos removidos da conta deixam de ser selecionados; a conta do Espertinho e suas permissões continuam sendo verificadas antes de cada operação. Fechar o painel cancela a análise e o login pendente, mas preserva uma sessão já instalada.
 
 O retorno é observado em 127.0.0.1:18766/auth/callback, sem servidor nessa porta, aceitando apenas a aba, frame, origem, caminho e state esperados. PKCE S256, nonce, assinatura da identidade, issuer, audience, validade e escopos são verificados. Chamadas de modelos/Responses são diretas à OpenAI.
 
@@ -29,3 +37,5 @@ O backend valida permissões, flags, contratos, versões e idempotência. A inte
 Login e inferência com a conta real foram homologados anteriormente pelo administrador. Este ciclo usa serviços/identidades simulados em testes unitários e Chromium real. Execute npm run check, npm run test:native e npm run package. O pacote contém somente a extensão e instruções/checksum.
 
 O painel usa espaçamento uniforme entre campos e ações. Textos explicativos fixos foram removidos; estados, contadores, erros e nomes acessíveis dos controles permanecem disponíveis.
+
+Testes incluem reinício real do Chromium com o mesmo perfil, restauração sem OAuth adicional, modelo preservado e segundo reinício após desconectar. Cofre adulterado, rotação serializada, callbacks antigos, modelos inexistentes e falha de rede são testados isoladamente.
