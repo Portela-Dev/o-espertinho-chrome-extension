@@ -110,6 +110,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.id),previousRun);
   assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.status),'waiting_for_human');
   assert.equal(received.length,before);
+  await worker.evaluate(async()=>{await chrome.tabs.remove(globalThis.catalogTest.state.tabId);});
   await worker.evaluate(()=>globalThis.catalogTest.handle({type:'RESUME'}));
   for(let i=0;i<100;i++){if(await worker.evaluate(()=>globalThis.catalogTest.state.run.status)==='completed')break;await new Promise(r=>setTimeout(r,50));}
   assert.equal(await worker.evaluate(()=>globalThis.catalogTest.state.run.status),'completed');
@@ -119,7 +120,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   assert.equal(received.find(r=>r.step==='enrich').data.priceCents,12345);
   assert.deepEqual(received.find(r=>r.step==='enrich').sourceCategoryPath,['Eletrônicos','Áudio']);
   assert.ok(visited.some(v=>v.step==='enrich'&&v.path==='/product'));assert.equal(visited.some(v=>v.step==='enrich'&&v.path==='/affiliate-product'),false);
-  assert.ok(visited.some(v=>v.step==='prices'&&v.path==='/affiliate-product'));
+  assert.ok(visited.some(v=>v.step==='prices'&&v.path==='/product'));assert.equal(visited.some(v=>v.step==='prices'&&v.path==='/affiliate-product'),false);
   assert.equal(received.find(r=>r.step==='prices').data.priceCents,12345);
   assert.doesNotMatch(JSON.stringify(received),/TEST_ONLY|cookies|refreshToken/);
   const panel=await context.newPage();await panel.setViewportSize({width:400,height:1000});

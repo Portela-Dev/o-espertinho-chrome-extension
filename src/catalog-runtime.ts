@@ -396,6 +396,9 @@ export class CatalogRuntime {
         const run = this.state.run;
         if (!run)
             throw new Error('Não há execução para retomar.');
+        const market = this.market(run.marketplace_id);
+        await this.navigation.ensure(market.config.recipe?.loginUrl ?? market.website_url, market.allowedOrigins, false);
+        await this.navigation.wait(market.allowedOrigins, market.config.timeoutMs);
         if (this.state.tabId) {
             const blocked = await this.navigation.inspect(run.snapshot.settings.blockRules);
             if (blocked && blocked !== 'unavailable')
@@ -464,7 +467,7 @@ export class CatalogRuntime {
             throw new Error('incomplete');
         const origins = snapshot.market.allowedHosts.map((h: string) => 'https://' + h), settings = snapshot.settings;
         let url = item.payload.url;
-        if (step === 'enrich')
+        if (step === 'enrich' || step === 'prices')
             url = item.payload.originalUrl;
         if (step === 'convert')
             url = settings.recipe.loginUrl;

@@ -8,7 +8,7 @@ test('aba própria recebe foco ao abrir, preserva a janela e não retoma foco na
  assert.deepEqual(calls[0],{windowId:9,url:'https://shop.example.com/p',active:true});await nav.wait(['https://shop.example.com'],500);
  await nav.ensure('https://shop.example.com/other',['https://shop.example.com']);assert.deepEqual(calls[1],{id:4,url:'https://shop.example.com/other'});
  await assert.rejects(nav.ensure('https://other.example.com/p',['https://shop.example.com']),/permission/);
- browser.tabs.get=async()=>{throw Error('closed');};await assert.rejects(nav.ensure('https://shop.example.com/p',['https://shop.example.com']),/tab_closed/);
+ browser.tabs.get=async()=>{throw Error('closed');};assert.equal(await nav.ensure('https://shop.example.com/p',['https://shop.example.com']),4);
  await assert.rejects(nav.focus(),/tab_closed/);
  browser.tabs.get=async()=>({id:4,windowId:99});await assert.rejects(nav.focus(),/tab_closed/);
 });
