@@ -1,3 +1,4 @@
+import {openWhatsAppGroup} from '../dist/whatsapp-group-navigation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Window} from 'happy-dom';
@@ -57,4 +58,18 @@ test('vínculos persistem no Chrome sem duplicação e validação recusa víncu
  const f=fixture();for(let i=0;i<2;i++){const c=await f.groups.handle('inspect',{tabId:7});await f.groups.handle('confirm',{ticket:c.ticket});}
  assert.equal(f.rows().length,1);const recreated=new WhatsAppGroups(async()=>{},f.browser);assert.equal((await recreated.handle('list')).length,1);
  await assert.rejects(recreated.handle('validate',{id:'unknown',tabId:7}),/não encontrado/);
+});
+
+
+test('abrir vínculo valida a conta e documento retornados, sem aceitar ID de grupo fornecido pelo painel',async()=>{
+ const f=fixture(),candidate=await f.groups.handle('inspect',{tabId:7}),binding=await f.groups.handle('confirm',{ticket:candidate.ticket});
+ const read=f.browser.scripting.executeScript;let opens=0;
+ f.browser.scripting.executeScript=async options=>{
+  if(options.func!==openWhatsAppGroup)return read(options);
+  opens++;assert.equal(options.args[0].groupId,binding.groupId);return [{frameId:0,documentId:'doc',result:{selected:true}}];
+ };
+ const opened=await f.groups.handle('open_group',{id:binding.id,tabId:7,groupId:'120363000000099@g.us'});assert.equal(opened.groupId,binding.groupId);assert.equal(opens,1);
+ f.browser.scripting.executeScript=async options=>options.func===openWhatsAppGroup?[{frameId:0,documentId:'another-document',result:{selected:true}}]:read(options);
+ await assert.rejects(f.groups.handle('open_group',{id:binding.id,tabId:7}),/documento divergente/);
+ await assert.rejects(f.groups.handle('open_group',{id:'unknown',tabId:7}),/não encontrado/);
 });

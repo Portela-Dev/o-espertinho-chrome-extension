@@ -1,3 +1,4 @@
+import {openWhatsAppGroup} from './whatsapp-group-navigation.js';
 import {WhatsAppTextPoc} from './whatsapp-text.js';
 /** Read-only adapter for WhatsApp Web's private modules. Never reads messages or credentials. */
 export function readWhatsAppIdentity() {
@@ -37,13 +38,26 @@ export class WhatsAppGroups {
   if(!Array.isArray(rows))return [];
   return rows.filter(r=>r&&typeof r.id==='string'&&typeof r.groupId==='string'&&/^\d{5,30}(?:-\d{1,20})?@g\.us$/.test(r.groupId)&&typeof r.name==='string'&&r.name.length<=300&&/^[a-f0-9]{64}$/.test(r.accountHash));
  }
- private async read(tabId:number){
-  if(!Number.isInteger(tabId)||tabId<0)throw new Error('Abra o grupo na aba atual.');
+ private async checkTab(tabId:number){
+  if(!Number.isInteger(tabId)||tabId<0)throw new Error('Abra o WhatsApp Web nesta janela.');
   if(!await this.browser.permissions.contains({origins:[origin+'/*']}))throw new Error('Autorize o acesso ao WhatsApp Web.');
-  const check=async()=>{const tab=await this.browser.tabs.get(tabId);if(!tab.url||new URL(tab.url).origin!==origin)throw new Error('A aba atual não é o WhatsApp Web.');};
-  await check();
+  const tab=await this.browser.tabs.get(tabId);if(!tab.url||new URL(tab.url).origin!==origin)throw new Error('A aba não é o WhatsApp Web.');
+ }
+ private async openBinding(binding:WhatsAppGroupBinding,tabId:number){
+  await this.checkTab(tabId);
+  const results=await this.browser.scripting.executeScript({target:{tabId},world:'MAIN',func:openWhatsAppGroup,args:[{groupId:binding.groupId,accountHash:binding.accountHash}]});
+  await this.checkTab(tabId);
+  const frame=results.find(r=>r.frameId===0);
+  if(frame?.result?.error)throw Error(frame.result.error);
+  if(!frame?.documentId||frame.result?.selected!==true)throw Error('O WhatsApp não confirmou a abertura do grupo.');
+  const current=await this.stable(tabId);
+  if(current.documentId!==frame.documentId||current.groupId!==binding.groupId||current.accountHash!==binding.accountHash)throw Error('Conta, grupo ou documento divergente após a abertura.');
+  return current;
+ }
+ private async read(tabId:number){
+  await this.checkTab(tabId);
   const result=await this.browser.scripting.executeScript({target:{tabId},world:'MAIN',func:readWhatsAppIdentity});
-  await check();
+  await this.checkTab(tabId);
   const frame=result.find(r=>r.frameId===0),data=frame?.result;
   if(data?.error)throw new Error(data.error);
   if(!frame?.documentId||!data||typeof data.accountId!=='string'||!/^\d{5,30}@(c\.us|lid)$/.test(data.accountId)||typeof data.groupId!=='string'||!/^\d{5,30}(?:-\d{1,20})?@g\.us$/.test(data.groupId)||typeof data.name!=='string'||!data.name.trim()||data.name.length>300)throw new Error('Identificação indisponível. Confira a sessão e reabra o grupo.');
@@ -52,16 +66,16 @@ export class WhatsAppGroups {
  }
  private same(a:Awaited<ReturnType<WhatsAppGroups['read']>>,b:Awaited<ReturnType<WhatsAppGroups['read']>>){return a.groupId===b.groupId&&a.accountHash===b.accountHash&&a.documentId===b.documentId;}
  private async stable(tabId:number){const first=await this.read(tabId),second=await this.read(tabId);if(!this.same(first,second))throw new Error('A conta, conversa ou página mudou durante a verificação. Tente novamente.');return second;}
- private async textDestination(id:string,tabId:number){
+ private async textDestination(id:string,tabId:number,prepare=false){
   const binding=(await this.bindings()).find(r=>r.id===id);if(!binding)throw Error('Vínculo não encontrado.');
-  const current=await this.stable(tabId);
+  const current=prepare?await this.openBinding(binding,tabId):await this.stable(tabId);
   if(current.accountHash!==binding.accountHash||current.groupId!==binding.groupId)throw Error('A conta ou grupo aberto não corresponde ao vínculo. Nenhuma mensagem foi enviada.');
   return {...current,bindingId:binding.id};
  }
  private async execute(operation:string,payload:any){
   await this.authorize();
   if(['preview_text','send_text','cancel_text','text_status'].includes(operation)){
-   this.text??=new WhatsAppTextPoc(this.browser,(id,tabId)=>this.textDestination(id,tabId));
+   this.text??=new WhatsAppTextPoc(this.browser,(id,tabId,prepare)=>this.textDestination(id,tabId,prepare));
    return this.text.handle(operation,payload);
   }
   for(const [id,pending] of this.pending)if(pending.expiresAt<Date.now())this.pending.delete(id);
@@ -79,6 +93,10 @@ export class WhatsAppGroups {
    const rows=await this.bindings();let binding=rows.find(r=>r.groupId===current.groupId&&r.accountHash===current.accountHash);
    if(!binding){if(rows.length>=50)throw new Error('Limite de 50 vínculos nesta POC.');binding={id:crypto.randomUUID(),groupId:current.groupId,name:current.name,accountHash:current.accountHash,createdAt:new Date().toISOString()};rows.push(binding);await this.browser.storage.local.set({[key]:rows});}
    return binding;
+  }
+  if(operation==='open_group'){
+   const binding=(await this.bindings()).find(r=>r.id===payload.id);if(!binding)throw Error('Vínculo não encontrado.');
+   const current=await this.openBinding(binding,payload.tabId);return {name:current.name,groupId:current.groupId};
   }
   if(operation==='validate'){
    const binding=(await this.bindings()).find(r=>r.id===payload.id);

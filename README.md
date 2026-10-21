@@ -73,4 +73,4 @@ O card Contas reúne Google/Espertinho, ChatGPT e modelo. A interface compacta m
 
 Os cards Contas, Manter catálogo, Selecionar elementos e Configuração da conexão iniciam recolhidos. Clique no título (ou use Enter/Espaço no teclado) para expandir. Recolher não interrompe execuções nem descarta a sessão/modelo do painel.
 
-POC de grupos do WhatsApp: consulte docs/WHATSAPP_GROUP_POC.md. O card começa recolhido e oferece vinculação/validação local e envio manual de um texto, com prévia, confirmação única e revalidação do grupo. Não há repetição automática.
+POC de grupos do WhatsApp: consulte docs/WHATSAPP_GROUP_POC.md. O card começa recolhido e oferece vinculação/validação local e envio manual de um texto, com prévia, confirmação única e revalidação do grupo. O grupo vinculado é aberto pelo identificador antes da prévia, sem mudar o foco da aba. Não há repetição automática.

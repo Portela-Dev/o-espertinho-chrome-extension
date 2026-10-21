@@ -48,7 +48,7 @@ export async function sendWhatsAppText(input:{attemptId:string;groupId:string;na
 
 export class WhatsAppTextPoc {
  private drafts=new Map<string,Draft>();
- constructor(private readonly browser:typeof chrome,private readonly destination:(bindingId:string,tabId:number)=>Promise<WhatsAppTextDestination>){}
+ constructor(private readonly browser:typeof chrome,private readonly destination:(bindingId:string,tabId:number,prepare?:boolean)=>Promise<WhatsAppTextDestination>){}
  private async hash(text:string){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');}
  async handle(operation:string,payload:any){
   for(const [ticket,draft] of this.drafts)if(draft.expiresAt<Date.now())this.drafts.delete(ticket);
@@ -56,7 +56,7 @@ export class WhatsAppTextPoc {
   if(operation==='cancel_text'){this.drafts.delete(payload.ticket);return {cancelled:true};}
   if(operation==='preview_text'){
    if(typeof payload.text!=='string'||payload.text.length>2000||!payload.text.trim()||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(payload.text))throw Error('Digite uma mensagem de 1 a 2.000 caracteres.');
-   const text=payload.text.replace(/\r\n?/g,'\n').trim(),destination=await this.destination(payload.id,payload.tabId),ticket=crypto.randomUUID();
+   const text=payload.text.replace(/\r\n?/g,'\n').trim(),destination=await this.destination(payload.id,payload.tabId,true),ticket=crypto.randomUUID();
    this.drafts.clear();this.drafts.set(ticket,{tabId:payload.tabId,destination,text,expiresAt:Date.now()+120000});
    return {ticket,text,name:destination.name,groupId:destination.groupId,accountFingerprint:destination.accountHash.slice(0,12)};
   }
