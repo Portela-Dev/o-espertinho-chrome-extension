@@ -31,7 +31,7 @@ async function refreshWorkflow(){
 function render(){
  if(!app)return;renderWorkflow();const state=app.status(),running=['waiting_for_login','validating_identity','analyzing'].includes(state.phase);
  el('direct-status').textContent=labels[state.phase]??state.phase;
- el('direct-status').hidden=['connected','completed'].includes(state.phase);
+ el('direct-status').hidden=['idle','connected','completed'].includes(state.phase);
  const model=el<HTMLSelectElement>('direct-model');
  if(JSON.stringify([...model.options].map(o=>o.value))!==JSON.stringify(state.models.map((m:any)=>m.id)))model.replaceChildren(...state.models.map((m:any)=>option(m.name,m.id)));
  model.value=state.selectedModel||'';

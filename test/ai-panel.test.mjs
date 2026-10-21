@@ -12,7 +12,7 @@ test('contas centralizadas no topo e modelo da IA, sem análise avulsa ou autori
  try{
   cleanup=await setupAiPanel(message=>notices.push(message),true,async()=>app);assert.equal(el('direct-login').textContent,'Conectar IA');assert.equal(el('direct-logout'),null);await click('direct-login');assert.equal(el('direct-login').textContent,'Desconectar IA');assert.equal(el('direct-account-info'),null);assert.equal(el('direct-status').hidden,true);assert.equal(el('direct-login').closest('section'),el('login').closest('section'));assert.equal(el('direct-model').closest('section'),el('login').closest('section'));assert.equal(el('ai-usage'),null);assert.equal(el('direct-callback-status'),null);assert.equal(document.querySelector('a[href*=Usage]'),null);assert.equal(el('limit-hint'),null);await click('direct-models');assert.equal(el('direct-model').options[0].value,'fixture');
   assert.equal(document.querySelectorAll('progress').length,1);assert.equal(el('direct-analyze'),null);assert.equal(el('direct-consent'),null);assert.equal(el('ai-workflow-consent'),null);assert.ok(el('ai-panel').compareDocumentPosition(el('workspace'))&page.Node.DOCUMENT_POSITION_FOLLOWING);
-  await click('direct-login');assert.equal(el('direct-login').textContent,'Conectar IA');assert.match(el('direct-status').textContent,/Desconectado/);
+  await click('direct-login');assert.equal(el('direct-login').textContent,'Conectar IA');assert.equal(el('direct-status').hidden,true);
  }finally{cleanup?.();assert.ok(dispose);page.close();Object.assign(globalThis,previous);}
 });
 
