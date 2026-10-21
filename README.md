@@ -1,6 +1,6 @@
 # O Espertinho — extensão Chrome
 
-Extensão Manifest V3/TypeScript para quatro etapas manuais de manutenção do catálogo, usando receitas e seletores do backend, sem implementação fixa por marketplace.
+Extensão Manifest V3/TypeScript para seis etapas manuais de manutenção do catálogo, usando receitas e seletores do backend, sem implementação fixa por marketplace.
 
 ## Instalar e conectar
 
@@ -14,16 +14,18 @@ Atualizar configurações consulta somente configurações e contadores; não de
 
 Entre no O Espertinho e aprove no site com a conta Google autorizada. A extensão exige affiliate_links e, por etapa, discovery, catalog ou updates. Requisições são autorizadas novamente pelo backend. Sessões revogadas/expiradas interrompem o fluxo.
 
-## Quatro etapas
+## Seis etapas
 
 1. **Extrair links:** carrega vitrines/perfis habilitados e percorre a paginação configurada. Envia URLs e origem, não dados incompletos de cards.
 2. **Gerar links de afiliados:** processa candidatos ainda sem conversão usando a receita cadastrada. Categoria/produto ainda não são necessários. A URL original é preservada separadamente.
 3. **Extrair informações:** navega na URL original dos produtos que já possuem link de afiliado e aplica os seletores de produto; grava categorias de origem e dados para revisão, sem confirmar mapeamentos ou publicar.
-4. **Atualizar preços:** atualiza ofertas publicadas e seu histórico diário. Falha técnica mantém o último preço e a oferta.
+4. **Catalogar produtos:** reutiliza produtos e rascunhos globais; confirma decisões válidas.
+5. **Categorizar produtos:** reutiliza árvores existentes e finaliza novos produtos, aplicando decisões válidas.
+6. **Analisar Preços:** atualiza ofertas publicadas e seu histórico diário. Falha técnica mantém o último preço e a oferta.
 
-No admin, confirme categoria, atribua/crie produto e publique explicitamente. Cada botão inicia só sua própria etapa. Limite de itens e inclusão de falhas ficam na interface. Novas configurações valem para execuções novas.
+No admin, revise as decisões aplicadas, resolva ambiguidades e publique explicitamente. Cada botão inicia só sua própria etapa. Limite de itens e inclusão de falhas ficam na interface. Novas configurações valem para execuções novas.
 
-Os botões 2 e 3 mostram links já gerados e extrações concluídas / total de links descobertos não arquivados do marketplace selecionado. Os rótulos Gerados e Extraídos distinguem conclusão de pendência; falhas não contam como conclusão. A inclusão de falhas altera os elegíveis da extração. O botão 4 mostra ofertas sem verificação bem-sucedida nas últimas 24 horas / ofertas publicadas com link de afiliado; falhas técnicas não renovam a data. Esse indicador não restringe a execução manual, que continua podendo verificar todas as ofertas, começando pelas mais antigas. Os totais independem do máximo de itens por execução. Contadores são atualizados ao trocar o filtro, atualizar configurações e concluir uma execução, com cache de até 15 segundos durante a consulta do painel. Falhas de consulta mostram indisponibilidade, sem inventar valores zero. Execução atual e histórico identificam a etapa; a execução atual também identifica o marketplace.
+Os botões 2 e 3 mostram links já gerados e extrações concluídas / total de links descobertos não arquivados do marketplace selecionado. Os rótulos Gerados e Extraídos distinguem conclusão de pendência; falhas não contam como conclusão. A inclusão de falhas altera os elegíveis da extração. O botão 6 mostra ofertas sem verificação bem-sucedida nas últimas 24 horas / ofertas publicadas com link de afiliado; falhas técnicas não renovam a data. Esse indicador não restringe a execução manual, que continua podendo verificar todas as ofertas, começando pelas mais antigas. Os totais independem do máximo de itens por execução. Contadores são atualizados ao trocar o filtro, atualizar configurações e concluir uma execução, com cache de até 15 segundos durante a consulta do painel. Falhas de consulta mostram indisponibilidade, sem inventar valores zero. Execução atual e histórico identificam a etapa; a execução atual também identifica o marketplace.
 
 ## Aba, bloqueios e retomada
 
@@ -39,7 +41,11 @@ Painel pode ser fechado sem perder progresso. Use Carregar execuções para reto
 
 O computador e o Chrome precisam estar disponíveis. Suspensão, abas congeladas/descartadas, perda de rede ou janela fechada podem pausar a execução. Não existe garantia de processamento com janela minimizada. Iframes configurados não são suportados nesta versão e causam falha controlada; documento principal, links de próximo, templates de URL, carregar mais e rolagem usam configurações limitadas.
 
-## Segurança e limites
+## IA do catálogo (teste)
+
+Login com ChatGPT e modelos ficam no painel lateral. Apenas a autorização abre uma aba; ela fecha após o retorno. Não há auxiliar, servidor local ou análise avulsa. Conta e modelo são restaurados inclusive após reiniciar o Chrome. Credenciais são cifradas em um cofre local da extensão, sem envio ao backend ou sincronização. Desconectar limpa a sessão e tenta revogá-la. Veja [instruções e limites](docs/AI.md).
+
+## Segurança e limites do catálogo
 
 Em Admin → Exploração → Perfis, a paginação por rolagem permite avançar por distância ou ir até o fim do conteúdo carregado. A segunda opção repete a ida ao fim quando novos cards aumentam a página e aguarda os tempos de hidratação configurados. Só encerra por falta de progresso após as tentativas configuradas no fim da página, sem novos links nem aumento de altura. Funciona também com um contêiner de rolagem configurado, sem código específico por marketplace.
 
@@ -60,3 +66,9 @@ Playwright é dependência somente de testes e não entra no ZIP. O teste nativo
 SonarQube permanece no runner Windows windows-portela-dev; validação/pacote ficam em ubuntu-22.04, preservando a sandbox do Chromium. Projeto Sonar: o-espertinho-chrome-extension. Configurações: SONAR_ENABLED, SONAR_HOST_URL e SONAR_TOKEN. Nenhum deploy acontece em PR.
 
 Documentos em docs/SESSION_PROOF.md e docs/AFFILIATE_PROOF.md são registros históricos de provas encerradas, sem rotas/telas no runtime atual. O plano principal e os aceites operacionais ficam no workspace e em 1-backend/docs.
+
+Contas Espertinho e ChatGPT são gerenciadas no topo. A IA reutiliza a única barra de Execução atual, incluindo pendências na quantidade processada, sem contá-las como links catalogados. O login e o início da tarefa substituem o antigo checkbox adicional. Não há mais seção de análise avulsa. Consulte docs/AI.md.
+
+O card Contas reúne Google/Espertinho, ChatGPT e modelo. A interface compacta mantém somente controles, estados e contadores, sem informações de consumo ou nomes de produtos durante a IA.
+
+Os cards Contas, Manter catálogo, Selecionar elementos e Configuração da conexão iniciam recolhidos. Clique no título (ou use Enter/Espaço no teclado) para expandir. Recolher não interrompe execuções nem descarta a sessão/modelo do painel.

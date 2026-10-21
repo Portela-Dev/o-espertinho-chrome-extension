@@ -57,7 +57,8 @@ for(const priorStatus of ['waiting_for_human','running'])test('reabrir aba fecha
   assert.equal(f.saved().run.id,runId);assert.equal(f.saved().run.status,priorStatus==='running'?'paused_by_user':'waiting_for_human');
   assert.match(f.saved().message,/Continuar/);assert.equal(f.calls.some(c=>c.path.endsWith('/results')),false);
   await f.runtime.handle({type:'FOCUS'});assert.equal(created,1);
-  blocked=null;await f.runtime.handle({type:'RESUME'});await finished(f);
+  exists=false;blocked=null;await f.runtime.handle({type:'RESUME'});await finished(f);
+  assert.equal(created,2);
   assert.equal(f.calls.filter(c=>c.path==='/catalog/runs').length,1);
  }finally{globalThis.fetch=original;}
 });
@@ -109,7 +110,7 @@ test('descoberta usa checkpoint e envia apenas URLs; extração e preço mantêm
   for(const step of ['enrich','prices']){
    const g=fixture({payload:{url:'https://shop.example.com/affiliate',originalUrl:'https://shop.example.com/p'},result:{outcome:'success',data:{title:'Produto',priceCents:12000},sourceCategoryPath:['Tecnologia']}});globalThis.fetch=g.fetch;
    await g.runtime.init();await g.runtime.handle({type:'REFRESH'});await g.runtime.handle({type:'START',marketplaceId:'shop',step});await finished(g);
-   const result=g.calls.find(c=>c.path.endsWith('/results')).body;assert.equal(result.data.priceCents,12000);assert.equal(result.affiliateUrl,undefined);assert.deepEqual(result.sourceCategoryPath,['Tecnologia']);assert.equal(g.navigations[0],step==='enrich'?'https://shop.example.com/p':'https://shop.example.com/affiliate');
+   const result=g.calls.find(c=>c.path.endsWith('/results')).body;assert.equal(result.data.priceCents,12000);assert.equal(result.affiliateUrl,undefined);assert.deepEqual(result.sourceCategoryPath,['Tecnologia']);assert.equal(g.navigations[0],'https://shop.example.com/p');
   }
  }finally{globalThis.fetch=original;}
 });
@@ -148,5 +149,16 @@ test('contadores respeitam o filtro, usam cache e falha não encerra a sessão',
   await f.runtime.handle({type:'FILTER',marketplaceId:'shop',retryFailed:true});view=await f.runtime.handle({type:'STATE'});assert.equal(view.stats.retryFailed,true);assert.equal(f.calls.filter(c=>c.path==='/catalog/stats').length,2);
   unavailable=true;view=await f.runtime.handle({type:'REFRESH'});assert.equal(view.stats,undefined);assert.match(view.statsError,/indisponíveis/);assert.ok(view.user);
   await f.runtime.handle({type:'LOGOUT'});view=await f.runtime.handle({type:'STATE'});assert.equal(view.stats,undefined);assert.equal(view.user,undefined);
+ }finally{globalThis.fetch=original;}
+});
+
+for(const step of ['convert','enrich','prices'])test('iniciar '+step+' recria aba fechada automaticamente',async()=>{
+ const f=fixture({result:{outcome:'success',data:{title:'Produto',priceCents:12000},affiliateUrl:'https://shop.example.com/affiliate'}}),original=globalThis.fetch;globalThis.fetch=f.fetch;
+ try{
+  await f.runtime.init();await f.runtime.handle({type:'REFRESH'});
+  f.runtime.state.tabId=44;f.runtime.state.windowId=9;
+  const get=f.browser.tabs.get;f.browser.tabs.get=async id=>{if(id===44)throw Error('No tab');return get(id);};
+  await f.runtime.handle({type:'START',marketplaceId:'shop',step});await finished(f);
+  assert.equal(f.saved().tabId,4);assert.equal(f.calls.some(c=>c.path.endsWith('/results')),true);
  }finally{globalThis.fetch=original;}
 });

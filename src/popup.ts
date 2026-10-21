@@ -1,9 +1,12 @@
 import { launchSelectorPicker } from './picker-launcher.js';
+import { setupAiPanel } from './ai-panel.js';
 import { backendOrigin } from './contracts.js';
 import { renderCatalog, runLabel,stepLabel, type CatalogView } from './catalog-view.js';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let view: CatalogView | undefined, busy = false, page = 1, total = 0;
 let notificationTimer: ReturnType<typeof setTimeout> | undefined;
+let aiBusy=false,aiProgressSuppressed=false;
+let aiProgress: import('./review-ai-workflow.js').ReviewAiWorkflow['progress']|undefined;
 let lastBackgroundError = '', lastPollingError = '';
 function hideNotification() {
     clearTimeout(notificationTimer);
@@ -22,6 +25,7 @@ function notify(message: string, kind: 'error' | 'success' = 'error') {
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Não foi possível concluir.';
 element('dismiss-notification').addEventListener('click', hideNotification);
 const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
+void setupAiPanel(notify,isPanel,undefined,{view:()=>view,progress:value=>{if(value?.status==='running')aiProgressSuppressed=false;if(!aiProgressSuppressed)aiProgress=value;},busy:value=>{aiBusy=value;render();}}).catch(()=>notify('Não foi possível iniciar a IA no painel.'));
 document.body.classList.toggle('side-panel', isPanel);
 function syncDisplayIcon() {
     const button=element<HTMLButtonElement>('display-mode'),label=isPanel?'Usar popup':'Abrir painel lateral';
@@ -31,16 +35,16 @@ function syncDisplayIcon() {
 }
 syncDisplayIcon();
 function render() {
-    element<HTMLButtonElement>('display-mode').disabled=busy;
+    element<HTMLButtonElement>('display-mode').disabled=busy||aiBusy;
     if (view) {
-        renderCatalog(view, busy);
+        renderCatalog(view, busy||aiBusy,aiProgress);
         const message = [view.error, view.statsError].filter(Boolean).join(' ');
         if (message && message !== lastBackgroundError) notify(message);
         lastBackgroundError = message;
     }
 }
 async function act(callback: () => Promise<unknown>) {
-    if (busy)
+    if (busy||aiBusy)
         return;
     busy = true;
     hideNotification();
@@ -66,8 +70,10 @@ async function request(type: string, extra: Record<string, unknown> = {}) {
     return reply.value;
 }
 async function send(type: string, extra: Record<string, unknown> = {}) {
+    if(['START','ATTACH'].includes(type)){aiProgress=undefined;aiProgressSuppressed=true;}
     view = await request(type, extra);
     render();
+    if(type==='REFRESH')document.dispatchEvent(new window.Event('catalog-config-updated'));
     if (type === 'REFRESH' && !view?.error && !view?.statsError) notify('Configurações atualizadas.', 'success');
 }
 element('display-mode').addEventListener('click', () => {
@@ -93,11 +99,12 @@ element('display-mode').addEventListener('click', () => {
     });
 });
 for (const [id, type] of Object.entries({
-    login: 'LOGIN', logout: 'LOGOUT', refresh: 'REFRESH', pause: 'PAUSE', resume: 'RESUME', cancel: 'CANCEL', focus: 'FOCUS'
+    login: 'LOGIN', logout: 'LOGOUT', refresh: 'REFRESH', pause: 'PAUSE', resume: 'RESUME', focus: 'FOCUS'
 }))
     element(id).addEventListener('click', () => {
         void act(() => send(type));
     });
+element('cancel').addEventListener('click',()=>{if(aiBusy)document.dispatchEvent(new Event('cancel-ai-review'));else void act(()=>send('CANCEL'));});
 const marketplace = () => element<HTMLSelectElement>('marketplace').value;
 for(const id of ['marketplace','retry-failed'])element(id).addEventListener('change',()=>{const marketplaceId=marketplace(),retryFailed=element<HTMLInputElement>('retry-failed').checked;void act(()=>send('FILTER',{marketplaceId,retryFailed}));});
 async function grant() {

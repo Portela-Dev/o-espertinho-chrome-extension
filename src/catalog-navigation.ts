@@ -33,17 +33,25 @@ export class CatalogNavigation {
         if (state.tabId && state.windowId) {
             try {
                 const existing = await this.browser.tabs.get(state.tabId);
-                if (existing.windowId !== state.windowId)throw new Error('tab_closed');
                 tab = existing;
             }
             catch {
-                throw new Error('tab_closed');
+                delete state.tabId;
+                delete state.windowId;
+                await this.save();
             }
+            if (tab && tab.windowId !== state.windowId)throw new Error('tab_closed');
         }
         if (!tab) {
-            const win = state.hostWindowId!==undefined
-                ? await this.browser.windows.get(state.hostWindowId)
-                : await this.browser.windows.getLastFocused({windowTypes:['normal']});
+            let win: chrome.windows.Window;
+            try {
+                win = state.hostWindowId!==undefined
+                    ? await this.browser.windows.get(state.hostWindowId)
+                    : await this.browser.windows.getLastFocused({windowTypes:['normal']});
+            } catch {
+                delete state.hostWindowId;
+                win = await this.browser.windows.getLastFocused({windowTypes:['normal']});
+            }
             if(win.id===undefined||win.type&&win.type!=='normal')throw new Error('tab_closed');
             tab = await this.browser.tabs.create({windowId:win.id,url:target.href,active:true});
             if (tab.id===undefined)

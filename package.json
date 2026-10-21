@@ -9,14 +9,15 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "validate:html": "html-validate extension/popup.html",
+    "validate:html": "html-validate extension/*.html",
     "build": "node scripts/build.mjs",
     "package": "npm run build && node scripts/package.mjs",
     "test": "npm run build:coverage && node --test test/*.test.mjs",
     "check": "npm run typecheck && npm run validate:html && npm run test:coverage",
     "build:coverage": "node scripts/build.mjs --coverage",
     "test:coverage": "c8 node scripts/test-suite.mjs",
-    "test:native": "node scripts/native-test.mjs"
+    "test:native": "node scripts/native-test.mjs",
+    "test:ai": "npm run build && node --test test/ai-*.test.mjs"
   },
   "devDependencies": {
     "@types/chrome": "0.3.5",

@@ -4,6 +4,17 @@ import {Window} from 'happy-dom';
 import {extractCatalogProduct} from '../dist/catalog-product.js';
 const settings={timeoutMs:1,blockRules:[],categorySeparator:'>'};
 const profile={rules:[{field:'title',selectors:['h1'],mode:'text',required:true},{field:'price',selectors:['.price'],mode:'text',required:true},{field:'category',selectors:['nav a'],mode:'text'},{field:'images',selectors:['img'],mode:'attribute',attribute:'src'}]};
+
+test('avaliações usam seletores configurados, atributos e números locais; valores ausentes são opcionais',async()=>{
+ const win=new Window({url:'https://shop.example.com/p'});globalThis.document=win.document;globalThis.location=win.location;
+ const input={profile:{rules:[...profile.rules,{field:'rating',selectors:['.rating'],mode:'attribute',attribute:'title'},{field:'reviewCount',selectors:['.reviews'],mode:'text'}]},settings,originalUrl:location.href,allowedOrigins:[location.origin]};
+ for(const [score,count,rating,reviewCount] of [['4,8 de 5 estrelas','(3.102)',4.8,3102],['4.3 out of 5','1,234 avaliações',4.3,1234],['0','0',0,0],['4,5','1,2 mil avaliações',4.5,1200],['6','sem avaliações',null,null],['-2','-3',null,null]]){
+  document.body.innerHTML='<h1>Produto</h1><span class="price">R$ 50,00</span><span class="rating"></span><span class="reviews"></span>';
+  document.querySelector('.rating').setAttribute('title',score);document.querySelector('.reviews').textContent=count;
+  const result=await extractCatalogProduct(input);assert.equal(result.outcome,'success');assert.equal(result.data.rating,rating);assert.equal(result.data.reviewCount,reviewCount);
+ }
+ document.querySelector('.rating').remove();document.querySelector('.reviews').remove();assert.equal((await extractCatalogProduct(input)).outcome,'success');win.close();
+});
 test('extrai preço em centavos e breadcrumb ordenado; preço ausente não significa indisponível',async()=>{
  const win=new Window({url:'https://shop.example.com/p'});globalThis.document=win.document;globalThis.location=win.location;
  document.body.innerHTML='<nav><a>Eletrônicos</a><a>Áudio</a></nav><h1>Produto</h1><div class="price">R$ 1.234,56</div><img src="https://cdn.example.com/photo.png">';
