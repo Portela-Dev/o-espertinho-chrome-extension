@@ -26,10 +26,16 @@ test('Chrome valida o destino e envia texto somente após prévia e confirmaçã
   await wa.evaluate(()=>{window.identity.account='5511999999999@c.us';window.identity.id='5511777777777@c.us';window.identity.group=false;});await panel.locator('#wa-identify').click();await panel.waitForFunction(()=>document.querySelector('#success').textContent.includes('não é um grupo'));
   await wa.reload();await panel.locator('#wa-identify').click();await panel.locator('#wa-candidate:not([hidden])').waitFor();await wa.reload();await panel.locator('#wa-confirm').click();await panel.waitForFunction(()=>document.querySelector('#success').textContent.includes('mudou'));
   assert.equal(await panel.locator('#wa-bindings option').count(),2);assert.equal(sent,0);
+  const other=await context.newPage();await other.goto('data:text/html,<h1>Outra aba em uso</h1>');await other.bringToFront();
+  const active=await worker.evaluate(async()=>(await chrome.tabs.query({active:true,currentWindow:true}))[0].id);
+  assert.equal(await worker.evaluate(async()=>(await chrome.tabs.query({url:'https://web.whatsapp.com/*'}))[0].active),false);
   await panel.locator('#wa-text').fill('Mensagem única de teste');await panel.locator('#wa-text-preview-button').click();await panel.locator('#wa-text-preview:not([hidden])').waitFor();assert.equal(await wa.evaluate(()=>window.sent.length),0);assert.equal(await panel.locator('#wa-preview-text').textContent(),'Mensagem única de teste');
   await wa.evaluate(()=>window.identity.id='120363000000002@g.us');await panel.locator('#wa-send-confirm').click();await panel.waitForFunction(()=>document.querySelector('#success').textContent.includes('não corresponde'));assert.equal(await wa.evaluate(()=>window.sent.length),0);
   await wa.evaluate(()=>window.identity.id='120363000000001@g.us');await panel.locator('#wa-text-preview-button').click();await panel.locator('#wa-text-preview:not([hidden])').waitFor();await panel.locator('#wa-send-confirm').click();await panel.waitForFunction(()=>document.querySelector('#wa-send-status').textContent.includes('registrada na conversa'));assert.deepEqual(await wa.evaluate(()=>window.sent),[{id:'120363000000001@g.us',text:'Mensagem única de teste'}]);
   assert.equal(await panel.locator('#wa-send-confirm').isDisabled(),true);await new Promise(r=>setTimeout(r,300));assert.equal(await wa.evaluate(()=>window.sent.length),1);assert.equal(sent,0);
+  assert.equal(await worker.evaluate(async()=>(await chrome.tabs.query({active:true,currentWindow:true}))[0].id),active);
+  assert.equal(await worker.evaluate(async()=>(await chrome.tabs.query({url:'https://web.whatsapp.com/*'}))[0].active),false);
+  const duplicate=await context.newPage();await duplicate.goto('https://web.whatsapp.com/');await other.bringToFront();await panel.locator('#wa-text-preview-button').click();await panel.waitForFunction(()=>document.querySelector('#success').textContent.includes('mais de uma aba'));assert.equal(await wa.evaluate(()=>window.sent.length),1);await duplicate.close();
   await panel.screenshot({path:'reports/whatsapp-groups-poc.png',fullPage:true});
  }finally{await context?.close();await rm(dir,{recursive:true,force:true});}
 });

@@ -15,8 +15,8 @@ Homologação de identidade em 21/10/2026: o administrador confirmou a identific
 
 ## Envio manual único
 
-1. Mantenha aberto o grupo de teste vinculado, selecione seu vínculo e escreva uma mensagem de até 2.000 caracteres no painel.
-2. Clique em Gerar prévia da mensagem. Confira nome, identificador, impressão da conta e texto exato. O texto tem quebras de linha normalizadas e espaços externos removidos; não é interpretado como HTML.
+1. Mantenha uma única aba do WhatsApp Web aberta na mesma janela do painel, já com o grupo de teste vinculado selecionado. Você pode deixar outra aba em foco. Selecione o vínculo e escreva uma mensagem de até 2.000 caracteres no painel.
+2. A prévia e Validar grupo vinculado localizam a única aba do WhatsApp na janela, sem ativá-la. Se não existir ou houver mais de uma, a operação é recusada. Não há navegação ou seleção de conversa. O primeiro vínculo ainda exige identificar explicitamente o grupo na aba atual. Clique em Gerar prévia da mensagem. Confira nome, identificador, impressão da conta e texto exato. O texto tem quebras de linha normalizadas e espaços externos removidos; não é interpretado como HTML.
 3. Clique uma vez em Confirmar e enviar uma vez. Editar o campo, mudar a seleção, cancelar ou expirar a prévia exige uma nova prévia.
 4. A confirmação consome um ticket de uso único antes de qualquer await. A extensão revalida vínculo/conta/grupo/nome/documento e registra a tentativa localmente antes de injetar a função de envio.
 5. A injeção é limitada ao documentId da prévia. No MAIN world, revalida novamente a conta, grupo ativo e nome imediatamente antes de chamar WAWebSendTextMsgChatAction.sendTextMsgToChat com o modelo capturado do grupo. Não usa o compositor, não seleciona destinatários nem tenta outro método se a função estiver indisponível.
