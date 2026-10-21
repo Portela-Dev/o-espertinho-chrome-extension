@@ -72,3 +72,5 @@ Contas Espertinho e ChatGPT são gerenciadas no topo. A IA reutiliza a única ba
 O card Contas reúne Google/Espertinho, ChatGPT e modelo. A interface compacta mantém somente controles, estados e contadores, sem informações de consumo ou nomes de produtos durante a IA.
 
 Os cards Contas, Manter catálogo, Selecionar elementos e Configuração da conexão iniciam recolhidos. Clique no título (ou use Enter/Espaço no teclado) para expandir. Recolher não interrompe execuções nem descarta a sessão/modelo do painel.
+
+POC de grupos do WhatsApp: consulte docs/WHATSAPP_GROUP_POC.md. O card começa recolhido e oferece somente vinculação e validação local, sem envio de mensagens.

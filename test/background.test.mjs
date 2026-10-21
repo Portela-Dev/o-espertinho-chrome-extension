@@ -22,6 +22,8 @@ test("eventos do Chrome aceitam somente paginas internas e encaminham erros", as
   assert.equal((await call({ type: "STATE" }, valid)).value.version, "0.2.0");
   assert.equal((await call({type:'AI_SESSION',operation:'token',payload:{sessionId:'fake'}},{id:f.browser.runtime.id,url:'https://evil.test'})).error,'Origem não autorizada.');
   assert.match((await call({type:'AI_SESSION',operation:'unknown'},valid)).error,/inválida/);
+  assert.match((await call({type:'WHATSAPP_GROUP',operation:'list'},valid)).error,/Entre no Espertinho/);
+  assert.equal((await call({type:'WHATSAPP_GROUP',operation:'list'},{id:f.browser.runtime.id,url:'https://web.whatsapp.com/'})).error,'Origem não autorizada.');
   assert.ok((await call({ type: "UNKNOWN" }, valid)).error);
   assert.equal((await call({ type: "DISPLAY_MODE", mode: "popup" }, valid)).error, undefined);
   assert.match((await call({ type: "DISPLAY_MODE", mode: "invalid" }, valid)).error, /inválida/);
