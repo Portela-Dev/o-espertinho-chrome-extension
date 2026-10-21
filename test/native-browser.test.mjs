@@ -180,7 +180,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   };await installAiRoutes(context);
   let direct=panel;const pagesBefore=context.pages().length;await direct.locator('#account-card > details > summary').click();
   await direct.locator('#direct-login').click();
-  try{await direct.locator('#direct-status').filter({hasText:'Conectado'}).waitFor({timeout:20000});}
+  try{await direct.getByRole('button',{name:'Desconectar IA',exact:true}).waitFor({timeout:20000});}
   catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#error').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
   await direct.locator('#direct-models').click();await direct.locator('#direct-model option').filter({hasText:'Modelo direto de teste'}).waitFor({state:'attached'});
   assert.equal(await direct.locator('progress').count(),1);assert.equal(await direct.locator('#direct-analyze').count(),0);assert.equal(await direct.locator('#ai-workflow-consent').count(),0);await direct.locator('#limit').fill('1');
@@ -205,7 +205,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    await context.close();context=await chromium.launchPersistentContext(join(directory,'profile'),{channel:'chromium',headless:true,chromiumSandbox:true,args:['--disable-extensions-except='+extension,'--load-extension='+extension,'--host-resolver-rules=MAP shop.example.com 127.0.0.1','--ignore-certificate-errors']});
    await installAiRoutes(context);direct=await context.newPage();await direct.goto(extensionPage);await direct.locator('#account-card > details > summary').click();
   };
-  await restart();await direct.locator('#direct-status').filter({hasText:'Conectado'}).waitFor();await direct.waitForFunction(()=>document.getElementById('direct-model').value==='direct-fixture');assert.equal(directStages.filter(s=>s==='/api/accounts/authorize').length,loginsBefore);
+  await restart();await direct.getByRole('button',{name:'Desconectar IA',exact:true}).waitFor();await direct.waitForFunction(()=>document.getElementById('direct-model').value==='direct-fixture');assert.equal(directStages.filter(s=>s==='/api/accounts/authorize').length,loginsBefore);
   await direct.getByRole('button',{name:'Desconectar IA',exact:true}).click();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();
   await restart();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();assert.equal(await direct.locator('#direct-model').inputValue(),'');assert.equal(directStages.filter(s=>s==='/api/accounts/authorize').length,loginsBefore);
   const resumedWorker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');const cleared=await resumedWorker.evaluate(async()=>await chrome.storage.local.get('directAiSessionV1'));assert.equal(cleared.directAiSessionV1.sealed,null);
