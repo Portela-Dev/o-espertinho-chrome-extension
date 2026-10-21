@@ -40,7 +40,7 @@ function render(){
  for(const id of ['direct-login','direct-models'])el<HTMLButtonElement>(id).disabled=busy||running||!!workflow?.busy;
  el<HTMLButtonElement>('direct-models').disabled=busy||running||!!workflow?.busy||!state.account?.planEnabled;
  el<HTMLButtonElement>('direct-cancel').hidden=!['waiting_for_login','validating_identity'].includes(state.phase);
- el<HTMLButtonElement>('direct-logout').disabled=busy||running||!!workflow?.busy;
+ el<HTMLButtonElement>('direct-login').textContent=state.account?'Desconectar IA':'Conectar IA';
  el<HTMLSelectElement>('direct-model').disabled=!!workflow?.busy;
  if(state.error&&state.error!==lastError)notify(state.error);lastError=state.error;
 }
@@ -49,9 +49,12 @@ async function act(task:()=>Promise<void>){
  try{await task();}catch(error){notify(error instanceof Error?error.message:'A operação direta não foi concluída.');}finally{busy=false;render();}
 }
 const on=(id:string,task:()=>Promise<void>)=>el(id).addEventListener('click',()=>{void act(task);});
-on('direct-login',async()=>{el<HTMLSelectElement>('direct-model').replaceChildren();await app.login(el<HTMLSelectElement>('direct-account').value||undefined);});
+on('direct-login',async()=>{
+ if(app.status().account){
+  const result=await app.logout();el<HTMLSelectElement>('direct-model').replaceChildren();notify(result.revoked?'IA desconectada.':'Sessão local encerrada; revogação remota não confirmada. Desconecte nas configurações do ChatGPT.',result.revoked?'success':'error');
+ }else{el<HTMLSelectElement>('direct-model').replaceChildren();await app.login(el<HTMLSelectElement>('direct-account').value||undefined);}
+});
 on('direct-models',async()=>{const models=await app.models();if(models.length&&!app.status().selectedModel)await app.selectModel(models[0].id);if(!models.length)notify('Nenhum modelo foi disponibilizado para esta conta.');});
-on('direct-logout',async()=>{const result=await app.logout();el<HTMLSelectElement>('direct-model').replaceChildren();notify(result.revoked?'ChatGPT desconectado.':'Sessão local encerrada; revogação remota não confirmada. Desconecte nas configurações do ChatGPT.',result.revoked?'success':'error');});
 // Cancellation remains available while the analysis promise is pending.
 el('direct-cancel').addEventListener('click',()=>{app?.cancelAnalysis();void app?.cancelLogin().then(render);});
 el('direct-model').addEventListener('change',()=>{const model=el<HTMLSelectElement>('direct-model').value;void act(()=>app.selectModel(model));});

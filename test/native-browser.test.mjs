@@ -206,7 +206,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    await installAiRoutes(context);direct=await context.newPage();await direct.goto(extensionPage);await direct.locator('#account-card > details > summary').click();
   };
   await restart();await direct.locator('#direct-status').filter({hasText:'Conectado'}).waitFor();await direct.waitForFunction(()=>document.getElementById('direct-model').value==='direct-fixture');assert.equal(directStages.filter(s=>s==='/api/accounts/authorize').length,loginsBefore);
-  await direct.locator('#direct-logout').click();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();
+  await direct.getByRole('button',{name:'Desconectar IA',exact:true}).click();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();
   await restart();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();assert.equal(await direct.locator('#direct-model').inputValue(),'');assert.equal(directStages.filter(s=>s==='/api/accounts/authorize').length,loginsBefore);
   const resumedWorker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');const cleared=await resumedWorker.evaluate(async()=>await chrome.storage.local.get('directAiSessionV1'));assert.equal(cleared.directAiSessionV1.sealed,null);
   assert.doesNotMatch(JSON.stringify(backendTraffic),/DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/);
