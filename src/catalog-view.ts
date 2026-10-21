@@ -35,10 +35,6 @@ export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./rev
     el('login').hidden = !!view.user;
     el<HTMLButtonElement>('login').disabled = busy || view.pairing;
     el('logout').hidden = !view.user && !view.pairing;
-    el<HTMLInputElement>('backend').disabled = !!view.user || view.pairing;
-    el<HTMLButtonElement>('save-backend').disabled = busy || !!view.user || view.pairing;
-    if (document.activeElement !== el('backend'))
-        el<HTMLInputElement>('backend').value = view.backendUrl;
     const select = el<HTMLSelectElement>('marketplace');
     const selected = view.marketplaceId || select.value || view.markets[0]?.id;
     select.disabled=busy;el<HTMLInputElement>('retry-failed').disabled=busy;

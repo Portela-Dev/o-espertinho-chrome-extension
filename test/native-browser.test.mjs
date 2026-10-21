@@ -126,7 +126,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   const panel=await context.newPage();await panel.setViewportSize({width:400,height:1000});
   await panel.goto(new URL('popup.html?view=panel',worker.url()).href);
   await panel.locator('#workspace').waitFor();
-  assert.equal(await panel.locator('.card-collapse').count(),5);assert.equal(await panel.locator('.card-collapse[open]').count(),0);
+  assert.equal(await panel.locator('.card-collapse').count(),4);assert.equal(await panel.locator('.card-collapse[open]').count(),0);
   for(const body of await panel.locator('.card-collapse > .card-content').all())assert.equal(await body.isVisible(),false);
   await panel.screenshot({path:'reports/cards-collapsed.png',fullPage:true});
   await panel.locator('#workspace > details > summary').click();

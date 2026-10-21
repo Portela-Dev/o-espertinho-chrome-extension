@@ -17,7 +17,6 @@ type CatalogCommand = {
     operation?:string;payload?:any;
     marketplaceId?: string;
     step?: CatalogStep;
-    url?: string;
     limit?: number;
     retryFailed?: boolean;
     runId?: string;
@@ -54,10 +53,13 @@ export class CatalogRuntime {
             accessLevel: 'TRUSTED_CONTEXTS'
         });
         const old = (await this.browser.storage.local.get('state')).state as CatalogState | undefined;
-        this.state = old?.version === 2 ? old : {
-            version: 2, backendUrl: old?.backendUrl ?? DEFAULT_BACKEND_URL, auth: old?.auth, markets: [], message: 'Conecte sua conta para começar.'
+        const configuredBackend = backendOrigin(DEFAULT_BACKEND_URL);
+        const sameBackend = old?.backendUrl === configuredBackend;
+        this.state = sameBackend && old?.version === 2 ? old : {
+            version: 2, backendUrl: configuredBackend, auth: sameBackend ? old?.auth : undefined, markets: [], message: 'Conecte sua conta para começar.'
         };
-        this.state.backendUrl = backendOrigin(this.state.backendUrl);
+        this.state.backendUrl = configuredBackend;
+        if (old && !sameBackend) await this.headers.clear();
         await this.browser.alarms.create('worker', {
             periodInMinutes: 0.5
         });
@@ -318,15 +320,6 @@ export class CatalogRuntime {
                 break;
             case 'REFRESH':
                 await this.refresh();
-                break;
-            case 'BACKEND':
-                if (this.state.auth || this.state.pair)
-                    throw new Error('Saia antes de alterar o backend.');
-                this.state.backendUrl = backendOrigin(command.url!);
-                delete this.state.run;
-                delete this.state.claim;
-                delete this.state.pendingResult;
-                await this.save();
                 break;
             case 'PREPARE':
                 this.state.marketplaceId = this.market(command.marketplaceId).id;

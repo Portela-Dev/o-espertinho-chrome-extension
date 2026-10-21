@@ -1,7 +1,6 @@
 import {setupWhatsAppPanel} from './whatsapp-panel.js';
 import { launchSelectorPicker } from './picker-launcher.js';
 import { setupAiPanel } from './ai-panel.js';
-import { backendOrigin } from './contracts.js';
 import { renderCatalog, runLabel,stepLabel, type CatalogView } from './catalog-view.js';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let view: CatalogView | undefined, busy = false, page = 1, total = 0;
@@ -143,19 +142,6 @@ element('pick-elements').addEventListener('click', () => {
         await launchSelectorPicker();
         if (!isPanel)
             window.close();
-    });
-});
-element('settings').addEventListener('submit', event => {
-    event.preventDefault();
-    void act(async () => {
-        const url = backendOrigin(element<HTMLInputElement>('backend').value);
-        if (!await chrome.permissions.request({
-            origins: [url + '/*']
-        }))
-            throw new Error('Permissão não concedida.');
-        await send('BACKEND', {
-            url
-        });
     });
 });
 async function runs() {

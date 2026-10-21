@@ -123,7 +123,7 @@ test('bloqueio exige resolução e retomada explícitas na mesma execução; pai
   await assert.rejects(f.runtime.handle({type:'RESUME'}),/intervenção/);
   blocked=null;await f.runtime.handle({type:'RESUME'});await finished(f);
   assert.equal(f.calls.filter(c=>c.path==='/catalog/runs').length,1);
-  await f.runtime.handle({type:'LOGOUT'});await f.runtime.handle({type:'BACKEND',url:'http://localhost:4000'});assert.equal(f.saved().backendUrl,'http://localhost:4000');
+  await f.runtime.handle({type:'LOGOUT'});await assert.rejects(f.runtime.handle({type:'BACKEND',url:'http://localhost:4000'}),/Operação desconhecida/);assert.equal(f.saved().backendUrl,'http://localhost:3000');
  }finally{globalThis.fetch=original;}
 });
 
@@ -162,3 +162,8 @@ for(const step of ['convert','enrich','prices'])test('iniciar '+step+' recria ab
   assert.equal(f.saved().tabId,4);assert.equal(f.calls.some(c=>c.path.endsWith('/results')),true);
  }finally{globalThis.fetch=original;}
 });
+
+ test('backend do build substitui servidor antigo sem reutilizar credenciais ou execuções',async()=>{
+ const f=fixture();f.browser.storage.local.get=async()=>({state:{version:2,backendUrl:'https://old.example.com',auth,markets:[{id:'old'}],run:{id:'old-run'},pair:{id:'old-pair'}}});
+ await f.runtime.init();assert.equal(f.saved().backendUrl,'http://localhost:3000');assert.equal(f.saved().auth,undefined);assert.equal(f.saved().run,undefined);assert.equal(f.saved().pair,undefined);assert.deepEqual(f.saved().markets,[]);
+ });
