@@ -13,7 +13,7 @@ import {DIRECT_CALLBACK} from '../dist/ai-controller.js';
 
 test('Chromium real executa os quatro passos configuráveis em aba própria na mesma janela, sem sessão no backend', {skip:process.env.TEST_NATIVE_BROWSER!=='1',timeout:90000},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'espertinho-native-')),extension=join(directory,'extension');
- let context,server,marketServer;let marketOrigin,challenge=false;const received=[],visited=[],backendTraffic=[],aiSuggestions=[];let run,item;
+ let context,server,marketServer;let marketOrigin,challenge=false;const received=[],visited=[],backendTraffic=[],aiSuggestions=[];let run,item,nativeDraft;const categoryId='65278c77-deee-463e-9ed2-d24362461234',draftId='65278c77-deee-463e-9ed2-d24362461235';
  const discovery={rendering:{frameSelector:'',readySelector:'.card',timeoutMs:1000,settleDelayMs:0},extraction:{itemSelector:'.card',linkSelector:'a',linkAttribute:'href'},pagination:{mode:'next',nextSelector:'.next',disabledSelector:'',endSelector:'',missingNextAction:'finish',noProgressLimit:1,waitAfterMs:100},limits:{maxPages:2,maxItems:10,requestIntervalMs:100}};
  const recipe={id:'fixture',name:'Fixture',loginUrl:'https://shop.example.com/product',allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],batchSize:1,intervalMs:100,steps:[{type:'extract',source:'dom',name:'csrf',selector:'meta[name="csrf-token"]',attribute:'content'},{type:'request',url:'https://shop.example.com/convert',method:'POST',headers:{'X-CSRF-Token':'{{csrf}}'},body:{url:'{{originalUrl}}'},responsePath:'link'}]};
  const settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,categorySeparator:'>',blockRules:[{kind:'challenge',match:'selector',value:'.human-check'}],recipe};
@@ -30,9 +30,10 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    if(path==='/catalog/config')data={marketplaces:[{id:'fixture',name:'Fixture',catalog_executor:'extension',website_url:marketOrigin,allowedOrigins:[marketOrigin],config:settings}]};
    else if(path==='/catalog/stats')data={marketplaceId:'fixture',retryFailed:new URL(req.url,'http://localhost').searchParams.get('retryFailed')==='true',convert:{pending:0,completed:1,total:1},enrich:{pending:0,completed:1,total:1},prices:{pending:1,total:1},observedAt:new Date().toISOString()};
    else if(path==='/catalog/ai/config')data={settings:{version:1,categoryEnabled:true,productEnabled:true},category:{completed:0,total:1},product:{completed:0,total:1}};
+   else if(path==='/catalog/ai/inventory'){const kind=new URL(req.url,'http://localhost').searchParams.get('kind');data={revision:'1',nextCursor:null,items:kind==='categories'?[{id:categoryId,path:['Áudio']}]:kind==='drafts'&&nativeDraft?[nativeDraft]:[]};}
    else if(path==='/catalog/ai/queue')data={items:[{id:'test-link',title:'Oferta aguardando revisão'}]};
    else if(path==='/catalog/ai/context')data={requestId:crypto.randomUUID(),task:body.task,instructions:'Use a categoria Áudio',offer:{title:'Produto controlado',description:'Descrição',brand:'Marca',sourceCategory:'Áudio'},categories:['Áudio'],products:[]};
-   else if(path==='/catalog/ai/suggestions'){aiSuggestions.push(body);data={ok:true};}
+   else if(path==='/catalog/ai/suggestions'){aiSuggestions.push(body);const category=body.suggestion.action==='use_category';nativeDraft={id:draftId,name:'Produto controlado',brand:'Marca',description:'Descrição',kind:'draft'};data={applied:true,outcome:category?'categorized':'drafted',inventory:{revision:'1',categories:[],products:[],drafts:category?[]:[nativeDraft],removeDraftIds:category?[draftId]:[]}};}
    else if(path==='/catalog/ai/release')data={ok:true};
    else if(path==='/catalog/runs'&&req.method==='POST'){
     run={id:crypto.randomUUID(),marketplace_id:'fixture',step:body.step,status:'queued',total:1,completed:0,failed:0,snapshot};
@@ -165,7 +166,9 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    if(url.pathname==='/v1/models'){await route.fulfill({json:{models:[{slug:'direct-fixture',display_name:'Modelo direto de teste',visibility:'list'}]}});return;}
    if(url.pathname==='/v1/responses'){
     responses++;const input=route.request().postDataJSON();assert.equal(input.store,false);assert.equal(input.stream,true);
-    await route.fulfill({contentType:'text/event-stream',body:'data: '+JSON.stringify({type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({action:'needs_review',category:'Áudio',productId:null,product:null,reason:'Análise direta simulada sem auxiliar.'})}]}]}})+'\n\n'});return;
+    const task=JSON.parse(input.input[0].content).task;
+    const decision=task==='category'?{action:'use_category',categoryId,category:'Áudio',productId:null,product:null,reason:'Categoria existente'}:task==='product'?{action:'create_new',category:'',categoryId:null,productId:null,product:{name:'Produto controlado',brand:'Marca',description:'Descrição'},reason:'Nova identidade'}:{action:'needs_review',category:'Áudio',categoryId:null,productId:null,product:null,reason:'Análise direta simulada sem auxiliar.'};
+    await route.fulfill({contentType:'text/event-stream',body:'data: '+JSON.stringify({type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(decision)}]}]}})+'\n\n'});return;
    }
    await route.abort();
   });
@@ -178,10 +181,10 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   await direct.locator('#direct-title').fill('Oferta direta de teste');await direct.locator('#direct-consent').check();await direct.locator('#direct-analyze').click();
   await direct.locator('#direct-result').filter({hasText:'Análise direta simulada sem auxiliar'}).waitFor();assert.equal(responses,1);assert.equal(context.pages().length,pagesBefore);
   await direct.locator('#ai-workflow-consent').check();await direct.locator('#limit').fill('1');
-  await direct.locator('#step-category').click();await direct.locator('#ai-batch-status').filter({hasText:'Concluída — confirme no admin'}).waitFor();
-  assert.equal(aiSuggestions.length,1);assert.equal(aiSuggestions[0].suggestion.action,'needs_review');
-  await direct.locator('#ai-workflow-consent').check();await direct.locator('#step-product').click();
-  await direct.waitForFunction(()=>document.getElementById('ai-batch-status').textContent.includes('Catalogação por IA · Concluída'));
+  await direct.locator('#step-product').click();await direct.waitForFunction(()=>document.getElementById('ai-batch-status').textContent.includes('Catalogação por IA · Concluída'));
+  assert.equal(aiSuggestions.length,1);assert.equal(aiSuggestions[0].suggestion.action,'create_new');
+  await direct.locator('#ai-workflow-consent').check();await direct.locator('#step-category').click();
+  await direct.waitForFunction(()=>document.getElementById('ai-batch-status').textContent.includes('Categorização por IA · Concluída'));
   assert.equal(aiSuggestions.length,2);assert.equal(context.pages().length,pagesBefore);
   const storage=await worker.evaluate(async()=>({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
   assert.doesNotMatch(JSON.stringify(storage)+JSON.stringify(backendTraffic),/DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/);

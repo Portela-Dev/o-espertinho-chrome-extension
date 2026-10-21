@@ -1,7 +1,8 @@
+import {ReviewAiInventory,decideReview} from './review-ai-inventory.js';
 export type AiTask='category'|'product';
-export type ReviewTransport=(operation:'config'|'queue'|'context'|'result'|'release',payload:any)=>Promise<any>;
+export type ReviewTransport=(operation:'config'|'queue'|'context'|'result'|'release'|'inventory',payload:any)=>Promise<any>;
 export class ReviewAiWorkflow{
- config:any;marketplaceId='';busy=false;progress={task:'category' as AiTask,completed:0,total:0,failed:0,status:'idle',title:''};
+ config:any;marketplaceId='';busy=false;progress={task:'category' as AiTask,completed:0,total:0,failed:0,pending:0,status:'idle',title:''};
  private sequence=0;
  constructor(private readonly transport:ReviewTransport,private readonly analyze:(input:any)=>Promise<any>,private readonly changed:()=>void=()=>{}){}
  async refresh(marketplaceId:string){
@@ -13,20 +14,21 @@ export class ReviewAiWorkflow{
   if(!consent)throw new Error('Autorize o envio dos itens e candidatos deste lote à OpenAI.');
   if(!model)throw new Error('Escolha um modelo da conta ChatGPT.');
   if(!Number.isInteger(limit)||limit<1||limit>10000)throw new Error('Informe um limite entre 1 e 10000.');
-  this.busy=true;const generation=++this.sequence;this.progress={task,completed:0,total:0,failed:0,status:'running',title:''};this.changed();
+  this.busy=true;const generation=++this.sequence;this.progress={task,completed:0,total:0,failed:0,pending:0,status:'running',title:''};this.changed();
   const current=()=>{if(generation!==this.sequence)throw new Error('Revisão por IA cancelada.');};
   try{
    const config=await this.refresh(marketplaceId);current();
    if(!config.settings[task==='category'?'categoryEnabled':'productEnabled'])throw new Error('Esta tarefa de IA está desativada no admin.');
+   const inventory=new ReviewAiInventory();this.progress.title='Carregando todo o inventário';this.changed();await inventory.load(this.transport,current);
    const queue=await this.transport('queue',{marketplaceId,task,limit});current();this.progress.total=queue.items.length;this.changed();
    for(const link of queue.items){
     current();let requestId:string|undefined,saved=false;
     try{
      this.progress.title=link.title||'Oferta';this.changed();
-     const context=await this.transport('context',{id:link.id,task});requestId=context.requestId;current();
-     const suggestion=await this.analyze({...context,model});current();
+     const context=await this.transport('context',{id:link.id,task,inventoryRevision:inventory.revision});requestId=context.requestId;current();
+     const suggestion=await decideReview(context,inventory,model,this.analyze,current);current();
      if(!suggestion)throw new Error('A análise não retornou uma sugestão válida.');
-     await this.transport('result',{requestId,model,suggestion});saved=true;current();this.progress.completed++;this.changed();
+     const result=await this.transport('result',{requestId,model,suggestion});saved=true;current();inventory.merge(result.inventory);if(result.applied)this.progress.completed++;else this.progress.pending++;this.changed();
     }finally{if(requestId&&!saved)await this.transport('release',{requestId}).catch(()=>{});}
    }
    this.progress.status='completed';await this.refresh(marketplaceId);

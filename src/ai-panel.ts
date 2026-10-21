@@ -18,12 +18,12 @@ function renderWorkflow(){
  for(const task of ['category','product'] as const){
   const button=el<HTMLButtonElement>('step-'+task),value=config?.[task];
   const reason=!isPanel?'abra o painel lateral':!permissions.includes('catalog')||!permissions.includes('affiliate_links')?'sem permissão de catálogo':!config?'atualize configurações':!config.settings[task==='category'?'categoryEnabled':'productEnabled']?'desativado no admin':!state?.account?.planEnabled?'entre no ChatGPT':!el<HTMLSelectElement>('direct-model').value?'escolha um modelo':active?'outra execução em andamento':'';
-  button.textContent=(task==='category'?'4 — Categorizar produtos':'5 — Catalogar produtos')+' · '+(value?value.completed+' / '+value.total:'— / —')+(reason?' · '+reason:'');
-  button.title=task==='category'?'Categorias confirmadas / total de links não arquivados aguardando publicação neste marketplace. Sugestões só contam após confirmação no admin.':'Produtos atribuídos / total de links com categoria confirmada deste marketplace.';
+  button.textContent=(task==='category'?'5 — Categorizar produtos':'4 — Catalogar produtos')+' · '+(value?value.completed+' / '+value.total:'— / —')+(reason?' · '+reason:'');
+  button.title=task==='category'?'Links com categoria do produto definida / links já catalogados.':'Links identificados por produto ou rascunho / total de links da revisão.';
   button.disabled=!!reason||busy||!!workflow?.busy||['analyzing','waiting_for_login','validating_identity'].includes(state?.phase??'');
  }
  if(workflow){const p=workflow.progress;
-  el('ai-batch-status').textContent=p.status==='idle'?'':(p.task==='category'?'Categorização':'Catalogação')+' por IA · '+({running:'Em execução',completed:'Concluída — confirme no admin',cancelled:'Cancelada',failed:'Interrompida'}[p.status]??p.status)+' · '+p.completed+'/'+p.total+' sugestões · '+p.failed+' falhas'+(p.status==='running'&&p.title?' · '+p.title:'');
+  el('ai-batch-status').textContent=p.status==='idle'?'':(p.task==='category'?'Categorização':'Catalogação')+' por IA · '+({running:'Em execução',completed:'Concluída',cancelled:'Cancelada',failed:'Interrompida'}[p.status]??p.status)+' · '+p.completed+'/'+p.total+' decisões aplicadas · '+p.pending+' pendências · '+p.failed+' falhas'+(p.status==='running'&&p.title?' · '+p.title:'');
   const progress=el<HTMLProgressElement>('ai-batch-progress');progress.hidden=p.status==='idle';progress.max=Math.max(1,p.total);progress.value=p.completed+p.failed;
   el<HTMLButtonElement>('ai-batch-cancel').hidden=!workflow.busy;
  }
@@ -80,7 +80,7 @@ try{app=await create();
    try{const view=hooks.view();if(!view?.user||!app.status().account?.planEnabled)throw new Error('Entre no Espertinho e no ChatGPT para continuar.');
     const consent=el<HTMLInputElement>('ai-workflow-consent').checked;el<HTMLInputElement>('ai-workflow-consent').checked=false;
     await workflow!.run(task,el<HTMLSelectElement>('marketplace').value,Number(el<HTMLInputElement>('limit').value),el<HTMLSelectElement>('direct-model').value,consent);
-    notify('Sugestões enviadas à revisão. Confirme as categorias ou produtos no admin.','success');
+    notify('Decisões válidas aplicadas. Revise as pendências e publique pelo admin.','success');
    }catch(e){notify(e instanceof Error?e.message:'Não foi possível concluir a revisão por IA.');}
   })();});
   el('ai-batch-cancel').addEventListener('click',()=>{workflow?.cancel();app.cancelAnalysis();});

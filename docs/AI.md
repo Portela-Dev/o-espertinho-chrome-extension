@@ -17,9 +17,9 @@ Tokens OAuth, PKCE e resultados ficam apenas na memória deste documento do pain
 
 O retorno de login é observado pelo Chrome no loopback 127.0.0.1:18766/auth/callback, sem servidor nessa porta. Somente a aba criada pela tentativa, frame principal, origem/caminho e state exatos são aceitos. PKCE S256, nonce, assinatura da identidade, issuer, audience, validade e escopos são verificados. A aba de login é fechada sem retransmitir o retorno a outra página.
 
-As chamadas são diretas aos endpoints oficiais de autenticação, modelos e Responses da OpenAI. Renovação é serializada. Erros são sanitizados. Captura da página lê apenas metadados públicos limitados; não lê cookies, storage ou scripts arbitrários. O backend recebe a consulta de permissão e, nos passos 4 e 5, as sugestões estruturadas para revisão. Credenciais ChatGPT nunca são enviadas ao backend; análises avulsas permanecem no painel.
+As chamadas são diretas aos endpoints oficiais de autenticação, modelos e Responses da OpenAI. Renovação é serializada. Erros são sanitizados. Captura da página lê apenas metadados públicos limitados; não lê cookies, storage ou scripts arbitrários. O backend recebe a consulta de permissão e, nos passos 4 e 5, as decisões estruturadas para aplicação validada. Credenciais ChatGPT nunca são enviadas ao backend; análises avulsas permanecem no painel.
 
-A análise avulsa não altera categorias, produtos ou publicações. Os passos 4 e 5 enviam sugestões ao backend para confirmação na revisão. categoryExists depende das categorias fornecidas no formulário; não consulta o banco. Vinculação usa somente IDs candidatos fornecidos. Cor, tamanho e tensão, isoladamente, não distinguem produtos.
+A análise avulsa não altera categorias, produtos ou publicações. Os passos 4 e 5 aplicam automaticamente decisões válidas no backend, preservando revisão e publicação manual. categoryExists depende das categorias fornecidas no formulário; não consulta o banco. Vinculação usa somente IDs candidatos fornecidos. Cor, tamanho e tensão, isoladamente, não distinguem produtos.
 
 ## Validação
 
@@ -29,8 +29,12 @@ Execute npm run check, npm run test:native e npm run package. O artefato contém
 
 ## Fluxo de revisão integrado
 
-Ative cada tarefa e cadastre suas instruções em Admin → Revisão → Configurações de IA. Clique em Atualizar configurações na extensão. Após conectar ChatGPT, carregar e selecionar um modelo, autorize o envio do lote e execute 4 — Categorizar produtos ou 5 — Catalogar produtos. Categorias devem ser confirmadas no site antes da catalogação. Os contadores mostram confirmações no admin, não meras sugestões. O passo 6 — Analisar Preços fica separado por divisor.
+Ative tarefas e prompts independentes no admin. Atualize as configurações, conecte ChatGPT, selecione modelo e autorize o lote.
 
-Os candidatos vêm do backend, filtrados e limitados. O painel envia apenas o resultado estruturado, nunca credenciais OpenAI. Falhas interrompem o lote e liberam o contexto; cancelar não aplica nada no catálogo. Para retentar uma sugestão válida, descarte-a no admin. Fechar abruptamente o painel pode exigir aguardar a reserva expirar em até 10 minutos.
+4 — Catalogar produtos percorre todos os produtos e rascunhos, em blocos de 30. Produtos existentes herdam sua categoria. Identidades novas aguardam como rascunhos compartilhados.
 
-O painel informa análises e tokens reportados nesta sessão, com atalho Gerenciar uso no ChatGPT. A integração não dispõe de um saldo documentado para uma barra percentual da conta.
+5 — Categorizar produtos compara todas as árvores em blocos de 100, seleciona os melhores candidatos e reutiliza ou cria a categoria. Finaliza o produto e seus links automaticamente. Resultados atualizam o inventário em memória para as ofertas seguintes; revisão consistente invalida contextos concorrentes obsoletos. Não há limite global oculto.
+
+Ambiguidades ficam pendentes; decisões válidas contam como aplicadas. Cancelar interrompe o restante do lote e não desfaz aplicações anteriores. Publicação continua manual. Fechar o painel pode exigir aguardar a reserva de até 10 minutos. O passo 6 — Analisar Preços fica separado por divisor.
+
+O backend valida permissões, flags, contratos, versões e idempotência. Tokens ChatGPT não saem do painel. Testes automatizados usam respostas simuladas, incluindo catálogo com múltiplos blocos, cache, login e aplicação. O painel informa tokens desta sessão, sem estimar a quota total da conta.

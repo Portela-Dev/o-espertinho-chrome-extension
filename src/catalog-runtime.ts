@@ -278,9 +278,14 @@ export class CatalogRuntime {
         }
         switch (command.type) {
             case 'AI_REVIEW': {
-                const paths:Record<string,string>={config:'/catalog/ai/config',queue:'/catalog/ai/queue',context:'/catalog/ai/context',result:'/catalog/ai/suggestions',release:'/catalog/ai/release'};
+                const paths:Record<string,string>={config:'/catalog/ai/config',queue:'/catalog/ai/queue',context:'/catalog/ai/context',result:'/catalog/ai/suggestions',release:'/catalog/ai/release',inventory:'/catalog/ai/inventory'};
                 if(!command.operation||!Object.hasOwn(paths,command.operation))throw new Error('Operação de IA inválida.');
                 const p=command.payload??{};
+                if(command.operation==='inventory'){
+                    if(!['categories','products','drafts'].includes(p.kind))throw new Error('Inventário inválido.');
+                    const params=new URLSearchParams({kind:p.kind,limit:'250'});if(p.cursor)params.set('cursor',p.cursor);if(p.revision)params.set('revision',p.revision);
+                    return this.api(paths.inventory+'?'+params);
+                }
                 if(['config','queue'].includes(command.operation)){
                     if(typeof p.marketplaceId!=='string'||!/^[a-z][a-z0-9_-]{1,39}$/.test(p.marketplaceId))throw new Error('Marketplace inválido.');
                     const params=new URLSearchParams({marketplaceId:p.marketplaceId});

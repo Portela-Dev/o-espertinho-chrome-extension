@@ -14,16 +14,18 @@ Atualizar configurações consulta somente configurações e contadores; não de
 
 Entre no O Espertinho e aprove no site com a conta Google autorizada. A extensão exige affiliate_links e, por etapa, discovery, catalog ou updates. Requisições são autorizadas novamente pelo backend. Sessões revogadas/expiradas interrompem o fluxo.
 
-## Quatro etapas
+## Seis etapas
 
 1. **Extrair links:** carrega vitrines/perfis habilitados e percorre a paginação configurada. Envia URLs e origem, não dados incompletos de cards.
 2. **Gerar links de afiliados:** processa candidatos ainda sem conversão usando a receita cadastrada. Categoria/produto ainda não são necessários. A URL original é preservada separadamente.
 3. **Extrair informações:** navega na URL original dos produtos que já possuem link de afiliado e aplica os seletores de produto; grava categorias de origem e dados para revisão, sem confirmar mapeamentos ou publicar.
-4. **Atualizar preços:** atualiza ofertas publicadas e seu histórico diário. Falha técnica mantém o último preço e a oferta.
+4. **Catalogar produtos:** reutiliza produtos e rascunhos globais; confirma decisões válidas.
+5. **Categorizar produtos:** reutiliza árvores existentes e finaliza novos produtos, aplicando decisões válidas.
+6. **Analisar Preços:** atualiza ofertas publicadas e seu histórico diário. Falha técnica mantém o último preço e a oferta.
 
-No admin, confirme categoria, atribua/crie produto e publique explicitamente. Cada botão inicia só sua própria etapa. Limite de itens e inclusão de falhas ficam na interface. Novas configurações valem para execuções novas.
+No admin, revise as decisões aplicadas, resolva ambiguidades e publique explicitamente. Cada botão inicia só sua própria etapa. Limite de itens e inclusão de falhas ficam na interface. Novas configurações valem para execuções novas.
 
-Os botões 2 e 3 mostram links já gerados e extrações concluídas / total de links descobertos não arquivados do marketplace selecionado. Os rótulos Gerados e Extraídos distinguem conclusão de pendência; falhas não contam como conclusão. A inclusão de falhas altera os elegíveis da extração. O botão 4 mostra ofertas sem verificação bem-sucedida nas últimas 24 horas / ofertas publicadas com link de afiliado; falhas técnicas não renovam a data. Esse indicador não restringe a execução manual, que continua podendo verificar todas as ofertas, começando pelas mais antigas. Os totais independem do máximo de itens por execução. Contadores são atualizados ao trocar o filtro, atualizar configurações e concluir uma execução, com cache de até 15 segundos durante a consulta do painel. Falhas de consulta mostram indisponibilidade, sem inventar valores zero. Execução atual e histórico identificam a etapa; a execução atual também identifica o marketplace.
+Os botões 2 e 3 mostram links já gerados e extrações concluídas / total de links descobertos não arquivados do marketplace selecionado. Os rótulos Gerados e Extraídos distinguem conclusão de pendência; falhas não contam como conclusão. A inclusão de falhas altera os elegíveis da extração. O botão 6 mostra ofertas sem verificação bem-sucedida nas últimas 24 horas / ofertas publicadas com link de afiliado; falhas técnicas não renovam a data. Esse indicador não restringe a execução manual, que continua podendo verificar todas as ofertas, começando pelas mais antigas. Os totais independem do máximo de itens por execução. Contadores são atualizados ao trocar o filtro, atualizar configurações e concluir uma execução, com cache de até 15 segundos durante a consulta do painel. Falhas de consulta mostram indisponibilidade, sem inventar valores zero. Execução atual e histórico identificam a etapa; a execução atual também identifica o marketplace.
 
 ## Aba, bloqueios e retomada
 
