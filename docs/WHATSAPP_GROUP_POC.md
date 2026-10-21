@@ -1,30 +1,40 @@
-# POC — identificação de grupos no WhatsApp Web
+# POC — grupos e envio manual de texto no WhatsApp Web
 
-Esta prova apenas identifica, vincula, valida e remove vínculos. Não envia mensagens, não entra em grupos, não procura destinos pelo nome e não possui método de envio. Não usa cookies ou tokens do WhatsApp, não consulta mensagens nem envia os dados do vínculo ao backend. O login do Espertinho e a permissão affiliate_links continuam obrigatórios.
+A extensão identifica, vincula e valida grupos. Também permite enviar uma única mensagem de texto ao grupo vinculado, somente após prévia e confirmação explícita. Não há agendamento, fila, envio em massa, busca de destinatário pelo nome ou repetição automática. Não importa cookies/tokens nem envia mensagens, vínculos ou credenciais do WhatsApp ao backend.
 
-## Uso local
+## Vincular e validar
 
-1. Recarregue a extensão dist em chrome://extensions e abra o painel lateral.
-2. Entre no Espertinho e expanda WhatsApp — vínculo de grupos (POC).
-3. Abra o WhatsApp Web, faça login se necessário e abra o grupo de teste.
-4. Clique em Identificar grupo na aba atual e autorize somente https://web.whatsapp.com/*.
-5. Confira nome, identificador @g.us e impressão da conta. Clique em Confirmar vínculo deste grupo em até dois minutos.
-6. Selecione o vínculo e use Validar na aba atual. A conferência vale somente para o instante exibido; qualquer envio futuro exigiria outra validação.
-7. Para testar bloqueios, abra outro grupo com o mesmo nome ou uma conversa individual e tente validar o vínculo original. Ambos devem ser recusados. Renomear o mesmo grupo deve continuar válido e informar a mudança. Outra conta deve ser recusada.
-8. Remover vínculo apaga o registro local. Carregar vínculos restaura a lista após reabrir o painel.
+1. Recarregue dist em chrome://extensions, abra o painel lateral e entre no Espertinho com a permissão affiliate_links.
+2. Expanda WhatsApp — vínculo de grupos (POC). Abra o WhatsApp Web e o grupo de teste.
+3. Clique em Identificar grupo na aba atual e autorize somente https://web.whatsapp.com/*.
+4. Confira nome, identificador @g.us e impressão da conta. Confirme o vínculo em até dois minutos.
+5. Selecione o vínculo e use Validar na aba atual. Outro grupo, mesmo com nome igual, ou uma conversa individual deve ser recusado. Renomear o mesmo grupo mantém sua identidade. Trocar de conta é recusado.
+6. Carregar vínculos restaura a lista após reabrir o painel. Remover vínculo apaga o registro local.
 
-Vínculos são locais ao perfil Chrome: identificador do grupo, nome confirmado, SHA-256 do identificador da conta e data. O número da conta não é persistido. A confirmação temporária fica somente na memória do service worker, é de uso único e se perde quando ele reinicia. O armazenamento é restrito a TRUSTED_CONTEXTS; não há sincronização entre PCs ou backup no servidor.
+Homologação de identidade em 21/10/2026: o administrador confirmou a identificação no WhatsApp real, a validação no grupo correto e a recusa após trocar para outra conversa. Identificadores reais não são registrados no repositório.
 
-## Leitura e validação
+## Envio manual único
 
-O adaptador somente lê WAWebCollections.Chat.getModelsArray e WAWebUserPrefsMeUser.getMaybeMePnUser/getMaybeMeLidUser no MAIN world do frame principal. Exige uma única conversa active, identificador @g.us e confirmação do tipo grupo pelo modelo. Dois levantamentos consecutivos precisam apresentar o mesmo identificador de conta, grupo e documento. Recarregar a página ou trocar de grupo/conta entre identificação e confirmação invalida o ticket. Nome nunca decide identidade.
+1. Mantenha aberto o grupo de teste vinculado, selecione seu vínculo e escreva uma mensagem de até 2.000 caracteres no painel.
+2. Clique em Gerar prévia da mensagem. Confira nome, identificador, impressão da conta e texto exato. O texto tem quebras de linha normalizadas e espaços externos removidos; não é interpretado como HTML.
+3. Clique uma vez em Confirmar e enviar uma vez. Editar o campo, mudar a seleção, cancelar ou expirar a prévia exige uma nova prévia.
+4. A confirmação consome um ticket de uso único antes de qualquer await. A extensão revalida vínculo/conta/grupo/nome/documento e registra a tentativa localmente antes de injetar a função de envio.
+5. A injeção é limitada ao documentId da prévia. No MAIN world, revalida novamente a conta, grupo ativo e nome imediatamente antes de chamar WAWebSendTextMsgChatAction.sendTextMsgToChat com o modelo capturado do grupo. Não usa o compositor, não seleciona destinatários nem tenta outro método se a função estiver indisponível.
+6. Observa somente a nova mensagem própria correspondente ao texto e identificador remoto dentro do grupo capturado. Registra apenas observação local, não entrega ou leitura pelos participantes.
+7. Se houver erro após invocação, timeout, recarga ou perda de resposta, o resultado fica desconhecido: confira a conversa manualmente antes de preparar outro envio. A extensão não reenvia. Carregar vínculos também recupera o estado da última tentativa; um registro iniciado sem confirmação final é tratado como desconhecido.
 
-São módulos privados e sujeitos a mudanças: se não estiverem disponíveis, a POC recusa a identificação, sem fallback por título, foto, histórico ou seletores de texto. A página comprometida ou extensões maliciosas no mesmo perfil estão fora da garantia desta prova. Não é uma certificação de identidade fornecida por uma API oficial.
+Homologação manual em 21/10/2026: o administrador confirmou o envio da mensagem no grupo vinculado e a recusa ao abrir outro grupo. O ensaio real foi realizado pelo próprio administrador com prévia e confirmação no painel. Os testes automatizados continuam isolados e não enviam nada à rede real.
 
-Referências de investigação: https://github.com/wppconnect-team/wa-js/blob/main/src/chat/functions/getActiveChat.ts e https://github.com/pedroslopez/whatsapp-web.js/blob/main/src/Client.js . Nenhuma dessas bibliotecas foi adicionada como dependência nem foram importadas rotinas de envio.
+## Dados e limites
+
+Vínculos ficam apenas no perfil Chrome, restritos a TRUSTED_CONTEXTS: identificador do grupo, nome confirmado, SHA-256 da conta e data. O número da conta não é persistido. A última tentativa guarda identificador aleatório, grupo, nome, hash do texto, horário e estado. O texto completo e tickets ficam somente em memória. Não há sincronização com o backend. Tickets se perdem ao reiniciar o service worker; não são restaurados nem reexecutados.
+
+O adaptador de identidade lê WAWebCollections.Chat e WAWebUserPrefsMeUser. Duas leituras consecutivas precisam corresponder em conta, grupo e documento. Os módulos são privados e podem mudar. A identificação não usa fallback por nome ou foto. O envio observa apenas a mensagem própria em processamento; não consulta conteúdo do histórico, exporta conversas ou acessa contatos. Antes de enviar, coleta IDs das mensagens já carregadas para não confundir uma mensagem antiga com a nova.
+
+A tentativa tem no máximo uma chamada iniciada pela extensão por confirmação. Isso não garante entrega exatamente uma vez pelo transporte interno do WhatsApp, nem impede que o usuário crie deliberadamente outra prévia e envie o mesmo texto novamente. Um perfil/página comprometido fica fora das garantias desta prova.
+
+Referências de investigação: https://github.com/wppconnect-team/wa-js/blob/main/src/chat/functions/getActiveChat.ts , https://github.com/wppconnect-team/wa-js/blob/main/src/whatsapp/functions/sendTextMsgToChat.ts e https://github.com/open-wa/wa-automate-nodejs/blob/master/packages/core/src/transport/assets/wapi.js . Nenhuma biblioteca de automação foi instalada.
 
 ## Testes
 
-npm run check executa contratos, isolamento, confirmação, expiração, persistência e UI. npm run test:native inclui um cenário Chromium com página simulada no domínio WhatsApp e módulos controlados. Ele testa grupos homônimos, nome alterado, contato individual, outra conta e recarga de documento. Não usa perfil pessoal nem realiza envio. O teste com a versão autenticada do WhatsApp real precisa de homologação manual; os testes controlados não comprovam compatibilidade com todas as versões do site.
-
-Homologação em 21/10/2026: o administrador confirmou a identificação de um grupo no WhatsApp Web real (nome, identificador @g.us e impressão da conta). Os identificadores reais não são registrados no repositório. Confirmação do vínculo e rejeição de outro destino no ambiente real ainda aguardam retorno; esses cenários passaram nos testes controlados.
+npm run check cobre contratos, autenticação, isolamento, tickets, confirmação, persistência, edição, cancelamento, dupla confirmação e resultados desconhecidos. npm run test:native usa Chromium e páginas/módulos controlados, testando recusa de outro grupo e um único disparo simulado após confirmação. Os testes não usam perfil pessoal nem enviam mensagens reais. O fluxo de catálogo e IA continua sendo testado separadamente no mesmo comando.

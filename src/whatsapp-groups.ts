@@ -1,3 +1,4 @@
+import {WhatsAppTextPoc} from './whatsapp-text.js';
 /** Read-only adapter for WhatsApp Web's private modules. Never reads messages or credentials. */
 export function readWhatsAppIdentity() {
  try {
@@ -24,6 +25,7 @@ export interface WhatsAppGroupBinding {id:string;groupId:string;name:string;acco
 const origin='https://web.whatsapp.com',key='whatsappGroupBindings';
 export class WhatsAppGroups {
  private pending=new Map<string,{tabId:number;documentId:string;identity:Awaited<ReturnType<WhatsAppGroups['read']>>;expiresAt:number}>();
+ private text?:WhatsAppTextPoc;
  private serial:Promise<unknown>=Promise.resolve();
  constructor(private readonly authorize:()=>Promise<void>,private readonly browser:typeof chrome=chrome){}
  handle(operation:string,payload:any={}){
@@ -50,8 +52,18 @@ export class WhatsAppGroups {
  }
  private same(a:Awaited<ReturnType<WhatsAppGroups['read']>>,b:Awaited<ReturnType<WhatsAppGroups['read']>>){return a.groupId===b.groupId&&a.accountHash===b.accountHash&&a.documentId===b.documentId;}
  private async stable(tabId:number){const first=await this.read(tabId),second=await this.read(tabId);if(!this.same(first,second))throw new Error('A conta, conversa ou página mudou durante a verificação. Tente novamente.');return second;}
+ private async textDestination(id:string,tabId:number){
+  const binding=(await this.bindings()).find(r=>r.id===id);if(!binding)throw Error('Vínculo não encontrado.');
+  const current=await this.stable(tabId);
+  if(current.accountHash!==binding.accountHash||current.groupId!==binding.groupId)throw Error('A conta ou grupo aberto não corresponde ao vínculo. Nenhuma mensagem foi enviada.');
+  return {...current,bindingId:binding.id};
+ }
  private async execute(operation:string,payload:any){
   await this.authorize();
+  if(['preview_text','send_text','cancel_text','text_status'].includes(operation)){
+   this.text??=new WhatsAppTextPoc(this.browser,(id,tabId)=>this.textDestination(id,tabId));
+   return this.text.handle(operation,payload);
+  }
   for(const [id,pending] of this.pending)if(pending.expiresAt<Date.now())this.pending.delete(id);
   if(operation==='list')return this.bindings();
   if(operation==='inspect'){
@@ -79,6 +91,6 @@ export class WhatsAppGroups {
   if(operation==='remove'){
    const rows=await this.bindings();await this.browser.storage.local.set({[key]:rows.filter(r=>r.id!==payload.id)});this.pending.clear();return {removed:true};
   }
-  throw new Error('Operação de grupo inválida. Esta POC não envia mensagens.');
+  throw new Error('Operação de grupo inválida. Use a prévia e confirmação para um envio manual.');
  }
 }

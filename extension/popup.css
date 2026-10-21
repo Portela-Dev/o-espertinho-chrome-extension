@@ -84,3 +84,5 @@ main > details { margin-top: 20px; }
 .card-collapse[open] > summary::after { transform: rotate(45deg); }
 .card-collapse > summary:focus-visible { outline: 2px solid var(--select-accent); outline-offset: 6px; }
 .card-content { margin-top: 18px; }
+
+#wa-preview-text{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0;padding:12px;border:1px solid var(--select-border);border-radius:8px}#wa-text-preview code{overflow-wrap:anywhere}#wa-text{width:100%;box-sizing:border-box;resize:vertical}

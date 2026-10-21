@@ -49,7 +49,7 @@ test('troca durante leitura, aba externa, falta de acesso e operações de envio
  f.permission(true);f.url('https://evil.test/');await assert.rejects(f.groups.handle('inspect',{tabId:7}),/não é o WhatsApp/);assert.equal(f.calls.length,0);
  f.url('https://web.whatsapp.com/');const execute=f.browser.scripting.executeScript;let n=0;f.browser.scripting.executeScript=async options=>{if(++n===2)f.value({groupId:'120363000000003@g.us'});return execute(options);};
  await assert.rejects(f.groups.handle('inspect',{tabId:7}),/mudou durante/);assert.equal(f.rows().length,0);
- await assert.rejects(f.groups.handle('send',{text:'Nunca enviar'}),/não envia/);assert.equal(f.rows().length,0);
+ await assert.rejects(f.groups.handle('send',{text:'Nunca enviar'}),/prévia/);assert.equal(f.rows().length,0);
  const denied=new WhatsAppGroups(async()=>{throw Error('Sem permissão');},f.browser);await assert.rejects(denied.handle('list'),/Sem permissão/);
 });
 
