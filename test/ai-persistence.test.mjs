@@ -33,3 +33,9 @@ test('renovação é persistida mesmo se a consulta posterior de modelos falhar'
  const f=fixture(),b=f.broker(),s=await login(f,b);f.advance();f.mode('models-offline');await assert.rejects(()=>b.handle('models',{sessionId:s.sessionId}));assert.equal((await f.vault().load()).credentials.refresh_token,'NEW_REFRESH_1');
  f.mode('ok');assert.equal((await f.broker().handle('token',{sessionId:s.sessionId})).accessToken,'NEW_ACCESS_1');assert.equal(f.refreshes,1);
 });
+import {PersistentAiSession} from '../dist/persistent-ai-session.js';
+test('respostas locais atrasadas não restauram conta/modelo depois de desconectar',async()=>{
+ let release;const wait=new Promise(r=>release=r),old={revision:'old',sessionId:'old',account:{clientId:'client',subject:'user',email:'old@example.test',scope:'openid chatgpt.tokens.use.direct'},model:'old-model',models:[]};
+ const browser={runtime:{sendMessage:async message=>{if(message.operation==='disconnect')return {value:{revoked:true}};await wait;return {value:old};}}};
+ const session=new PersistentAiSession({hostId:'test'},browser),pending=session.sync();await session.signout();release();await assert.rejects(()=>pending,/encerrada/);assert.equal(session.active,null);assert.equal(session.preference().model,'');
+});

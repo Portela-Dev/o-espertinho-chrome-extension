@@ -2,7 +2,7 @@ import {OpenAISession,LocalError} from './shared/openai-session.mjs';
 export class PersistentAiSession extends OpenAISession{
  private saved:any={revision:'',sessionId:'',model:'',models:[]};
  constructor(options:any,private readonly browser:typeof chrome=chrome){super(options);}
- private async call(operation:string,payload:any={}){const reply=await this.browser.runtime.sendMessage({type:'AI_SESSION',operation,payload});if(reply.error)throw new LocalError(reply.error);return reply.value;}
+ private async call(operation:string,payload:any={}){const generation=this.generation;const reply=await this.browser.runtime.sendMessage({type:'AI_SESSION',operation,payload});if(generation!==this.generation)throw new LocalError('Sessão ChatGPT encerrada ou alterada.');if(reply.error)throw new LocalError(reply.error);return reply.value;}
  async sync(){const record=await this.call('snapshot');if(!record||typeof record.revision!=='string')throw new LocalError('Sessão local indisponível.');this.saved=record;this.active=record.account;return record;}
  preference(){return {sessionId:this.saved.sessionId,model:this.saved.model,models:this.saved.models};}
  async begin(redirectUri:string,accountId?:string){await this.sync();return super.begin(redirectUri,accountId);}
