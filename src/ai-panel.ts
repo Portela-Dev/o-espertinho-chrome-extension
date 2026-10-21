@@ -36,6 +36,7 @@ function render(){
  if(JSON.stringify([...model.options].map(o=>o.value))!==JSON.stringify(state.models.map((m:any)=>m.id)))model.replaceChildren(...state.models.map((m:any)=>option(m.name,m.id)));
  model.value=state.selectedModel||'';
  const accounts=el<HTMLSelectElement>('direct-account'),selected=accounts.value;
+ accounts.disabled=!!state.account||busy||running;
  accounts.replaceChildren(option('Adicionar outra conta',''),...state.accounts.map((r:any)=>option(r.label,r.id)));accounts.value=state.activeAccountId!==lastAccountId?(state.activeAccountId||''):selected;lastAccountId=state.activeAccountId||'';
  for(const id of ['direct-login','direct-models'])el<HTMLButtonElement>(id).disabled=busy||running||!!workflow?.busy;
  el<HTMLButtonElement>('direct-models').disabled=busy||running||!!workflow?.busy||!state.account?.planEnabled;
