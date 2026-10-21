@@ -172,11 +172,10 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
    }
    await route.abort();
   });
-  const direct=panel,pagesBefore=context.pages().length;await direct.locator('#ai-panel > summary').click();
+  const direct=panel,pagesBefore=context.pages().length;
   await direct.locator('#direct-login').click();
-  try{await direct.locator('#direct-status').filter({hasText:'Conta conectada diretamente'}).waitFor({timeout:20000});}
-  catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#error').textContent(),callback:await direct.locator('#direct-callback-status').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
-  await direct.locator('#direct-callback-status').filter({hasText:'reconhecido'}).waitFor();
+  try{await direct.locator('#direct-status').filter({hasText:'Conectado'}).waitFor({timeout:20000});}
+  catch{throw Error(JSON.stringify({phase:await direct.locator('#direct-status').textContent(),notice:await direct.locator('#error').textContent(),stages:directStages,pages:context.pages().map(page=>{const url=new URL(page.url());return url.origin+url.pathname;})}));}
   await direct.locator('#direct-models').click();await direct.locator('#direct-model option').filter({hasText:'Modelo direto de teste'}).waitFor({state:'attached'});
   assert.equal(await direct.locator('progress').count(),1);assert.equal(await direct.locator('#direct-analyze').count(),0);assert.equal(await direct.locator('#ai-workflow-consent').count(),0);await direct.locator('#limit').fill('1');
   await direct.locator('#step-product').click();await direct.waitForFunction(()=>document.getElementById('run-status').textContent.includes('Catalogação por IA · Concluída'));
@@ -186,8 +185,14 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
   assert.equal(aiSuggestions.length,2);assert.equal(context.pages().length,pagesBefore);
   const storage=await worker.evaluate(async()=>({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
   assert.doesNotMatch(JSON.stringify(storage)+JSON.stringify(backendTraffic),/DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/);
-  await direct.setViewportSize({width:390,height:1000});assert.equal(await direct.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await direct.screenshot({path:'reports/ai-panel.png',fullPage:true});
-  await direct.locator('#direct-logout').click();await direct.locator('#direct-status').filter({hasText:'desconectado'}).waitFor();
+  assert.equal(await direct.locator('#account-card #login').count(),1);assert.equal(await direct.locator('#account-card #direct-login').count(),1);assert.equal(await direct.locator('#account-card #direct-model').count(),1);
+  assert.equal(await direct.locator('#ai-usage, #direct-callback-status, #limit-hint, #session-hint, #queue-counts').count(),0);
+  for(const scheme of ['light','dark']){
+   await direct.emulateMedia({colorScheme:scheme});await direct.setViewportSize({width:320,height:1000});assert.equal(await direct.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+   await direct.setViewportSize({width:390,height:1000});const model=await direct.locator('#direct-model').boundingBox(),button=await direct.locator('#direct-models').boundingBox();assert.ok(button.y-(model.y+model.height)>=12);
+   await direct.screenshot({path:'reports/ai-panel-'+scheme+'.png',fullPage:true});
+  }
+  await direct.locator('#direct-logout').click();await direct.locator('#direct-status').filter({hasText:'Desconectado'}).waitFor();
  }finally{
   await context?.close();if(server)await new Promise(r=>server.close(r));if(marketServer)await new Promise(r=>marketServer.close(r));
   if(relative(resolve(tmpdir()),resolve(directory)).startsWith('..'))throw Error('Diretório de teste inválido.');

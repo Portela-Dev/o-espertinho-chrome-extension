@@ -31,7 +31,7 @@ test('ações dos quatro passos, permissão, seletor e ícone usam mensagens int
   el('refresh').click();await tick();assert.equal(el('notification').dataset.kind,'success');assert.equal(el('success').textContent,'Configurações atualizadas.');
   state.error='<img src=x> Falha de processamento';poll();await tick();assert.equal(el('notification').dataset.kind,'error');assert.equal(el('error').textContent,state.error);assert.equal(el('error').querySelector('img'),null);assert.equal(el('notification').closest('main'),null);
   el('dismiss-notification').click();poll();await tick();assert.equal(el('notification').hidden,true);
-  state.error=undefined;state.statsError='Contadores indisponíveis.';poll();await tick();assert.equal(el('error').textContent,state.statsError);assert.doesNotMatch(el('queue-counts').textContent,/indisponíveis/);state.statsError=undefined;
+  state.error=undefined;state.statsError='Contadores indisponíveis.';poll();await tick();assert.equal(el('error').textContent,state.statsError);assert.equal(el('queue-counts'),null);state.statsError=undefined;
   offline=true;poll();await tick();assert.equal(el('error').textContent,'Backend indisponível.');el('dismiss-notification').click();poll();await tick();assert.equal(el('notification').hidden,true);offline=false;poll();await tick();
   for(const step of ['discover','convert','enrich','prices']){el('step-'+step).click();await tick();assert.ok(messages.some(m=>m.type==='START'&&m.step===step),JSON.stringify({step,messages,error:el('error').textContent,market:el('marketplace').value,limit:el('limit').value}));}
   assert.ok(messages.some(m=>m.type==='START'&&m.hostWindowId===42));
@@ -44,8 +44,8 @@ test('ações dos quatro passos, permissão, seletor e ícone usam mensagens int
 });
 
 test('uma única barra exibe todos os links processados, incluindo pendências da IA',()=>{
- const state=view();const ai={task:'product',status:'completed',total:51,completed:47,pending:4,failed:0,title:''};renderCatalog(state,false,ai);
+ const state=view();const ai={task:'product',status:'completed',total:51,completed:47,pending:4,failed:0,title:'Produto que não deve aparecer'};renderCatalog(state,false,ai);
  assert.equal(document.querySelectorAll('progress').length,1);assert.equal(el('progress').value,51);assert.equal(el('progress').max,51);assert.match(el('counts').textContent,/51 \/ 51 links processados · 47 catalogados · 4 pendências/);assert.equal(el('cancel').disabled,true);assert.equal(el('pause').hidden,true);
- ai.status='running';renderCatalog(state,true,ai);assert.equal(el('cancel').disabled,false);assert.equal(el('step-enrich').disabled,true);
+ ai.status='running';renderCatalog(state,true,ai);assert.doesNotMatch(el('run-status').textContent,/Produto que não deve aparecer/);assert.equal(el('cancel').disabled,false);assert.equal(el('step-enrich').disabled,true);
  renderCatalog(state,false);assert.equal(el('pause').hidden,false);
 });

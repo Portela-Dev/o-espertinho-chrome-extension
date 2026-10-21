@@ -26,7 +26,6 @@ function renderQueue(view:CatalogView,marketplaceId:string){
         button.textContent=stepLabel(step)+' · '+label+': '+(value&&count!==undefined?`${count} / ${value.total}`:'— / —');
         button.title=step==='prices'?'Sem verificação bem-sucedida nas últimas 24h / ofertas publicadas com link de afiliado. A execução manual continua permitindo verificar todas as ofertas.':'Concluídos / total de links descobertos não arquivados. Falhas não contam como conclusão. Independente do limite por execução.';
     }
-    el('queue-counts').textContent='Conversão e extração: concluídos / links não arquivados. Preços: pendentes de verificação nas últimas 24h / ofertas publicadas.';
 }
 export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./review-ai-workflow.js').ReviewAiWorkflow['progress']) {
     el('account').textContent = view.user?.email ?? 'Conta desconectada';
@@ -52,10 +51,6 @@ export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./rev
         }));
     if (selected && [...select.options].some(o => o.value === selected))
         select.value = selected;
-    const recipe = view.markets.find(m => m.id === select.value)?.config?.recipe;
-    el('session-hint').textContent = recipe?.steps.some(step => step.type === 'extract' && step.source === 'requestHeader')
-        ? 'Esta receita exige observar um header: prepare a aba e gere um link manualmente nela antes de converter.'
-        : 'Faça login na aba de processamento, se necessário. Os valores de sessão são obtidos automaticamente conforme a receita, sem gerar um link manualmente.';
     if(document.activeElement!==el('retry-failed'))el<HTMLInputElement>('retry-failed').checked=view.retryFailed??false;
     renderQueue(view,select.value);
     const run = view.run, active = !!run && !['completed', 'failed', 'cancelled'].includes(run.status);
@@ -72,7 +67,7 @@ export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./rev
     const aiShown=!!ai&&ai.status!=='idle',aiActive=aiShown&&ai.status==='running';
     if(aiShown){
         const processed=Math.min(ai.total,ai.completed+ai.pending+ai.failed);
-        el('run-status').textContent=(ai.task==='category'?'Categorização':'Catalogação')+' por IA · '+({running:'Em execução',completed:'Concluída',cancelled:'Cancelada',failed:'Interrompida'}[ai.status]??ai.status)+(ai.title&&aiActive?' · '+ai.title:'');
+        el('run-status').textContent=(ai.task==='category'?'Categorização':'Catalogação')+' por IA · '+({running:'Em execução',completed:'Concluída',cancelled:'Cancelada',failed:'Interrompida'}[ai.status]??ai.status);
         el('counts').textContent=processed+' / '+ai.total+(ai.task==='product'?' links processados · ':' produtos processados · ')+ai.completed+(ai.task==='category'?' categorizados':' catalogados')+' · '+ai.pending+' pendências · '+ai.failed+' falhas';
         el<HTMLProgressElement>('progress').max=Math.max(1,ai.total);el<HTMLProgressElement>('progress').value=processed;
     }

@@ -8,7 +8,7 @@ document.getElementById('ai-popup-hint')!.hidden=isPanel;
 if(!isPanel){document.getElementById('ai-open-panel')!.addEventListener('click',()=>document.getElementById('display-mode')!.click());return ()=>{};}
 const el=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
 const option=(label:string,value:string)=>{const node=document.createElement('option');node.textContent=label;node.value=value;return node;};
-const labels:Record<string,string>={idle:'ChatGPT desconectado.',waiting_for_login:'Aguardando autorização na aba de login…',validating_identity:'Retorno capturado. Validando identidade diretamente com a OpenAI…',connected:'Conta conectada diretamente pela extensão.',analyzing:'Analisando uma oferta diretamente com a OpenAI…',completed:'Análise concluída.',failed:'Não foi possível concluir a operação.'};
+const labels:Record<string,string>={idle:'Desconectado',waiting_for_login:'Aguardando login…',validating_identity:'Validando login…',connected:'Conectado',analyzing:'Em análise',completed:'Conectado',failed:'Falha na operação'};
 let app:AiController,busy=false,lastError='',workflow:ReviewAiWorkflow|undefined;
 let refreshing=false,refreshedAt=0,configError='';
 function renderWorkflow(){
@@ -30,16 +30,14 @@ async function refreshWorkflow(){
 function render(){
  if(!app)return;renderWorkflow();const state=app.status(),running=['waiting_for_login','validating_identity','analyzing'].includes(state.phase);
  el('direct-status').textContent=labels[state.phase]??state.phase;
- el('direct-account-info').textContent=state.account?`${state.account.email||'Conta ChatGPT'} · ${state.account.planEnabled?'Usando seu plano ChatGPT':'Uso do plano não autorizado'}`:'';
- el('direct-callback-status').textContent=state.callbackObserved?'Retorno do login reconhecido neste painel.':'Nenhum retorno de login recebido nesta sessão.';
+ el('direct-account-info').textContent=state.account?.email||'';el('direct-account-info').hidden=!state.account?.email;
  const accounts=el<HTMLSelectElement>('direct-account'),selected=accounts.value;
  accounts.replaceChildren(option('Adicionar outra conta',''),...state.accounts.map((r:any)=>option(r.label,r.id)));accounts.value=selected;
  for(const id of ['direct-login','direct-models'])el<HTMLButtonElement>(id).disabled=busy||running||!!workflow?.busy;
  el<HTMLButtonElement>('direct-models').disabled=busy||running||!!workflow?.busy||!state.account?.planEnabled;
- el<HTMLButtonElement>('direct-cancel').disabled=!['waiting_for_login','validating_identity'].includes(state.phase);
+ el<HTMLButtonElement>('direct-cancel').hidden=!['waiting_for_login','validating_identity'].includes(state.phase);
  el<HTMLButtonElement>('direct-logout').disabled=busy||running||!!workflow?.busy;
  el<HTMLSelectElement>('direct-model').disabled=!!workflow?.busy;
- el('ai-usage').textContent='Nesta sessão: '+(state.usage?.requests??0)+' análises · '+(state.usage?.tokenReports?(state.usage.totalTokens+' tokens informados'):'tokens não informados pela OpenAI')+'. O saldo total do plano não é disponibilizado por esta integração.';
  if(state.error&&state.error!==lastError)notify(state.error);lastError=state.error;
 }
 async function act(task:()=>Promise<void>){
