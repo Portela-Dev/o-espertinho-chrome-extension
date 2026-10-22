@@ -55,6 +55,8 @@ export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./rev
         status = stepLabel(run.step)+' · '+(view.markets.find(m=>m.id===run.marketplace_id)?.name??run.marketplace_id??'')+' · '+runLabel(run.status);
         if (run.reason)
             status += ' · ' + run.reason;
+        const diagnostic = /^Conversão recusada: HTTP (401|403|429)\./.exec(view.message)?.[0];
+        if (run.status === 'waiting_for_human' && diagnostic) status += ' · ' + diagnostic;
     }
     el('run-status').textContent = status;
     el('counts').textContent = run ? `${run.completed} concluídos · ${run.failed} falhas · ${run.total} itens` : '';

@@ -2,6 +2,8 @@
 
 As receitas vêm do backend por marketplace. O executor não contém endpoints ou regras fixas por loja. As requisições usam somente a origem da aba preparada, com sessão do navegador, redirecionamentos recusados e resultado restrito às origens autorizadas.
 
+`executionWorld` é opcional e aceita `ISOLATED` (padrão) ou `MAIN`. O contexto principal usa o `fetch` instalado pela própria página, inclusive seus interceptadores, em vez do `fetch` do mundo isolado. A escolha afeta somente a receita de conversão; descoberta, leitura de produtos e credenciais do backend continuam isoladas. Não fornece implementação de assinaturas nem copia headers de segurança da página para o servidor.
+
 ## JSON estruturado
 
 `request.body` aceita um objeto JSON com objetos, listas e valores escalares. Strings podem usar `{{originalUrl}}` e variáveis locais; o executor serializa o resultado com `JSON.stringify`, sem concatenação de JSON ou execução de código. Números, booleanos e `null` mantêm seus tipos. Formulários continuam aceitando somente campos textuais.
@@ -18,6 +20,8 @@ Limites: seis níveis, 512 nós e 32 KB. Chaves `__proto__`, `constructor` e `pr
 ```
 
 As receitas anteriores não precisam dessas condições e continuam válidas. Falhas não devolvem o conteúdo sensível da resposta ao backend.
+
+HTTP 401 pausa por autenticação (`login`), 403 por acesso negado (`access_denied`) e 429 por limite de chamadas (`rate_limit`). O status HTTP aparece localmente no painel, sem copiar o corpo da resposta. Uma pausa nunca é retomada automaticamente.
 
 ## Header CSRF local
 

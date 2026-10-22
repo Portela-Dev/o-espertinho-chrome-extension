@@ -475,12 +475,12 @@ export class CatalogRuntime {
             return {
                 blocked: block
             };
-        const inject = async (func: any, args: any[]) => {
+        const inject = async (func: any, args: any[], world: 'ISOLATED' | 'MAIN' = 'ISOLATED') => {
             assertActive();
             const values = await this.browser.scripting.executeScript({
                 target: {
                     tabId: this.state.tabId!
-                }, world: 'ISOLATED', func, args
+                }, world, func, args
             });
             const value = values[0]?.result;
             if (value === undefined)
@@ -495,13 +495,15 @@ export class CatalogRuntime {
                 profile: snapshot.profile, settings, originalUrl: item.payload.originalUrl, allowedOrigins: origins
             }]);
     }
-    private async convert(claim: CatalogClaim, inject: (func: any, args: any[]) => Promise<any>) {
+    private async convert(claim: CatalogClaim, inject: (func: any, args: any[], world?: 'ISOLATED' | 'MAIN') => Promise<any>) {
         const recipe = claim.snapshot.settings.recipe;
         validateRecipe(recipe);
         const variables = await this.headers.values(recipe), item = claim.item!;
         const result = await inject(executeRecipe, [recipe, {
                 id: item.id, title: item.payload.title ?? '', originalUrl: item.payload.originalUrl
-            }, variables]);
+            }, variables], recipe.executionWorld ?? 'ISOLATED');
+        if (result.blocked)
+            return { blocked: result.blocked, diagnostic: 'Conversão recusada: HTTP ' + result.httpStatus + '.' };
         if (result.needsLogin)
             return {
                 blocked: 'login'
@@ -663,7 +665,7 @@ export class CatalogRuntime {
             return;
         if (result.blocked) {
             await this.action('human', result.blocked);
-            this.state.message = 'Intervenção necessária: ' + result.blocked + '. Abra a janela de processamento e depois clique em Continuar.';
+            this.state.message = (result.diagnostic ? result.diagnostic + ' ' : '') + 'Intervenção necessária: ' + result.blocked + '. Abra a janela de processamento e depois clique em Continuar.';
             await this.save();
             return;
         }

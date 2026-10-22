@@ -3,6 +3,8 @@ export interface ExecutionResult {
   affiliateUrl?: string;
   error?: string;
   needsLogin?: boolean;
+  blocked?: 'login' | 'access_denied' | 'rate_limit';
+  httpStatus?: number;
 }
 
 // A função inteira é serializada pelo Chrome. Os helpers e valores de sessão
@@ -20,6 +22,9 @@ export async function executeRecipe(
   >;
   variables.originalUrl = item.originalUrl;
   class LoginRequired extends Error {}
+  class RequestBlocked extends Error {
+    constructor(readonly kind: 'login' | 'access_denied' | 'rate_limit', readonly status: number) { super('Requisição recusada.'); }
+  }
 
   function validateOrigin() {
     const original = new URL(item.originalUrl);
@@ -173,9 +178,9 @@ export async function executeRecipe(
       redirect: "error",
       signal: AbortSignal.timeout(12000),
     });
-    if (response.status === 401 || response.status === 403) {
-      throw new LoginRequired();
-    }
+    if (response.status === 401) throw new RequestBlocked('login', 401);
+    if (response.status === 403) throw new RequestBlocked('access_denied', 403);
+    if (response.status === 429) throw new RequestBlocked('rate_limit', 429);
     if (!response.ok) {
       throw new Error("Conversão recusada.");
     }
@@ -213,6 +218,7 @@ export async function executeRecipe(
     }
     return { affiliateUrl: link.href };
   } catch (error) {
+    if (error instanceof RequestBlocked) return { error: 'A conversão foi recusada pelo servidor.', blocked: error.kind, httpStatus: error.status, needsLogin: error.kind === 'login' };
     if (error instanceof LoginRequired) {
       return {
         error: "Abra o marketplace, confirme o login e tente novamente.",

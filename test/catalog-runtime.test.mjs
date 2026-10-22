@@ -21,6 +21,21 @@ function fixture(options={}){
  return {runtime:new CatalogRuntime(browser),browser,fetch,calls,navigations,saved:()=>saved};
 }
 
+test('HTTP 403 da conversão pausa por acesso negado com status local, sem repetir nem salvar resultado',async()=>{
+ const f=fixture({result:{blocked:'access_denied',httpStatus:403}}),original=globalThis.fetch;globalThis.fetch=f.fetch;
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'convert'});
+ for(let i=0;i<800&&f.saved().run?.status!=='waiting_for_human';i++)await new Promise(r=>setTimeout(r,5));
+ assert.equal(f.saved().run.status,'waiting_for_human');assert.match(f.saved().message,/HTTP 403.*access_denied/);assert.equal(f.calls.filter(c=>c.path.endsWith('/results')).length,0);assert.deepEqual(f.calls.find(c=>c.path.endsWith('/action')).body,{action:'human',reason:'access_denied'});
+ }finally{globalThis.fetch=original;}
+});
+
+test('contexto MAIN é aplicado só à receita de conversão e não recebe credenciais do backend',async()=>{
+ const f=fixture(),original=globalThis.fetch,baseFetch=f.fetch;let conversion;
+ globalThis.fetch=async(url,options)=>{const response=await baseFetch(url,options);const data=await response.json();if(url.endsWith('/catalog/config'))data.marketplaces[0].config.recipe.executionWorld='MAIN';if(data.snapshot?.settings?.recipe)data.snapshot.settings.recipe.executionWorld='MAIN';return Response.json(data);};
+ const execute=f.browser.scripting.executeScript;f.browser.scripting.executeScript=async call=>{if(call.func.name==='executeRecipe')conversion=call;else assert.equal(call.world,'ISOLATED');return execute(call);};
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'convert'});await finished(f);assert.equal(conversion.world,'MAIN');assert.doesNotMatch(JSON.stringify(conversion.args),/refreshToken|TEST_ONLY|Bearer/);}finally{globalThis.fetch=original;}
+});
+
 test('atualizar configurações independe da execução salva; acompanhamento limpa somente referências locais de execução removida',async()=>{
  const f=fixture(),original=globalThis.fetch;let lookups=0;
  globalThis.fetch=async(url,options)=>{

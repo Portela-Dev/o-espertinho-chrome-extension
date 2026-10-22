@@ -11,6 +11,8 @@ test('JSON aninhado tem limites e condição de resposta não aceita caminhos pe
  assert.equal(isRequestBody(JSON.parse('{"constructor":1}')),false);let deep={};for(let i=0;i<9;i++)deep={value:deep};assert.equal(isRequestBody(deep),false);
 });
 
+test('contexto da receita é declarativo e limitado a ISOLATED ou MAIN',()=>{for(const executionWorld of ['MAIN','ISOLATED']){const c=structuredClone(configuration);c.marketplaces[0].executionWorld=executionWorld;assert.ok(validateConfiguration(c));}const c=structuredClone(configuration);c.marketplaces[0].executionWorld='eval';assert.throws(()=>validateConfiguration(c));});
+
 test("configurações aceitam HTTPS e loopback e recusam caminhos/segredos/protocolos inseguros", () => {
   assert.equal(backendOrigin("https://api.test/"), "https://api.test");
   assert.equal(backendOrigin("http://127.0.0.1:3000"), "http://127.0.0.1:3000");

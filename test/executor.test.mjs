@@ -151,15 +151,18 @@ test("recusa origem externa, credenciais na URL, headers reservados e saída nã
     ).error,
   );
 });
-test("sessão ausente e 401/403 pedem intervenção, enquanto erro técnico fica genérico", async () => {
+test("sessão ausente e HTTP 401, 403 e 429 têm motivos distintos sem expor a resposta", async () => {
   const { recipe } = setup();
   document.querySelector("meta").remove();
   assert.equal((await executeRecipe(recipe, item)).needsLogin, true);
-  for (const status of [401, 403, 500]) {
+  for (const status of [401, 403, 429, 500]) {
     const { recipe } = setup();
-    globalThis.fetch = async () => new Response("", { status });
+    globalThis.fetch = async () => new Response("PRIVATE_RESPONSE", { status });
     const result = await executeRecipe(recipe, item);
-    assert.equal(!!result.needsLogin, status !== 500);
+    assert.equal(!!result.needsLogin, status === 401);
+    assert.equal(result.blocked, {401:'login',403:'access_denied',429:'rate_limit'}[status]);
+    assert.equal(result.httpStatus, status === 500 ? undefined : status);
+    assert.doesNotMatch(JSON.stringify(result),/PRIVATE_RESPONSE/);
     assert.ok(result.error);
   }
 });

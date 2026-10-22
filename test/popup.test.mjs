@@ -8,6 +8,8 @@ globalThis.window=page;globalThis.document=page.document;
 document.write(await readFile(new URL('../extension/popup.html',import.meta.url),'utf8'));
 const el=id=>document.getElementById(id);
 const view=()=>({backendUrl:'http://localhost:3000',user:{email:'<img src=x onerror=alert(1)>',permissions:['affiliate_links','discovery','catalog','updates']},pairing:false,markets:[{id:'fixture',name:'Loja',catalog_executor:'extension',allowedOrigins:['https://shop.example.com']}],message:'Pronto',version:'0.2.0'});
+
+test('execução pausada mostra o status HTTP da conversão sem confundir 403 com login',()=>{const state={...view(),message:'Conversão recusada: HTTP 403. Intervenção necessária: access_denied.',run:{step:'convert',marketplace_id:'fixture',status:'waiting_for_human',reason:'access_denied',total:1,completed:0,failed:0}};renderCatalog(state,false);assert.match(el('run-status').textContent,/HTTP 403/);assert.match(el('run-status').textContent,/access_denied/);});
 test('interface mostra permissões, progresso e texto externo sem HTML',()=>{
  const state=view();renderCatalog(state,false);assert.equal(el('account').querySelector('img'),null);assert.equal(el('workspace').hidden,false);assert.equal(el('step-discover').disabled,false);
  state.run={step:'enrich',marketplace_id:'fixture',status:'waiting_for_human',reason:'challenge',total:5,completed:2,failed:1};renderCatalog(state,false);assert.equal(el('step-prices').disabled,true);assert.equal(el('resume').disabled,false);assert.equal(el('progress').value,3);

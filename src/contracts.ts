@@ -42,6 +42,7 @@ export interface Recipe {
   batchSize: number;
   intervalMs: number;
   steps: Step[];
+  executionWorld?: 'ISOLATED' | 'MAIN';
 }
 export interface Configuration {
   version: 1;
@@ -117,6 +118,7 @@ function originsValid(origins: unknown): origins is string[] {
 }
 
 export function validateRecipe(recipe: Recipe) {
+  if (recipe?.executionWorld !== undefined && !['ISOLATED','MAIN'].includes(recipe.executionWorld)) throw new Error('Contexto de execução inválido.');
   if (
     !recipe ||
     typeof recipe.id !== "string" ||
