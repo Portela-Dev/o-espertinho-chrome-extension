@@ -35,6 +35,7 @@
         <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar aba / fazer login</button></div>
         <div class="control-field"><label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100"></div>
         <label><input id="retry-failed" type="checkbox"> Incluir extrações com falha</label>
+        <label><input id="retry-ai-review" type="checkbox"> Reprocessar somente itens em revisão nos passos 4 e 5</label>
         <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-product" disabled>4 — Catalogar produtos · entre no ChatGPT</button><button type="button" id="step-category" disabled>5 — Categorizar produtos · entre no ChatGPT</button><hr class="workflow-divider"><button type="button" id="step-prices">6 — Analisar Preços</button></div>
         <h3>Execução atual</h3><output id="run-status" aria-live="polite">Nenhuma execução selecionada.</output>
         <progress id="progress" max="1" value="0" aria-label="Progresso da execução"></progress>

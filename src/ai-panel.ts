@@ -66,7 +66,7 @@ try{app=await create();
   workflow=new ReviewAiWorkflow(async(operation,payload)=>{const reply=await chrome.runtime.sendMessage({type:'AI_REVIEW',operation,payload});if(reply.error)throw new Error(reply.error);return reply.value;},input=>app.analyze(input),()=>{hooks.progress?.(workflow?.progress);hooks.busy(!!workflow?.busy);render();});
   for(const task of ['category','product'] as const)el('step-'+task).addEventListener('click',()=>{void (async()=>{
    try{const view=hooks.view();if(!view?.user||!app.status().account?.planEnabled)throw new Error('Entre no Espertinho e no ChatGPT para continuar.');
-    await workflow!.run(task,el<HTMLSelectElement>('marketplace').value,Number(el<HTMLInputElement>('limit').value),el<HTMLSelectElement>('direct-model').value);
+    await workflow!.run(task,el<HTMLSelectElement>('marketplace').value,Number(el<HTMLInputElement>('limit').value),el<HTMLSelectElement>('direct-model').value,el<HTMLInputElement>('retry-ai-review').checked);
     notify('Decisões válidas aplicadas. Revise as pendências e publique pelo admin.','success');
    }catch(e){notify(e instanceof Error?e.message:'Não foi possível concluir a revisão por IA.');}
   })();});

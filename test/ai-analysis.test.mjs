@@ -8,7 +8,7 @@ const complete=text=>stream([{type:'response.output_text.delta',delta:text},{typ
 test('análise usa modelo da conta e Responses oficial, sem ferramentas ou armazenamento',async()=>{
  const calls=[],session={models:async()=>[{id:'fixture'}],token:async()=>'local-secret',fetcher:async(url,options)=>{calls.push({url,options});return complete(JSON.stringify(suggestion));}};
  const result=await analyze(session,{...input,model:'fixture'},new AbortController().signal);assert.equal(result.productId,'p1');assert.equal(calls[0].url,'https://api.openai.com/v1/responses');
- const body=JSON.parse(calls[0].options.body);assert.equal(body.store,false);assert.equal(body.stream,true);assert.equal(body.tools,undefined);assert.match(body.instructions,/Cor, tensão e tamanho/);assert.doesNotMatch(JSON.stringify(result),/local-secret/);
+ const body=JSON.parse(calls[0].options.body);assert.equal(body.store,false);assert.equal(body.stream,true);assert.equal(body.tools,undefined);assert.match(body.instructions,/tamanho de tela/);assert.doesNotMatch(JSON.stringify(result),/local-secret/);
  await assert.rejects(()=>analyze(session,{...input,model:'other'}),/disponível/);
 });
 test('resposta incompleta, limite, JSON inválido e produto inventado não geram sugestão válida',async()=>{
@@ -27,3 +27,13 @@ test('resposta incompleta, limite, JSON inválido e produto inventado não geram
   assert.throws(()=>validateSuggestion({...suggestion,action:'link_existing'},{...input,task:'category'}),/somente a categoria/);
   assert.equal(validateSuggestion(suggestion,{...input,task:'product'}).category,'');
  });
+
+test('política do admin e mapeamento chegam à chamada; inválidos não podem aplicar produto e kits são separados',async()=>{
+ let body;const session={models:async()=>[{id:'fixture'}],token:async()=>'private',fetcher:async(_url,options)=>{body=JSON.parse(options.body);return complete(JSON.stringify({action:'invalid',reason:'Título e descrição divergem.',productId:null,categoryId:null,product:null}));}};
+ const specifications=[{name:'RAM',value:'8 GB'}];
+ const result=await analyze(session,{...input,offer:{...input.offer,specifications},task:'product',instructions:'Minha política personalizada: kits são independentes.',mapping:'Saúde > Suplementos Alimentares',model:'fixture'},new AbortController().signal);
+ assert.equal(result.action,'invalid');assert.equal(result.product,null);assert.match(body.instructions,/Minha política personalizada/);assert.match(body.instructions,/RAM física/);assert.match(body.instructions,/Kits personalizados/);assert.equal(JSON.parse(body.input[0].content).mapping,'Saúde > Suplementos Alimentares');
+ assert.throws(()=>validateSuggestion({...result,product:{name:'Não aplicar'}},{...input,task:'product'}),/não pode aplicar/);
+ assert.deepEqual(JSON.parse(body.input[0].content).offer.specifications,specifications);
+ assert.throws(()=>validateSuggestion(suggestion,{...input,task:'product',products:[{...input.products[0],personalizedKit:true}]}),/Kits personalizados/);
+});

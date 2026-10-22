@@ -64,9 +64,9 @@ export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./rev
     el<HTMLProgressElement>('progress').value = (run?.completed ?? 0) + (run?.failed ?? 0);
     const aiShown=!!ai&&ai.status!=='idle',aiActive=aiShown&&ai.status==='running';
     if(aiShown){
-        const processed=Math.min(ai.total,ai.completed+ai.pending+ai.failed);
+        const processed=Math.min(ai.total,ai.completed+ai.pending+ai.failed+(ai.invalid??0));
         el('run-status').textContent=(ai.task==='category'?'Categorização':'Catalogação')+' por IA · '+({running:'Em execução',completed:'Concluída',cancelled:'Cancelada',failed:'Interrompida'}[ai.status]??ai.status);
-        el('counts').textContent=processed+' / '+ai.total+(ai.task==='product'?' links processados · ':' produtos processados · ')+ai.completed+(ai.task==='category'?' categorizados':' catalogados')+' · '+ai.pending+' pendências · '+ai.failed+' falhas';
+        el('counts').textContent=processed+' / '+ai.total+(ai.task==='product'?' links processados · ':' produtos processados · ')+ai.completed+(ai.task==='category'?' categorizados':' catalogados')+' · '+ai.pending+' pendências · '+(ai.invalid??0)+' inválidos · '+ai.failed+' falhas';
         el<HTMLProgressElement>('progress').max=Math.max(1,ai.total);el<HTMLProgressElement>('progress').value=processed;
     }
     for(const id of ['pause','resume','focus'])el(id).hidden=aiShown;

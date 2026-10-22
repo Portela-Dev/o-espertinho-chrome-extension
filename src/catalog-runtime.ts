@@ -291,7 +291,7 @@ export class CatalogRuntime {
                 if(['config','queue'].includes(command.operation)){
                     if(typeof p.marketplaceId!=='string'||!/^[a-z][a-z0-9_-]{1,39}$/.test(p.marketplaceId))throw new Error('Marketplace inválido.');
                     const params=new URLSearchParams({marketplaceId:p.marketplaceId});
-                    if(command.operation==='queue'){if(!['category','product'].includes(p.task)||!Number.isInteger(p.limit)||p.limit<1||p.limit>10000)throw new Error('Fila de IA inválida.');params.set('task',p.task);params.set('limit',String(p.limit));}
+                    if(command.operation==='queue'){if(!['category','product'].includes(p.task)||!Number.isInteger(p.limit)||p.limit<1||p.limit>10000||p.retryReview!==undefined&&typeof p.retryReview!=='boolean')throw new Error('Fila de IA inválida.');params.set('task',p.task);params.set('limit',String(p.limit));params.set('retryReview',String(p.retryReview??false));}
                     return this.api(paths[command.operation]+'?'+params);
                 }
                 return this.api(paths[command.operation],p);
