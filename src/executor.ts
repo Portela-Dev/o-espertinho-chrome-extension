@@ -102,23 +102,38 @@ export async function executeRecipe(
     if (step.method === "GET") {
       return undefined;
     }
-    const body = Object.fromEntries(
-      Object.entries(step.body ?? {}).map(([key, value]) => [
-        key,
-        render(value),
-      ]),
-    );
+    let nodes = 0;
+    function renderJson(value: unknown, depth = 0): unknown {
+      if (++nodes > 512 || depth > 6) throw new Error('Corpo excedeu os limites.');
+      if (typeof value === 'string') return render(value);
+      if (value === null || typeof value === 'boolean' || typeof value === 'number' && Number.isFinite(value)) return value;
+      if (Array.isArray(value)) return value.map(child => renderJson(child, depth + 1));
+      if (!value || typeof value !== 'object') throw new Error('Corpo inválido.');
+      return Object.fromEntries(Object.entries(value).map(([key, child]) => {
+        if (['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Chave reservada.');
+        return [key, renderJson(child, depth + 1)];
+      }));
+    }
     if (step.bodyEncoding === "form") {
+      const body: Record<string, string> = {};
+      for (const [key, value] of Object.entries(step.body ?? {})) {
+        if (typeof value !== 'string') throw new Error('Campo de formulário inválido.');
+        body[key] = render(value);
+      }
       return new URLSearchParams(body);
     }
-    return JSON.stringify(body);
+    const body = JSON.stringify(renderJson(step.body ?? {}));
+    if (body.length > 32768) throw new Error('Corpo excedeu os limites.');
+    return body;
   }
-  function responseLink(text: string, path: string) {
+  function responseLink(text: string, step: Extract<Step, { type: "request" }>) {
     if (text.length > 262144) {
       throw new Error("Resposta excedeu o limite.");
     }
-    let value: unknown = JSON.parse(text);
-    for (const key of path.split(".")) {
+    const data: unknown = JSON.parse(text);
+    function readPath(path: string) {
+      let value = data;
+      for (const key of path.split(".")) {
       if (
         ["__proto__", "constructor", "prototype"].includes(key) ||
         !value ||
@@ -128,7 +143,13 @@ export async function executeRecipe(
         throw new Error("Link não encontrado.");
       }
       value = (value as Record<string, unknown>)[key];
+      }
+      return value;
     }
+    for (const check of step.responseChecks ?? []) {
+      if (readPath(check.path) !== check.equals) throw new Error('Conversão recusada.');
+    }
+    const value = readPath(step.responsePath);
     if (typeof value !== "string" || value.length > 2000) {
       throw new Error("Link inválido.");
     }
@@ -158,7 +179,7 @@ export async function executeRecipe(
     if (!response.ok) {
       throw new Error("Conversão recusada.");
     }
-    return responseLink(await response.text(), step.responsePath);
+    return responseLink(await response.text(), step);
   }
   async function runSteps() {
     let link = "";

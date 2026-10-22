@@ -5,6 +5,15 @@ import {extractCatalogProduct} from '../dist/catalog-product.js';
 const settings={timeoutMs:1,blockRules:[],categorySeparator:'>'};
 const profile={rules:[{field:'title',selectors:['h1'],mode:'text',required:true},{field:'price',selectors:['.price'],mode:'text',required:true},{field:'category',selectors:['nav a'],mode:'text'},{field:'images',selectors:['img'],mode:'attribute',attribute:'src'}]};
 
+test('seletores configurados para HTML fornecido preservam preço condicionado, breadcrumb e avaliações',async()=>{
+ const win=new Window({url:'https://shop.example.com/product'});globalThis.document=win.document;globalThis.location=win.location;
+ document.head.innerHTML='<meta property="og:description" content="Produto de vitrine"><meta property="og:image" content="https://cdn.example.com/product.jpg">';
+ document.body.innerHTML='<h1 class="auau1S">Iphone 13 Branco Apple 128gb VITRINE</h1><div class="uLEz5u"><button><div class="FllsTu">4.8</div></button><button><div class="FllsTu">133</div><div>Avaliações</div></button><div>257 Vendidos</div></div><section aria-live="polite"><div class="pyzxvq pw3J3G">R$2.116,00</div><p>no Pix com cupom</p><p>ou R$2.400,00 sem cupom</p></section><div class="page-product__breadcrumb"><a href="/">Shopee</a><a href="/Celulares-e-Dispositivos-cat.11059988">Celulares e Dispositivos</a><a href="/Celulares-cat.11059988.11060166">Celulares</a><span>Nome do produto</span></div>';
+ const rules=[{field:'title',selectors:['h1'],mode:'text',required:true},{field:'price',selectors:['section[aria-live="polite"] .pyzxvq'],mode:'text',required:true},{field:'conditions',selectors:['section[aria-live="polite"]'],mode:'text'},{field:'category',selectors:['.page-product__breadcrumb a[href*="-cat."]'],mode:'text'},{field:'rating',selectors:['.uLEz5u button:first-child .FllsTu'],mode:'text'},{field:'reviewCount',selectors:['.uLEz5u button:nth-child(2) .FllsTu'],mode:'text'},{field:'images',selectors:['meta[property="og:image"]'],mode:'attribute',attribute:'content'}];
+ const result=await extractCatalogProduct({profile:{rules},settings,originalUrl:location.href,allowedOrigins:[location.origin]});
+ assert.equal(result.outcome,'success');assert.equal(result.data.priceCents,211600);assert.equal(result.data.rating,4.8);assert.equal(result.data.reviewCount,133);assert.match(result.data.conditions,/Pix com cupom/);assert.deepEqual(result.sourceCategoryPath,['Celulares e Dispositivos','Celulares']);assert.deepEqual(result.data.images,['https://cdn.example.com/product.jpg']);win.close();
+});
+
 test('avaliações usam seletores configurados, atributos e números locais; valores ausentes são opcionais',async()=>{
  const win=new Window({url:'https://shop.example.com/p'});globalThis.document=win.document;globalThis.location=win.location;
  const input={profile:{rules:[...profile.rules,{field:'rating',selectors:['.rating'],mode:'attribute',attribute:'title'},{field:'reviewCount',selectors:['.reviews'],mode:'text'}]},settings,originalUrl:location.href,allowedOrigins:[location.origin]};

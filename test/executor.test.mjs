@@ -8,6 +8,17 @@ const item = {
   title: "Teste",
   originalUrl: "https://shop.test/product/1",
 };
+
+test('JSON GraphQL mantém objetos, listas e tipos; resposta exige sucesso configurado antes de aceitar URL',async()=>{
+ const {recipe,sent}=setup();const request=recipe.steps[1];
+ request.body={query:'query ($links: [Link!]) { links { shortLink failCode } }',variables:{links:[{url:'{{originalUrl}}',params:{campaign:'test'}}],enabled:true,count:1,optional:null}};
+ request.responsePath='data.links.0.shortLink';request.responseChecks=[{path:'data.links.0.failCode',equals:0}];
+ globalThis.fetch=async(url,options)=>{sent.push({url,options});return Response.json({data:{links:[{shortLink:'https://shop.test/affiliate/1',failCode:0}]}});};
+ assert.equal((await executeRecipe(recipe,item)).affiliateUrl,'https://shop.test/affiliate/1');
+ assert.deepEqual(JSON.parse(sent[0].options.body).variables,{links:[{url:item.originalUrl,params:{campaign:'test'}}],enabled:true,count:1,optional:null});
+ for(const data of [{data:{links:[{shortLink:'https://shop.test/affiliate/1',failCode:9}]}},{errors:[{message:'PRIVATE_ERROR'}]},{data:{links:[]}}]){globalThis.fetch=async()=>Response.json(data);const result=await executeRecipe(recipe,item);assert.equal(result.affiliateUrl,undefined);assert.doesNotMatch(JSON.stringify(result),/PRIVATE_ERROR/);}
+ request.bodyEncoding='form';assert.equal((await executeRecipe(recipe,item)).affiliateUrl,undefined);
+});
 function setup() {
   const window = new Window({ url: "https://shop.test/login" });
   for (const key of [

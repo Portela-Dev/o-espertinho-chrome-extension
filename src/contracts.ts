@@ -1,3 +1,4 @@
+import { isRequestBody, isResponsePath, type RecipeBody } from './recipe-json.js';
 export interface Account {
   id: string;
   email: string;
@@ -25,9 +26,10 @@ export type Step =
       url: string;
       method: "GET" | "POST";
       headers?: Record<string, string>;
-      body?: Record<string, string>;
+      body?: RecipeBody;
       bodyEncoding?: "json" | "form";
       responsePath: string;
+      responseChecks?: { path: string; equals: string | number | boolean | null }[];
     }
   | { type: "fill"; selector: string; value: string }
   | { type: "click"; selector: string };
@@ -190,7 +192,7 @@ function validateExtract(step: Extract<Step, { type: "extract" }>) {
     validateSelector(step.selector);
     return;
   }
-  if(step.source==='requestHeader'&&(!step.sourceUrl||!/^x-[\w-]+$/i.test(step.key??'')||new URL(step.sourceUrl).protocol!=='https:'))throw new Error('Origem do header inválida.');
+  if(step.source==='requestHeader'&&(!step.sourceUrl||!/^(?:x-[\w-]+|csrf-token)$/i.test(step.key??'')||new URL(step.sourceUrl).protocol!=='https:'))throw new Error('Origem do header inválida.');
   if (typeof step.key !== "string" || !step.key) {
     throw new Error("Chave de extração inválida.");
   }
@@ -199,15 +201,14 @@ function validateRequest(step: Extract<Step, { type: "request" }>) {
   if (
     !["GET", "POST"].includes(step.method) ||
     typeof step.url !== "string" ||
-    typeof step.responsePath !== "string" ||
-    !step.responsePath
+    !isResponsePath(step.responsePath)
   ) {
     throw new Error("Requisição inválida.");
   }
   if (step.bodyEncoding && !["json", "form"].includes(step.bodyEncoding)) {
     throw new Error("Codificação inválida.");
   }
-  for (const values of [step.headers, step.body]) {
+  for (const values of [step.headers]) {
     if (
       values &&
       (typeof values !== "object" ||
@@ -216,4 +217,6 @@ function validateRequest(step: Extract<Step, { type: "request" }>) {
       throw new Error("Valores de requisição inválidos.");
     }
   }
+  if (step.body !== undefined && !isRequestBody(step.body, step.bodyEncoding === 'form')) throw new Error('Corpo de requisição inválido.');
+  if (step.responseChecks !== undefined && (!Array.isArray(step.responseChecks) || step.responseChecks.length > 8 || step.responseChecks.some(check => !check || !isResponsePath(check.path) || !(check.equals === null || ['string','boolean'].includes(typeof check.equals) || typeof check.equals === 'number' && Number.isFinite(check.equals))))) throw new Error('Condição de resposta inválida.');
 }
