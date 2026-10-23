@@ -1,5 +1,7 @@
 # O Espertinho — extensão Chrome
 
+O CI valida pushes/PRs em `develop`, `staging` e `main`, além de tags `staging-v*`. A branch staging acompanha o fluxo dos demais projetos, mas esta extensão continua sem deploy e sem publicação automática na Web Store: o resultado é apenas um pacote para download. Criar uma tag da extensão não implanta frontend ou backend.
+
 Extensão Manifest V3/TypeScript para seis etapas manuais de manutenção do catálogo, usando receitas e seletores do backend, sem implementação fixa por marketplace.
 
 ## Instalar e conectar
