@@ -2,9 +2,10 @@ name: CI e pacote da extensão
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, staging]
+    tags: ['v*']
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, staging]
   workflow_dispatch:
     inputs:
       sonar:
