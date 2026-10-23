@@ -64,7 +64,7 @@ export interface WhatsAppGroupBinding {
 const origin = 'https://web.whatsapp.com',
   key = 'whatsappGroupBindings';
 export class WhatsAppGroups {
-  private pending = new Map<
+  private readonly pending = new Map<
     string,
     {
       tabId: number;

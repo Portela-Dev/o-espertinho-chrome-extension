@@ -123,7 +123,7 @@ export async function sendWhatsAppText(
     invoked = true;
     const sent = Promise.resolve(action(chat, input.text, {})).then(
       () => {
-        const message = collection.getModelsArray().find(matches);
+        const message = collection.getModelsArray().some(matches);
         return message ? { status: 'observed' as const } : observation;
       },
       () => ({ status: 'unknown' as const }),
@@ -149,7 +149,7 @@ export async function sendWhatsAppText(
 }
 
 export class WhatsAppTextPoc {
-  private drafts = new Map<string, Draft>();
+  private readonly drafts = new Map<string, Draft>();
   constructor(
     private readonly browser: typeof chrome,
     private readonly destination: (

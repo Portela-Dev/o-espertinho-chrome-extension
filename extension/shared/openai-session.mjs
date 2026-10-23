@@ -45,7 +45,7 @@ export async function verifyIdentity(
         (!k.use || k.use === 'sig') &&
         (!k.alg || k.alg === header.alg),
     );
-    if (!jwk || jwk.kty !== (header.alg === 'RS256' ? 'RSA' : 'EC'))
+    if (jwk?.kty !== (header.alg === 'RS256' ? 'RSA' : 'EC'))
       throw new Error('Invalid operation data.');
     const algorithm =
       header.alg === 'RS256'

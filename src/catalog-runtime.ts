@@ -1006,7 +1006,7 @@ export class CatalogRuntime {
     )
       return;
     await this.syncRun();
-    if (!this.state.run || this.state.run.id !== run.id) return;
+    if (this.state.run?.id !== run.id) return;
     if (
       !['queued', 'running'].includes(this.state.run.status) ||
       (this.state.nextAt ?? 0) > Date.now()
