@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { unzipSync, strFromU8 } from "fflate";
+import { BACKEND_ENVIRONMENTS } from '../dist/config.js';
 
 test("o pacote contém os recursos e solicita somente permissões para o executor configurável", async () => {
   const cwd = fileURLToPath(new URL("../", import.meta.url));
@@ -31,7 +32,7 @@ test("o pacote contém os recursos e solicita somente permissões para o executo
   assert.equal(manifest.action.default_popup, undefined);
   assert.equal(manifest.side_panel.default_path, "popup.html?view=panel");
   assert.equal(manifest.optional_permissions,undefined);
-  assert.equal(manifest.host_permissions.length, 1);
+  assert.deepEqual(manifest.host_permissions, BACKEND_ENVIRONMENTS.map(environment => environment.url + '/*'));
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
   assert.equal(manifest.content_scripts?.length ?? 0, 0);
   assert.match(

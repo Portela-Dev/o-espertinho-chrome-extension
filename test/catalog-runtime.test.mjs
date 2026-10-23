@@ -18,8 +18,55 @@ function fixture(options={}){
   if(path==='/auth/logout')return Response.json({ok:true});
   throw Error('unexpected '+path);
  };
- return {runtime:new CatalogRuntime(browser),browser,fetch,calls,navigations,saved:()=>saved};
+ return {runtime:new CatalogRuntime(browser,options.environments),browser,fetch,calls,navigations,saved:()=>saved};
 }
+
+const environments = [{id:'local',label:'Local',url:'http://localhost:3000'},{id:'production',label:'Produção',url:'https://production.example.test'}];
+test('troca de ambiente revoga somente no servidor anterior, limpa dados e persiste a escolha',async()=>{
+ const f=fixture({environments}),original=globalThis.fetch,traffic=[];
+ globalThis.fetch=async(url,options)=>{traffic.push({url,authorization:options.headers.Authorization});return f.fetch(url,options);};
+ try{
+  await f.runtime.init();
+  f.runtime.state.markets=[{id:'old'}];f.runtime.state.marketplaceId='old';f.runtime.state.tabId=4;
+  f.runtime.state.pair={deviceCode:'old'};f.runtime.state.run={id:'old',status:'completed'};
+  f.runtime.state.pendingResult={secret:'old'};f.runtime.state.claim={item:{id:'old'}};
+  const view=await f.runtime.handle({type:'ENVIRONMENT',environmentId:'production'});
+  assert.equal(view.backendUrl,environments[1].url);assert.equal(view.environmentId,'production');
+  for(const key of ['auth','pair','claim','run','tabId','marketplaceId','pendingResult'])assert.equal(f.saved()[key],undefined,key);
+  assert.deepEqual(view.markets,[]);assert.equal(view.user,undefined);assert.equal(view.stats,undefined);
+  assert.deepEqual(traffic,[{url:'http://localhost:3000/api/extension/auth/logout',authorization:'Bearer '+auth.token}]);
+  const restarted=new CatalogRuntime(f.browser,environments);await restarted.init();
+  assert.equal(restarted.state.environmentId,'production');assert.equal(restarted.state.backendUrl,environments[1].url);
+  await assert.rejects(restarted.handle({type:'REFRESH'}),/Entre/);
+  await assert.rejects(restarted.handle({type:'AI_REVIEW',environmentUrl:environments[0].url,operation:'result',payload:{}}),/ambiente mudou/);
+ }finally{globalThis.fetch=original;}
+});
+test('troca recusa ambiente arbitrário e execução ativa inclusive pausada',async()=>{
+ const f=fixture({environments});await f.runtime.init();
+ await assert.rejects(f.runtime.handle({type:'ENVIRONMENT',environmentId:'https://attacker.test'}),/configurado/);
+ for(const status of ['queued','running','waiting_for_human','paused_technical','paused_by_user']){
+  f.runtime.state.run={id:'active',status};
+  await assert.rejects(f.runtime.handle({type:'ENVIRONMENT',environmentId:'production'}),/Conclua ou cancele/);
+  assert.equal(f.saved().backendUrl,environments[0].url);
+ }
+});
+test('servidor anterior offline não impede sair localmente nem transfere credenciais',async()=>{
+ const f=fixture({environments}),original=globalThis.fetch,urls=[];
+ globalThis.fetch=async url=>{urls.push(url);throw Error('offline');};
+ try{await f.runtime.init();const view=await f.runtime.handle({type:'ENVIRONMENT',environmentId:'production'});
+  assert.equal(view.backendUrl,environments[1].url);assert.equal(f.saved().auth,undefined);
+  assert.match(view.message,/não confirmada/);assert.ok(urls.every(url=>url.startsWith(environments[0].url+'/')));
+ }finally{globalThis.fetch=original;}
+});
+test('resposta atrasada do ambiente anterior é descartada após a troca',async()=>{
+ const f=fixture({environments}),original=globalThis.fetch;let release;
+ globalThis.fetch=async(url,options)=>url.endsWith('/late')?new Promise(resolve=>{release=()=>resolve(Response.json({old:true}));}):f.fetch(url,options);
+ try{await f.runtime.init();const pending=f.runtime.request('/late');
+  await f.runtime.handle({type:'ENVIRONMENT',environmentId:'production'});
+  release();await assert.rejects(pending,/interrompida/);
+  assert.equal(f.saved().backendUrl,environments[1].url);assert.equal(f.saved().auth,undefined);
+ }finally{globalThis.fetch=original;}
+});
 
 test('HTTP 403 da conversão pausa por acesso negado com status local, sem repetir nem salvar resultado',async()=>{
  const f=fixture({result:{blocked:'access_denied',httpStatus:403}}),original=globalThis.fetch;globalThis.fetch=f.fetch;

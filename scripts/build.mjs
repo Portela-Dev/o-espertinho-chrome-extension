@@ -32,7 +32,29 @@ if (
   throw new Error(
     "BACKEND_URL deve ser uma origem HTTPS ou localhost/127.0.0.1 HTTP.",
   );
-manifest.host_permissions = [`${backend.origin}/*`];
+const configuredEnvironments = process.env.BACKEND_ENVIRONMENTS ? JSON.parse(process.env.BACKEND_ENVIRONMENTS) : [
+  { id: 'default', label: 'Padrão', url: backend.origin },
+];
+if (!Array.isArray(configuredEnvironments) || !configuredEnvironments.length || configuredEnvironments.length > 10)
+  throw new Error('BACKEND_ENVIRONMENTS deve conter entre 1 e 10 ambientes.');
+const environmentIds = new Set(), environmentOrigins = new Set();
+function validEnvironmentIdentity(environment) {
+  return environment && typeof environment.id === 'string' && /^[a-z][a-z0-9_-]{0,39}$/.test(environment.id) &&
+    typeof environment.label === 'string' && environment.label.trim() && environment.label.length <= 60 && typeof environment.url === 'string';
+}
+const environments = configuredEnvironments.map(environment => {
+  if (!validEnvironmentIdentity(environment))
+    throw new Error('Ambiente inválido em BACKEND_ENVIRONMENTS.');
+  const url = new URL(environment.url);
+  if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) ||
+      url.username || url.password || url.pathname !== '/' || url.search || url.hash ||
+      environmentIds.has(environment.id) || environmentOrigins.has(url.origin))
+    throw new Error('Ambientes devem ter IDs e origens únicos, com HTTPS ou HTTP local, sem caminho ou credenciais.');
+  environmentIds.add(environment.id); environmentOrigins.add(url.origin);
+  return { id: environment.id, label: environment.label.trim(), url: url.origin };
+});
+if (!environmentOrigins.has(backend.origin)) throw new Error('BACKEND_URL deve pertencer a BACKEND_ENVIRONMENTS.');
+manifest.host_permissions = environments.map(environment => `${environment.url}/*`);
 
 if (packageJson.version !== manifest.version) {
   throw new Error(
@@ -67,7 +89,7 @@ if (compiler.error) throw compiler.error;
 if (compiler.status !== 0) process.exit(compiler.status ?? 1);
 await writeFile(
   new URL("config.js", destination),
-  `export const DEFAULT_BACKEND_URL = ${JSON.stringify(backend.origin)};\n`,
+  `export const DEFAULT_BACKEND_URL = ${JSON.stringify(backend.origin)};\nexport const BACKEND_ENVIRONMENTS = ${JSON.stringify(environments)};\n`,
 );
 await writeFile(
   new URL("manifest.json", destination),
