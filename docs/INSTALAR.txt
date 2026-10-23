@@ -12,5 +12,10 @@ Mantenha a pasta no computador: o Chrome carrega os arquivos a partir dela.
 Para atualizar, substitua os arquivos e clique em "Recarregar" em chrome://extensions.
 Para remover, use "Remover" na mesma página.
 
-Este pacote é um boilerplate. Não há login, coleta de dados ou geração de links.
+Após carregar, abra a extensão, conecte a conta do O Espertinho e autorize no site.
+O perfil precisa de permissão para gerar links de afiliados.
+BACKEND_URL padrão: http://localhost:3000. Aplique as migrations atuais do backend antes de usar o catálogo.
+As quatro etapas do catálogo operam sobre os dados do backend configurado.
+IA do catálogo (teste): abra o painel lateral, entre no O Espertinho e use Continue with ChatGPT na seção IA do catálogo. Apenas o login abre uma aba, fechada ao retornar. Carregue os modelos, confira os dados da oferta, autorize o envio à OpenAI e analise no próprio painel.
+Nenhum processo adicional é necessário. Fechar/recarregar o painel ou trocar para popup exige novo login. A prova não altera o catálogo nem envia credenciais ChatGPT ao backend.
 Não é um instalador automático .exe/.crx nem uma publicação na Chrome Web Store.

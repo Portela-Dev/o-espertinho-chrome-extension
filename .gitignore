@@ -5,8 +5,10 @@ coverage/
 reports/
 .env
 .env.*
+!.env.example
 *.pem
 *.crx
 *.log
 .DS_Store
 Thumbs.db
+test-results/

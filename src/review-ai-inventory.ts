@@ -1,0 +1,171 @@
+import type { ReviewTransport } from './review-ai-workflow.js';
+export class ReviewAiInventory {
+  revision = '';
+  categories: any[] = [];
+  products: any[] = [];
+  async load(transport: ReviewTransport, current: () => void) {
+    this.revision = '';
+    this.categories = [];
+    this.products = [];
+    for (const kind of ['categories', 'products', 'drafts'])
+      await this.loadKind(kind, transport, current);
+  }
+  private async loadKind(
+    kind: string,
+    transport: ReviewTransport,
+    current: () => void,
+  ) {
+    let cursor: string | undefined;
+    const seen = new Set<string>();
+    do {
+      current();
+      const page = await transport('inventory', {
+        kind,
+        ...(cursor ? { cursor } : {}),
+        ...(this.revision ? { revision: this.revision } : {}),
+        limit: 250,
+      });
+      current();
+      this.validatePage(page);
+      this.revision = page.revision;
+      if (kind === 'categories') this.categories.push(...page.items);
+      else this.products.push(...page.items);
+      cursor = page.nextCursor ?? undefined;
+      if (cursor) {
+        if (seen.has(cursor))
+          throw new Error('Paginação do inventário sem progresso.');
+        seen.add(cursor);
+      }
+    } while (cursor);
+  }
+
+  private validatePage(page: any) {
+    if (
+      typeof page.revision !== 'string' ||
+      !Array.isArray(page.items) ||
+      (this.revision && page.revision !== this.revision)
+    )
+      throw new Error('Inventário inconsistente. Atualize e tente novamente.');
+  }
+  merge(delta: any) {
+    if (!delta?.revision)
+      throw new Error(
+        'O backend não devolveu a revisão do catálogo atualizado.',
+      );
+    this.revision = delta.revision;
+    this.categories = [
+      ...new Map(
+        [...this.categories, ...(delta.categories ?? [])].map((c) => [c.id, c]),
+      ).values(),
+    ];
+    const removed = new Set(delta.removeDraftIds ?? []);
+    this.products = [
+      ...new Map(
+        [
+          ...this.products.filter((p) => !removed.has(p.id)),
+          ...(delta.products ?? []),
+          ...(delta.drafts ?? []),
+        ].map((p) => [p.id, p]),
+      ).values(),
+    ];
+  }
+}
+const chunks = (items: any[], size: number) =>
+  Array.from({ length: Math.max(1, Math.ceil(items.length / size)) }, (_, i) =>
+    items.slice(i * size, (i + 1) * size),
+  );
+export async function decideReview(
+  context: any,
+  inventory: ReviewAiInventory,
+  model: string,
+  analyze: (input: any) => Promise<any>,
+  current: () => void,
+) {
+  const call = async (
+    categories: any[],
+    products: any[],
+    allowCreate = true,
+  ) => {
+    current();
+    const answer = await analyze({
+      ...context,
+      model,
+      categories,
+      products,
+      allowCreate,
+      candidatesTruncated: false,
+    });
+    current();
+    return answer;
+  };
+  if (context.task === 'product')
+    return decideProduct(inventory.products, call);
+  return decideCategory(inventory.categories, call);
+}
+type CandidateCall = (
+  categories: any[],
+  products: any[],
+  allowCreate?: boolean,
+) => Promise<any>;
+async function decideProduct(products: any[], call: CandidateCall) {
+  const groups = chunks(
+      products.filter((p) => !p.personalized_kit),
+      30,
+    ),
+    matches = new Map<string, any>();
+  if (groups.length === 1) return call([], groups[0]);
+  for (const group of groups) {
+    const answer = await call([], group);
+    if (answer.action === 'invalid') return answer;
+    if (answer.action === 'link_existing') {
+      const product = group.find((p) => p.id === answer.productId);
+      if (!product)
+        throw new Error('A IA escolheu um produto fora dos candidatos.');
+      matches.set(product.id, product);
+    }
+  }
+  if (matches.size > 30)
+    return {
+      action: 'needs_review',
+      category: '',
+      categoryId: null,
+      productId: null,
+      product: null,
+      reason: 'Muitos candidatos equivalentes; revise a identidade do produto.',
+    };
+  // A doubt from an unrelated batch must not veto the final decision; compare all matches together.
+  return call([], [...matches.values()], matches.size === 0);
+}
+async function decideCategory(categories: any[], call: CandidateCall) {
+  if (categories.length <= 100) return call(categories, []);
+  let proposal: any,
+    ambiguous: any,
+    finalists: any[] = [];
+  for (const group of chunks(categories, 100)) {
+    const answer = await call(group, []);
+    if (answer.action === 'invalid') return answer;
+    if (answer.action === 'use_category') {
+      const category = group.find((c) => c.id === answer.categoryId);
+      if (!category)
+        throw new Error('A IA escolheu uma categoria fora dos candidatos.');
+      finalists.push(category);
+    } else if (answer.action === 'needs_review') ambiguous = answer;
+    else proposal ??= answer;
+  }
+  finalists = [...new Map(finalists.map((c) => [c.id, c])).values()];
+  if (finalists.length === 0) return ambiguous ?? proposal;
+  return reduceCategoryFinalists(finalists, call);
+}
+async function reduceCategoryFinalists(finalists: any[], call: CandidateCall) {
+  while (finalists.length > 100) {
+    const next: any[] = [];
+    for (const group of chunks(finalists, 100)) {
+      const answer = await call(group, [], false);
+      if (answer.action === 'needs_review') return answer;
+      next.push(group.find((c) => c.id === answer.categoryId));
+    }
+    finalists = next;
+  }
+  // Resolve between all matching branches, rather than choosing the first partial match.
+  return call(finalists, []);
+}

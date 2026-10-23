@@ -1,26 +1,47 @@
 {
   "manifest_version": 3,
   "name": "O Espertinho",
-  "description": "Extensão administrativa do O Espertinho. Estrutura inicial, sem integrações habilitadas.",
-  "version": "0.1.0",
+  "description": "Catálogo por configuração: descoberta, conversão, extração e atualização de preços no Chrome.",
+  "version": "0.3.0",
   "minimum_chrome_version": "120",
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting",
+    "activeTab",
+    "webRequest",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "http://localhost/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://127.0.0.1/*"
+  ],
   "icons": {
-    "32": "icons/icon-32.png",
-    "128": "icons/icon-128.png"
+    "16": "icons/tinho-caramelo-v9-16.png",
+    "32": "icons/tinho-caramelo-v9-32.png",
+    "48": "icons/tinho-caramelo-v9-48.png",
+    "128": "icons/tinho-caramelo-v9-128.png"
   },
   "action": {
     "default_title": "O Espertinho",
-    "default_popup": "popup.html",
     "default_icon": {
-      "32": "icons/icon-32.png",
-      "128": "icons/icon-128.png"
+      "16": "icons/tinho-caramelo-v9-16.png",
+      "32": "icons/tinho-caramelo-v9-32.png",
+      "48": "icons/tinho-caramelo-v9-48.png",
+      "128": "icons/tinho-caramelo-v9-128.png"
     }
+  },
+  "side_panel": {
+    "default_path": "popup.html?view=panel"
   },
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'; base-uri 'none'; frame-ancestors 'none';"
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; frame-ancestors 'none';"
   }
 }
