@@ -41,5 +41,9 @@ chrome.runtime.onStartup.addListener(() => {
   void runtime.pump();
 });
 chrome.runtime.onInstalled.addListener(() => {
+  void restoreModeSafely();
   void runtime.init();
 });
+
+// Reapply action behavior after an extension reload or MV3 worker restart.
+void restoreModeSafely();
