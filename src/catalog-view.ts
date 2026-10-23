@@ -35,10 +35,6 @@ export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./rev
     el('login').hidden = !!view.user;
     el<HTMLButtonElement>('login').disabled = busy || view.pairing;
     el('logout').hidden = !view.user && !view.pairing;
-    el<HTMLInputElement>('backend').disabled = !!view.user || view.pairing;
-    el<HTMLButtonElement>('save-backend').disabled = busy || !!view.user || view.pairing;
-    if (document.activeElement !== el('backend'))
-        el<HTMLInputElement>('backend').value = view.backendUrl;
     const select = el<HTMLSelectElement>('marketplace');
     const selected = view.marketplaceId || select.value || view.markets[0]?.id;
     select.disabled=busy;el<HTMLInputElement>('retry-failed').disabled=busy;
@@ -59,6 +55,8 @@ export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./rev
         status = stepLabel(run.step)+' · '+(view.markets.find(m=>m.id===run.marketplace_id)?.name??run.marketplace_id??'')+' · '+runLabel(run.status);
         if (run.reason)
             status += ' · ' + run.reason;
+        const diagnostic = /^Conversão recusada: HTTP (401|403|429)\./.exec(view.message)?.[0];
+        if (run.status === 'waiting_for_human' && diagnostic) status += ' · ' + diagnostic;
     }
     el('run-status').textContent = status;
     el('counts').textContent = run ? `${run.completed} concluídos · ${run.failed} falhas · ${run.total} itens` : '';
@@ -66,9 +64,9 @@ export function renderCatalog(view: CatalogView, busy: boolean,ai?:import('./rev
     el<HTMLProgressElement>('progress').value = (run?.completed ?? 0) + (run?.failed ?? 0);
     const aiShown=!!ai&&ai.status!=='idle',aiActive=aiShown&&ai.status==='running';
     if(aiShown){
-        const processed=Math.min(ai.total,ai.completed+ai.pending+ai.failed);
+        const processed=Math.min(ai.total,ai.completed+ai.pending+ai.failed+(ai.invalid??0));
         el('run-status').textContent=(ai.task==='category'?'Categorização':'Catalogação')+' por IA · '+({running:'Em execução',completed:'Concluída',cancelled:'Cancelada',failed:'Interrompida'}[ai.status]??ai.status);
-        el('counts').textContent=processed+' / '+ai.total+(ai.task==='product'?' links processados · ':' produtos processados · ')+ai.completed+(ai.task==='category'?' categorizados':' catalogados')+' · '+ai.pending+' pendências · '+ai.failed+' falhas';
+        el('counts').textContent=processed+' / '+ai.total+(ai.task==='product'?' links processados · ':' produtos processados · ')+ai.completed+(ai.task==='category'?' categorizados':' catalogados')+' · '+ai.pending+' pendências · '+(ai.invalid??0)+' inválidos · '+ai.failed+' falhas';
         el<HTMLProgressElement>('progress').max=Math.max(1,ai.total);el<HTMLProgressElement>('progress').value=processed;
     }
     for(const id of ['pause','resume','focus'])el(id).hidden=aiShown;

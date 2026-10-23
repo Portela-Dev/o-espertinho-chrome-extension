@@ -17,7 +17,6 @@ type CatalogCommand = {
     operation?:string;payload?:any;
     marketplaceId?: string;
     step?: CatalogStep;
-    url?: string;
     limit?: number;
     retryFailed?: boolean;
     runId?: string;
@@ -54,10 +53,13 @@ export class CatalogRuntime {
             accessLevel: 'TRUSTED_CONTEXTS'
         });
         const old = (await this.browser.storage.local.get('state')).state as CatalogState | undefined;
-        this.state = old?.version === 2 ? old : {
-            version: 2, backendUrl: old?.backendUrl ?? DEFAULT_BACKEND_URL, auth: old?.auth, markets: [], message: 'Conecte sua conta para começar.'
+        const configuredBackend = backendOrigin(DEFAULT_BACKEND_URL);
+        const sameBackend = old?.backendUrl === configuredBackend;
+        this.state = sameBackend && old?.version === 2 ? old : {
+            version: 2, backendUrl: configuredBackend, auth: sameBackend ? old?.auth : undefined, markets: [], message: 'Conecte sua conta para começar.'
         };
-        this.state.backendUrl = backendOrigin(this.state.backendUrl);
+        this.state.backendUrl = configuredBackend;
+        if (old && !sameBackend) await this.headers.clear();
         await this.browser.alarms.create('worker', {
             periodInMinutes: 0.5
         });
@@ -289,7 +291,7 @@ export class CatalogRuntime {
                 if(['config','queue'].includes(command.operation)){
                     if(typeof p.marketplaceId!=='string'||!/^[a-z][a-z0-9_-]{1,39}$/.test(p.marketplaceId))throw new Error('Marketplace inválido.');
                     const params=new URLSearchParams({marketplaceId:p.marketplaceId});
-                    if(command.operation==='queue'){if(!['category','product'].includes(p.task)||!Number.isInteger(p.limit)||p.limit<1||p.limit>10000)throw new Error('Fila de IA inválida.');params.set('task',p.task);params.set('limit',String(p.limit));}
+                    if(command.operation==='queue'){if(!['category','product'].includes(p.task)||!Number.isInteger(p.limit)||p.limit<1||p.limit>10000||p.retryReview!==undefined&&typeof p.retryReview!=='boolean')throw new Error('Fila de IA inválida.');params.set('task',p.task);params.set('limit',String(p.limit));params.set('retryReview',String(p.retryReview??false));}
                     return this.api(paths[command.operation]+'?'+params);
                 }
                 return this.api(paths[command.operation],p);
@@ -318,15 +320,6 @@ export class CatalogRuntime {
                 break;
             case 'REFRESH':
                 await this.refresh();
-                break;
-            case 'BACKEND':
-                if (this.state.auth || this.state.pair)
-                    throw new Error('Saia antes de alterar o backend.');
-                this.state.backendUrl = backendOrigin(command.url!);
-                delete this.state.run;
-                delete this.state.claim;
-                delete this.state.pendingResult;
-                await this.save();
                 break;
             case 'PREPARE':
                 this.state.marketplaceId = this.market(command.marketplaceId).id;
@@ -482,12 +475,12 @@ export class CatalogRuntime {
             return {
                 blocked: block
             };
-        const inject = async (func: any, args: any[]) => {
+        const inject = async (func: any, args: any[], world: 'ISOLATED' | 'MAIN' = 'ISOLATED') => {
             assertActive();
             const values = await this.browser.scripting.executeScript({
                 target: {
                     tabId: this.state.tabId!
-                }, world: 'ISOLATED', func, args
+                }, world, func, args
             });
             const value = values[0]?.result;
             if (value === undefined)
@@ -502,13 +495,15 @@ export class CatalogRuntime {
                 profile: snapshot.profile, settings, originalUrl: item.payload.originalUrl, allowedOrigins: origins
             }]);
     }
-    private async convert(claim: CatalogClaim, inject: (func: any, args: any[]) => Promise<any>) {
+    private async convert(claim: CatalogClaim, inject: (func: any, args: any[], world?: 'ISOLATED' | 'MAIN') => Promise<any>) {
         const recipe = claim.snapshot.settings.recipe;
         validateRecipe(recipe);
         const variables = await this.headers.values(recipe), item = claim.item!;
         const result = await inject(executeRecipe, [recipe, {
                 id: item.id, title: item.payload.title ?? '', originalUrl: item.payload.originalUrl
-            }, variables]);
+            }, variables], recipe.executionWorld ?? 'ISOLATED');
+        if (result.blocked)
+            return { blocked: result.blocked, diagnostic: 'Conversão recusada: HTTP ' + result.httpStatus + '.' };
         if (result.needsLogin)
             return {
                 blocked: 'login'
@@ -670,7 +665,7 @@ export class CatalogRuntime {
             return;
         if (result.blocked) {
             await this.action('human', result.blocked);
-            this.state.message = 'Intervenção necessária: ' + result.blocked + '. Abra a janela de processamento e depois clique em Continuar.';
+            this.state.message = (result.diagnostic ? result.diagnostic + ' ' : '') + 'Intervenção necessária: ' + result.blocked + '. Abra a janela de processamento e depois clique em Continuar.';
             await this.save();
             return;
         }

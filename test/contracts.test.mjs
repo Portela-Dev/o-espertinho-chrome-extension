@@ -2,6 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { backendOrigin, validateConfiguration } from "../dist/contracts.js";
 import { configuration } from "./fixtures.mjs";
+import {isRequestBody} from '../dist/recipe-json.js';
+
+test('JSON aninhado tem limites e condição de resposta não aceita caminhos perigosos',()=>{
+ const c=structuredClone(configuration),step=c.marketplaces[0].steps[0];step.body={variables:{links:[{url:'{{originalUrl}}'}],flag:true,optional:null}};step.responseChecks=[{path:'data.links.0.failCode',equals:0}];assert.ok(validateConfiguration(c));
+ step.bodyEncoding='form';assert.throws(()=>validateConfiguration(c));delete step.bodyEncoding;
+ step.responseChecks[0].path='data.__proto__.url';assert.throws(()=>validateConfiguration(c));
+ assert.equal(isRequestBody(JSON.parse('{"constructor":1}')),false);let deep={};for(let i=0;i<9;i++)deep={value:deep};assert.equal(isRequestBody(deep),false);
+});
+
+test('contexto da receita é declarativo e limitado a ISOLATED ou MAIN',()=>{for(const executionWorld of ['MAIN','ISOLATED']){const c=structuredClone(configuration);c.marketplaces[0].executionWorld=executionWorld;assert.ok(validateConfiguration(c));}const c=structuredClone(configuration);c.marketplaces[0].executionWorld='eval';assert.throws(()=>validateConfiguration(c));});
 
 test("configurações aceitam HTTPS e loopback e recusam caminhos/segredos/protocolos inseguros", () => {
   assert.equal(backendOrigin("https://api.test/"), "https://api.test");

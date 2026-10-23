@@ -35,6 +35,7 @@
         <div class="actions"><button type="button" id="refresh" class="secondary">Atualizar configurações</button><button type="button" id="prepare" class="secondary">Preparar aba / fazer login</button></div>
         <div class="control-field"><label for="limit">Máximo de itens por execução</label><input id="limit" type="number" min="1" max="10000" value="100"></div>
         <label><input id="retry-failed" type="checkbox"> Incluir extrações com falha</label>
+        <label><input id="retry-ai-review" type="checkbox"> Reprocessar somente itens em revisão nos passos 4 e 5</label>
         <div class="workflow-steps"><button type="button" id="step-discover">1 — Extrair links</button><button type="button" id="step-convert">2 — Gerar links de afiliados</button><button type="button" id="step-enrich">3 — Extrair informações dos produtos</button><button type="button" id="step-product" disabled>4 — Catalogar produtos · entre no ChatGPT</button><button type="button" id="step-category" disabled>5 — Categorizar produtos · entre no ChatGPT</button><hr class="workflow-divider"><button type="button" id="step-prices">6 — Analisar Preços</button></div>
         <h3>Execução atual</h3><output id="run-status" aria-live="polite">Nenhuma execução selecionada.</output>
         <progress id="progress" max="1" value="0" aria-label="Progresso da execução"></progress>
@@ -43,7 +44,22 @@
         <details><summary>Retomar execução</summary><div class="control-stack details-content"><button type="button" id="load-runs" class="secondary">Carregar execuções</button><ul id="runs"></ul><div class="control-field"><label for="runs-size">Itens por página</label><select id="runs-size"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select></div><div class="actions"><button type="button" id="runs-previous" class="secondary">Anterior</button><span id="runs-page"></span><button type="button" id="runs-next" class="secondary">Próxima</button></div></div></details>
       </div></details></section>
       <section class="control-stack" aria-labelledby="picker-title"><details class="card-collapse"><summary><h2 id="picker-title">Selecionar elementos</h2></summary><div class="card-content control-stack"><button type="button" id="pick-elements">Selecionar elementos na aba atual</button></div></details></section>
-      <section aria-labelledby="connection-title"><details class="card-collapse"><summary><h2 id="connection-title">Configuração da conexão</h2></summary><div class="card-content"><form id="settings" class="control-stack details-content"><div class="control-field"><label for="backend">URL do backend</label><input id="backend" type="url" required></div><button type="submit" id="save-backend">Salvar conexão</button></form></div></details></section>
+      <section aria-labelledby="wa-title"><details class="card-collapse"><summary><h2 id="wa-title">WhatsApp — vínculo de grupos (POC)</h2></summary><div class="card-content control-stack">
+        <p class="hint">Mantenha uma aba do WhatsApp nesta janela. A prévia abre o grupo vinculado pelo identificador, sem mudar o foco.</p>
+        <div class="actions"><button type="button" id="wa-open" class="secondary">Abrir WhatsApp Web</button><button type="button" id="wa-identify">Identificar grupo na aba atual</button></div>
+        <div id="wa-candidate" class="control-stack" hidden><strong id="wa-candidate-name"></strong><code id="wa-candidate-id"></code><small id="wa-candidate-account"></small><button type="button" id="wa-confirm" disabled>Confirmar vínculo deste grupo</button></div>
+        <div class="control-field"><label for="wa-bindings">Grupos vinculados neste Chrome</label><select id="wa-bindings"><option value="">Selecione um grupo vinculado</option></select></div>
+        <div class="actions"><button type="button" id="wa-load" class="secondary">Carregar vínculos</button><button type="button" id="wa-select" class="secondary">Abrir grupo vinculado</button><button type="button" id="wa-validate">Validar grupo vinculado</button><button type="button" id="wa-remove" class="secondary">Remover vínculo</button></div>
+        <output id="wa-validation" aria-live="polite">Verificação pendente.</output>
+        <hr class="workflow-divider">
+        <div class="control-field"><label for="wa-text">Mensagem de teste (até 2.000 caracteres)</label><textarea id="wa-text" rows="4" maxlength="2000"></textarea></div>
+        <button type="button" id="wa-text-preview-button">Gerar prévia da mensagem</button>
+        <section id="wa-text-preview" class="control-stack" aria-labelledby="wa-text-preview-title" hidden>
+          <h3 id="wa-text-preview-title">Confira o envio único</h3><strong id="wa-text-name"></strong><code id="wa-text-group"></code><small id="wa-text-account"></small><pre id="wa-preview-text"></pre>
+          <div class="actions"><button type="button" id="wa-send-confirm" disabled>Confirmar e enviar uma vez</button><button type="button" id="wa-send-cancel" class="secondary">Cancelar prévia</button></div>
+        </section>
+        <output id="wa-send-status" aria-live="polite">Nenhuma tentativa de envio.</output>
+      </div></details></section>
       <footer>Versão <span id="version"></span></footer>
     </main>
     <aside id="notification" class="toast" hidden aria-label="Notificação">

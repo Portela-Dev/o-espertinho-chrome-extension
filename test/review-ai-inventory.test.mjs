@@ -5,7 +5,21 @@ const proposed={action:'create_new',category:'',categoryId:null,productId:null,p
 test('comparação global percorre todos os lotes e encontra produto depois do antigo limite',async()=>{
  const inventory=new ReviewAiInventory();inventory.products=Array.from({length:65},(_,i)=>({id:'p'+i,name:'Modelo '+i,brand:'Marca',kind:'product'}));let calls=0;
  const decision=await decideReview({task:'product',offer:{title:'Modelo 64'}},inventory,'fixture',async input=>{calls++;return input.products.some(p=>p.id==='p64')?{...proposed,action:'link_existing',product:null,productId:'p64'}:proposed;},()=>{});
- assert.equal(calls,3);assert.equal(decision.productId,'p64');
+ assert.equal(calls,4);assert.equal(decision.productId,'p64');
+});
+
+test('decisão final compara todos os vínculos e uma dúvida em lote irrelevante não veta criação',async()=>{
+ const inventory=new ReviewAiInventory();inventory.products=Array.from({length:60},(_,i)=>({id:'p'+i,name:'Modelo '+i}));let calls=0;
+ const result=await decideReview({task:'product'},inventory,'fixture',async input=>{calls++;if(!input.products.length)return proposed;return calls===1?{...proposed,action:'needs_review',product:null,reason:'Candidatos não correspondem.'}:proposed;},()=>{});
+ assert.equal(result.action,'create_new');assert.equal(calls,3);
+ const seen=[];const matched=await decideReview({task:'product'},inventory,'fixture',async input=>{seen.push(input.products.map(p=>p.id));return {...proposed,action:'link_existing',product:null,productId:input.products.at(-1).id};},()=>{});
+ assert.deepEqual(seen.at(-1),['p29','p59']);assert.equal(matched.productId,'p59');
+});
+
+test('contradição invalida antes de criar; categorias completas podem criar filho de raiz existente',async()=>{
+ const inventory=new ReviewAiInventory();inventory.products=Array.from({length:35},(_,i)=>({id:'p'+i}));let calls=0;
+ const invalid=await decideReview({task:'product'},inventory,'fixture',async()=>{calls++;return {action:'invalid',reason:'128 GB contra 256 GB.'};},()=>{});assert.equal(invalid.action,'invalid');assert.equal(calls,1);
+ inventory.categories=[{id:'root',path:['Saúde']}];const category=await decideReview({task:'category'},inventory,'fixture',async input=>{assert.equal(input.allowCreate,true);return {action:'create_category',category:'Saúde > Suplementos Alimentares'};},()=>{});assert.equal(category.action,'create_category');
 });
 test('categorização considera todas as árvores e desempata os candidatos, sem criar quando há equivalente',async()=>{
  const inventory=new ReviewAiInventory();inventory.categories=Array.from({length:125},(_,i)=>({id:'c'+i,path:['Grupo '+i]}));let seen=new Set(),calls=0;

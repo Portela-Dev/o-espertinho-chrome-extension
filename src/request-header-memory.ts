@@ -8,7 +8,7 @@ export class RequestHeaderMemory {
   const captures:Capture[]=recipe.steps.flatMap(s=>{
    if(s.type!=='extract'||s.source!=='requestHeader')return [];
    const url=new URL(s.sourceUrl!);
-   if(!/^x-[\w-]+$/i.test(s.key??'')||url.protocol!=='https:'||!recipe.allowedOrigins.includes(url.origin)||url.username||url.password)throw new Error('Origem de observação inválida.');
+   if(!/^(?:x-[\w-]+|csrf-token)$/i.test(s.key??'')||url.protocol!=='https:'||!recipe.allowedOrigins.includes(url.origin)||url.username||url.password)throw new Error('Origem de observação inválida.');
    return [{name:s.name,header:s.key!.toLowerCase(),url:url.origin+url.pathname}];
   });
   await this.browser.storage.session.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});

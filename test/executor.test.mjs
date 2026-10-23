@@ -8,6 +8,17 @@ const item = {
   title: "Teste",
   originalUrl: "https://shop.test/product/1",
 };
+
+test('JSON GraphQL mantém objetos, listas e tipos; resposta exige sucesso configurado antes de aceitar URL',async()=>{
+ const {recipe,sent}=setup();const request=recipe.steps[1];
+ request.body={query:'query ($links: [Link!]) { links { shortLink failCode } }',variables:{links:[{url:'{{originalUrl}}',params:{campaign:'test'}}],enabled:true,count:1,optional:null}};
+ request.responsePath='data.links.0.shortLink';request.responseChecks=[{path:'data.links.0.failCode',equals:0}];
+ globalThis.fetch=async(url,options)=>{sent.push({url,options});return Response.json({data:{links:[{shortLink:'https://shop.test/affiliate/1',failCode:0}]}});};
+ assert.equal((await executeRecipe(recipe,item)).affiliateUrl,'https://shop.test/affiliate/1');
+ assert.deepEqual(JSON.parse(sent[0].options.body).variables,{links:[{url:item.originalUrl,params:{campaign:'test'}}],enabled:true,count:1,optional:null});
+ for(const data of [{data:{links:[{shortLink:'https://shop.test/affiliate/1',failCode:9}]}},{errors:[{message:'PRIVATE_ERROR'}]},{data:{links:[]}}]){globalThis.fetch=async()=>Response.json(data);const result=await executeRecipe(recipe,item);assert.equal(result.affiliateUrl,undefined);assert.doesNotMatch(JSON.stringify(result),/PRIVATE_ERROR/);}
+ request.bodyEncoding='form';assert.equal((await executeRecipe(recipe,item)).affiliateUrl,undefined);
+});
 function setup() {
   const window = new Window({ url: "https://shop.test/login" });
   for (const key of [
@@ -140,15 +151,18 @@ test("recusa origem externa, credenciais na URL, headers reservados e saída nã
     ).error,
   );
 });
-test("sessão ausente e 401/403 pedem intervenção, enquanto erro técnico fica genérico", async () => {
+test("sessão ausente e HTTP 401, 403 e 429 têm motivos distintos sem expor a resposta", async () => {
   const { recipe } = setup();
   document.querySelector("meta").remove();
   assert.equal((await executeRecipe(recipe, item)).needsLogin, true);
-  for (const status of [401, 403, 500]) {
+  for (const status of [401, 403, 429, 500]) {
     const { recipe } = setup();
-    globalThis.fetch = async () => new Response("", { status });
+    globalThis.fetch = async () => new Response("PRIVATE_RESPONSE", { status });
     const result = await executeRecipe(recipe, item);
-    assert.equal(!!result.needsLogin, status !== 500);
+    assert.equal(!!result.needsLogin, status === 401);
+    assert.equal(result.blocked, {401:'login',403:'access_denied',429:'rate_limit'}[status]);
+    assert.equal(result.httpStatus, status === 500 ? undefined : status);
+    assert.doesNotMatch(JSON.stringify(result),/PRIVATE_RESPONSE/);
     assert.ok(result.error);
   }
 });

@@ -6,7 +6,7 @@ Extensão Manifest V3/TypeScript para seis etapas manuais de manutenção do cat
 
 Node 24 e Chrome 120+. Execute `npm ci` e `npm run package`. Carregue dist em chrome://extensions ou extraia o ZIP de artifacts em pasta permanente e carregue a pasta com manifest.json. Após atualizar, recarregue a extensão. O pipeline gera ZIP, checksum e instruções, sem deploy/Web Store.
 
-BACKEND_URL no .env ou variable do build define a origem da API (padrão http://localhost:3000). A conexão pode ser alterada na interface após sair. Não coloque segredos no .env da extensão. Produção usa HTTPS. Nenhuma credencial de marketplace é embutida no pacote.
+BACKEND_URL no .env ou variable do build define a origem da API (padrão http://localhost:3000). A URL é definida somente no build; para trocar de servidor, altere BACKEND_URL e gere novamente o pacote. Ao mudar a origem, a sessão anterior é descartada. Não coloque segredos no .env da extensão. Produção usa HTTPS. Nenhuma credencial de marketplace é embutida no pacote.
 
 O ícone da extensão abre o painel lateral por padrão. O botão de ícone no cabeçalho alterna entre painel lateral (janela com coluna lateral) e popup (janela com pequeno painel), com tooltip e nome acessível indicando o destino. A preferência é salva; o painel permanece aberto enquanto você usa a página. O seletor visual e sua composição continuam disponíveis, com edição e contagem de matches. Pause a coleta antes de inspecionar uma página.
 
@@ -71,4 +71,6 @@ Contas Espertinho e ChatGPT são gerenciadas no topo. A IA reutiliza a única ba
 
 O card Contas reúne Google/Espertinho, ChatGPT e modelo. A interface compacta mantém somente controles, estados e contadores, sem informações de consumo ou nomes de produtos durante a IA.
 
-Os cards Contas, Manter catálogo, Selecionar elementos e Configuração da conexão iniciam recolhidos. Clique no título (ou use Enter/Espaço no teclado) para expandir. Recolher não interrompe execuções nem descarta a sessão/modelo do painel.
+Os cards Contas, Manter catálogo, Selecionar elementos e WhatsApp iniciam recolhidos. Clique no título (ou use Enter/Espaço no teclado) para expandir. Recolher não interrompe execuções nem descarta a sessão/modelo do painel.
+
+POC de grupos do WhatsApp: consulte docs/WHATSAPP_GROUP_POC.md. O card começa recolhido e oferece vinculação/validação local e envio manual de um texto, com prévia, confirmação única e revalidação do grupo. O grupo vinculado é aberto pelo identificador antes da prévia, sem mudar o foco da aba. Não há repetição automática.

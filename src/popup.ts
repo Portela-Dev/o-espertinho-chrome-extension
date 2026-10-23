@@ -1,6 +1,6 @@
+import {setupWhatsAppPanel} from './whatsapp-panel.js';
 import { launchSelectorPicker } from './picker-launcher.js';
 import { setupAiPanel } from './ai-panel.js';
-import { backendOrigin } from './contracts.js';
 import { renderCatalog, runLabel,stepLabel, type CatalogView } from './catalog-view.js';
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let view: CatalogView | undefined, busy = false, page = 1, total = 0;
@@ -24,6 +24,7 @@ function notify(message: string, kind: 'error' | 'success' = 'error') {
 }
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Não foi possível concluir.';
 element('dismiss-notification').addEventListener('click', hideNotification);
+setupWhatsAppPanel(notify);
 const isPanel = new URLSearchParams(window.location.search).get('view') === 'panel';
 void setupAiPanel(notify,isPanel,undefined,{view:()=>view,progress:value=>{if(value?.status==='running')aiProgressSuppressed=false;if(!aiProgressSuppressed)aiProgress=value;},busy:value=>{aiBusy=value;render();}}).catch(()=>notify('Não foi possível iniciar a IA no painel.'));
 document.body.classList.toggle('side-panel', isPanel);
@@ -141,19 +142,6 @@ element('pick-elements').addEventListener('click', () => {
         await launchSelectorPicker();
         if (!isPanel)
             window.close();
-    });
-});
-element('settings').addEventListener('submit', event => {
-    event.preventDefault();
-    void act(async () => {
-        const url = backendOrigin(element<HTMLInputElement>('backend').value);
-        if (!await chrome.permissions.request({
-            origins: [url + '/*']
-        }))
-            throw new Error('Permissão não concedida.');
-        await send('BACKEND', {
-            url
-        });
     });
 });
 async function runs() {

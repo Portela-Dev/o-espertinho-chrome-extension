@@ -39,3 +39,12 @@ Login e inferência com a conta real foram homologados anteriormente pelo admini
 O painel usa espaçamento uniforme entre campos e ações. Textos explicativos fixos foram removidos; estados, contadores, erros e nomes acessíveis dos controles permanecem disponíveis.
 
 Testes incluem reinício real do Chromium com o mesmo perfil, restauração sem OAuth adicional, modelo preservado e segundo reinício após desconectar. Cofre adulterado, rotação serializada, callbacks antigos, modelos inexistentes e falha de rede são testados isoladamente.
+
+
+## Revisão e anúncios inválidos
+
+Os prompts configurados no admin são lidos do backend em cada contexto e enviados ao modelo. RAM física, armazenamento, tamanho de tela, modelo e geração distinguem produtos. Kits personalizados geram produto próprio por anúncio. Inconsistências factuais internas retornam invalid sem aplicar dados; dúvidas sem contradição retornam needs_review. O progresso distingue inválidos de pendências e falhas.
+
+Marque Reprocessar somente itens em revisão nos passos 4 e 5 para reavaliar needs_review do marketplace selecionado, respeitando o máximo de itens. Desmarque para o fluxo normal. Uma reserva ativa não é substituída. Anúncios inválidos exigem Extrair novamente para reavaliar no admin, passo 3 bem-sucedido e nova análise. Isso permite que o vendedor corrija a página sem aceitar dados antigos automaticamente.
+
+Os candidatos de produto de todos os lotes são consolidados antes da decisão final; mapeamentos anteriores de categoria são incluídos no contexto. Não há inferência, publicação ou reenvio automático ao marcar a opção.

@@ -25,16 +25,25 @@ const chunks=(items:any[],size:number)=>Array.from({length:Math.max(1,Math.ceil(
 export async function decideReview(context:any,inventory:ReviewAiInventory,model:string,analyze:(input:any)=>Promise<any>,current:()=>void){
  const call=async(categories:any[],products:any[],allowCreate=true)=>{current();const answer=await analyze({...context,model,categories,products,allowCreate,candidatesTruncated:false});current();return answer;};
  if(context.task==='product'){
-  let proposal:any,ambiguous:any;
-  for(const group of chunks(inventory.products,30)){
-   const answer=await call([],group);if(answer.action==='link_existing')return answer;
-   if(answer.action==='needs_review')ambiguous=answer;else proposal??=answer;
+  const groups=chunks(inventory.products.filter(p=>!p.personalized_kit),30),matches=new Map<string,any>();
+  if(groups.length===1)return call([],groups[0]);
+  for(const group of groups){
+   const answer=await call([],group);
+   if(answer.action==='invalid')return answer;
+   if(answer.action==='link_existing'){
+    const product=group.find(p=>p.id===answer.productId);if(!product)throw new Error('A IA escolheu um produto fora dos candidatos.');
+    matches.set(product.id,product);
+   }
   }
-  return ambiguous??proposal;
+  if(matches.size>30)return {action:'needs_review',category:'',categoryId:null,productId:null,product:null,reason:'Muitos candidatos equivalentes; revise a identidade do produto.'};
+  // A doubt from an unrelated batch must not veto the final decision; compare all matches together.
+  return call([],[...matches.values()],matches.size===0);
  }
+ if(inventory.categories.length<=100)return call(inventory.categories,[]);
  let proposal:any,ambiguous:any,finalists:any[]=[];
  for(const group of chunks(inventory.categories,100)){
   const answer=await call(group,[]);
+  if(answer.action==='invalid')return answer;
   if(answer.action==='use_category'){const category=group.find(c=>c.id===answer.categoryId);if(!category)throw new Error('A IA escolheu uma categoria fora dos candidatos.');finalists.push(category);}
   else if(answer.action==='needs_review')ambiguous=answer;else proposal??=answer;
  }
@@ -42,5 +51,5 @@ export async function decideReview(context:any,inventory:ReviewAiInventory,model
  if(finalists.length===0)return ambiguous??proposal;
  while(finalists.length>100){const next:any[]=[];for(const group of chunks(finalists,100)){const answer=await call(group,[],false);if(answer.action==='needs_review')return answer;next.push(group.find(c=>c.id===answer.categoryId));}finalists=next;}
  // Resolve between all matching branches, rather than choosing the first partial match.
- return call(finalists,[],false);
+ return call(finalists,[]);
 }

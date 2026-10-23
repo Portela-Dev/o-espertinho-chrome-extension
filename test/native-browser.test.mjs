@@ -21,7 +21,7 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
  const snapshot={settings,profile,market:{allowedHosts:['shop.example.com'],normalizationRules:[]}};
  try{
   await cp(new URL('../dist/',import.meta.url),extension,{recursive:true});
-  await writeFile(join(extension,'background.js'),(await readFile(join(extension,'background.js'),'utf8'))+'\nglobalThis.catalogTest=runtime;\n');
+  await writeFile(join(extension,'background.js'),(await readFile(join(extension,'background.js'),'utf8'))+'\nimport {executeRecipe as contextRecipeTest} from "./executor.js";\nglobalThis.catalogTest=runtime;globalThis.executeRecipeTest=contextRecipeTest;\n');
   const manifest=JSON.parse(await readFile(join(extension,'manifest.json'),'utf8'));manifest.host_permissions.push('https://shop.example.com/*','http://localhost/*','http://127.0.0.1/*','https://auth.openai.com/*','https://api.openai.com/*');await writeFile(join(extension,'manifest.json'),JSON.stringify(manifest));
   server=createServer(async(req,res)=>{
    const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=chunks.length?JSON.parse(Buffer.concat(chunks)):undefined;
@@ -54,12 +54,17 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
     res.end('<!doctype html><div class="card"><a href="/a">A</a></div><div id="space" style="height:2400px"></div><script>let added=false;addEventListener("scroll",()=>{if(!added&&scrollY+innerHeight>=document.scrollingElement.scrollHeight-2){added=true;document.body.insertAdjacentHTML("afterbegin",\'<div class="card"><a href="/b">B</a></div>\');document.getElementById("space").style.height="3600px";}});</script>');return;
    }
    if(['/product','/affiliate-product'].includes(url.pathname))visited.push({step:run?.step,path:url.pathname});
+   if(url.pathname==='/convert-page'){
+    const ok=req.headers['x-page-context']==='TEST_ONLY_PAGE'&&req.headers['x-csrf-token']==='TEST_ONLY_CSRF';
+    res.writeHead(ok?200:403,{'Content-Type':'application/json'});res.end(JSON.stringify({data:{links:[{shortLink:marketOrigin+'/product?affiliate=page-context',failCode:0}]}}));return;
+   }
    if(url.pathname==='/convert'){
+
     if(req.headers['x-csrf-token']!=='TEST_ONLY_CSRF'){res.writeHead(403);res.end('{}');return;}
     res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({link:marketOrigin+'/product?affiliate=fixture'}));return;
    }
    const html=challenge?'<div class="human-check">Intervenção no ambiente de teste</div>':url.pathname.startsWith('/list')?'<div class="card"><a href="'+(url.pathname==='/list'?'/product?ref=test':'/product2?ref=test')+'">Product</a></div>'+(url.pathname==='/list'?'<button class="next" onclick="location.href=&quot;/list2&quot;">Next</button>':''):(url.pathname==='/product'?'<nav><a>Eletrônicos</a><a>Áudio</a></nav>':'')+'<h1>Produto controlado</h1><div class="price">R$ 123,45</div>';
-   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<!doctype html><html lang="pt-BR"><head><title>Fixture</title><meta name="csrf-token" content="TEST_ONLY_CSRF"></head><body>'+html+'</body></html>');
+   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<!doctype html><html lang="pt-BR"><head><title>Fixture</title><meta name="csrf-token" content="TEST_ONLY_CSRF"></head><body><script>document.cookie="native_csrf=TEST_ONLY_CSRF; Path=/";const originalFetch=window.fetch;window.fetch=(url,options={})=>originalFetch.call(window,url,{...options,headers:{...options.headers,"X-Page-Context":"TEST_ONLY_PAGE"}});</script>'+html+'</body></html>');
   });await new Promise(r=>marketServer.listen(0,'127.0.0.1',r));marketOrigin='https://shop.example.com:'+marketServer.address().port;
   recipe.loginUrl=marketOrigin+'/product';recipe.allowedOrigins=[marketOrigin];recipe.affiliateOrigins=[marketOrigin];recipe.steps[1].url=marketOrigin+'/convert';snapshot.market.allowedHosts=['shop.example.com:'+marketServer.address().port];
   context=await chromium.launchPersistentContext(join(directory,'profile'),{channel:'chromium',headless:true,chromiumSandbox:true,args:['--disable-extensions-except='+extension,'--load-extension='+extension,'--host-resolver-rules=MAP shop.example.com 127.0.0.1','--ignore-certificate-errors']});
@@ -84,6 +89,10 @@ test('Chromium real executa os quatro passos configuráveis em aba própria na m
     await worker.evaluate(async owner=>chrome.tabs.update(owner.tabId,{active:true}),owner);
    }else assert.equal(current.tab.active,true);
   }
+
+  const pageRecipe={...recipe,steps:[{type:'extract',name:'csrf',source:'cookie',key:'native_csrf'},{type:'request',url:marketOrigin+'/convert-page',method:'POST',headers:{'X-CSRF-Token':'{{csrf}}'},body:{variables:{links:[{url:'{{originalUrl}}'}]}},responsePath:'data.links.0.shortLink',responseChecks:[{path:'data.links.0.failCode',equals:0}]}]};
+  const contexts=await worker.evaluate(async({pageRecipe,marketOrigin})=>{const executeRecipe=globalThis.executeRecipeTest;const output=[];for(const world of ['ISOLATED','MAIN'])output.push((await chrome.scripting.executeScript({target:{tabId:globalThis.catalogTest.state.tabId},world,func:executeRecipe,args:[pageRecipe,{id:'page-probe',title:'Probe',originalUrl:marketOrigin+'/product'}]}))[0].result);return output;},{pageRecipe,marketOrigin});
+  assert.equal(contexts[0].blocked,'access_denied');assert.equal(contexts[0].httpStatus,403);assert.equal(contexts[1].affiliateUrl,marketOrigin+'/product?affiliate=page-context');assert.doesNotMatch(JSON.stringify(contexts),/TEST_ONLY_CSRF|TEST_ONLY_PAGE/);
   const lazy=await context.newPage();await lazy.goto(marketOrigin+'/scroll-list');
   const scrolling={...discovery,pagination:{...discovery.pagination,mode:'scroll',scrollStrategy:'bottom',scrollContainerSelector:''}};
   const read=()=>lazy.evaluate(discoverPage,{config:scrolling,rules:[],action:'read',page:1});

@@ -36,3 +36,10 @@ test('pendências contam como links processados, sem fingir que foram catalogado
  const f=fixture();let calls=0;const flow=new ReviewAiWorkflow(f.transport,async()=>++calls===1?create:{action:'needs_review',category:'',categoryId:null,productId:null,product:null,reason:'Ambíguo'});
  await flow.run('product','shop',2,'model');assert.equal(flow.progress.completed,1);assert.equal(flow.progress.pending,1);assert.equal(flow.progress.total,2);assert.equal(flow.progress.status,'completed');
 });
+
+test('opção de reprocessamento é enviada à fila e a cada reserva sem aplicar decisão inválida',async()=>{
+ const f=fixture();const transport=async(operation,payload)=>{if(operation==='result')return {applied:false,outcome:'invalid',inventory:{revision:'1',categories:[],products:[],drafts:[]}};return f.transport(operation,payload);};
+ const flow=new ReviewAiWorkflow(transport,async()=>({action:'invalid',reason:'Configurações conflitantes.',product:null,productId:null,categoryId:null}));
+ await flow.run('product','shop',2,'model',true);assert.equal(flow.progress.invalid,2);assert.equal(flow.progress.pending,0);assert.equal(flow.progress.completed,0);
+ assert.ok(f.sent.filter(v=>['queue','context'].includes(v.operation)).every(v=>v.payload.retryReview===true));
+});
