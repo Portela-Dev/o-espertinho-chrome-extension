@@ -41,7 +41,17 @@ test('ações dos quatro passos, permissão, seletor e ícone usam mensagens int
   allowed=false;el('step-discover').click();await tick();assert.equal(el('error').hidden,false);allowed=true;
   el('pick-elements').click();await tick();assert.equal(closed,1);
   el('display-mode').click();await tick();assert.equal(opened,1);assert.equal(closed,2);assert.ok(messages.some(m=>m.type==='DISPLAY_MODE'&&m.mode==='panel'));
+  state.environments=[{id:'local',label:'Local',url:'http://localhost:3000'},{id:'production',label:'Produção',url:'https://production.test'}];state.environmentId='local';
   poll();await tick();
+  el('runs').append(document.createElement('li'));
+  const originalSend=globalThis.chrome.runtime.sendMessage;
+  globalThis.chrome.runtime.sendMessage=async message=>{
+   if(message.type==='ENVIRONMENT')state={...state,backendUrl:'https://production.test',environmentId:'production',user:undefined,markets:[]};
+   return originalSend(message);
+  };
+  el('environment').value='production';el('environment').dispatchEvent(new page.Event('change'));await tick();await tick();
+  assert.ok(messages.some(message=>message.type==='ENVIRONMENT'&&message.environmentId==='production'&&message.environmentUrl==='http://localhost:3000'));
+  assert.equal(el('environment').value,'production');assert.equal(el('runs').children.length,0);assert.equal(el('workspace').hidden,true);
  }finally{el('dismiss-notification').click();globalThis.setInterval=interval;}
 });
 

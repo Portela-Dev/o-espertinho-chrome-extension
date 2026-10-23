@@ -29,10 +29,10 @@ test("build valida backend e versao e nao inclui source maps de teste na produca
     await cp(join(root, "scripts/build.mjs"), join(temp, "scripts/build.mjs"));
     await symlink(join(root, "node_modules"), modules, "junction");
     linked = true;
-    const build = (url, args = []) =>
+    const build = (url, args = [], environments) =>
       spawnSync(process.execPath, ["scripts/build.mjs", ...args], {
         cwd: temp,
-        env: { ...process.env, BACKEND_URL: url },
+        env: { ...process.env, BACKEND_URL: url, BACKEND_ENVIRONMENTS: environments ? JSON.stringify(environments) : '' },
         encoding: "utf8",
         windowsHide: true,
       });
@@ -51,6 +51,12 @@ test("build valida backend e versao e nao inclui source maps de teste na produca
       await readFile(join(temp, "dist/manifest.json"), "utf8"),
     );
     assert.deepEqual(manifest.host_permissions, ["https://api.test/*"]);
+    const environments = [{id:'local',label:'Local',url:'http://localhost:3000'}, {id:'production',label:'Produção',url:'https://api.test'}];
+    assert.equal(build('https://api.test', [], environments).status, 0);
+    assert.deepEqual(JSON.parse(await readFile(join(temp,'dist/manifest.json'),'utf8')).host_permissions,['http://localhost:3000/*','https://api.test/*']);
+    assert.match(await readFile(join(temp,'dist/config.js'),'utf8'), /BACKEND_ENVIRONMENTS/);
+    for (const invalid of [[], [...environments,environments[0]], [{...environments[1],url:'http://remote.test'}], [{...environments[1],url:'https://api.test/path'}], [{...environments[1],url:'https://user:secret@api.test'}]])
+      assert.equal(build('https://api.test', [], invalid).status, 1);
     const pkg = JSON.parse(await readFile(join(temp, "package.json"), "utf8"));
     pkg.version = "9.9.9";
     await writeFile(join(temp, "package.json"), JSON.stringify(pkg));

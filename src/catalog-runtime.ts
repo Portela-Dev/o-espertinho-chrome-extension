@@ -1,5 +1,5 @@
 import { discoveryPolicy, failureKind } from './catalog-policy.js';
-import { DEFAULT_BACKEND_URL } from './config.js';
+import { DEFAULT_BACKEND_URL, BACKEND_ENVIRONMENTS } from './config.js';
 import { backendOrigin, validateRecipe, type Auth } from './contracts.js';
 import { RequestHeaderMemory } from './request-header-memory.js';
 import { CatalogNavigation } from './catalog-navigation.js';
@@ -39,12 +39,16 @@ type CatalogCommand = {
   page?: number;
   pageSize?: number;
   hostWindowId?: number;
+  environmentId?: string;
+  environmentUrl?: string;
 };
 export class CatalogRuntime {
   state!: CatalogState;
   private initialization?: Promise<void>;
   private refreshing?: Promise<boolean>;
   private pumping = false;
+  private changingEnvironment = false;
+  private operations = 0;
   private generation = 0;
   private nextRequestAt = 0;
   private timer?: ReturnType<typeof setTimeout>;
@@ -60,7 +64,7 @@ export class CatalogRuntime {
   };
   private readonly headers: RequestHeaderMemory;
   private readonly navigation: CatalogNavigation;
-  constructor(private readonly browser: typeof chrome = chrome) {
+  constructor(private readonly browser: typeof chrome = chrome, private readonly environments = BACKEND_ENVIRONMENTS) {
     this.headers = new RequestHeaderMemory(browser);
     this.navigation = new CatalogNavigation(
       browser,
@@ -79,7 +83,9 @@ export class CatalogRuntime {
     const old = (await this.browser.storage.local.get('state')).state as
       | CatalogState
       | undefined;
-    const configuredBackend = backendOrigin(DEFAULT_BACKEND_URL);
+    const environment = this.environments.find(value => value.id === old?.environmentId && value.url === old?.backendUrl)
+      ?? this.environments.find(value => value.url === backendOrigin(DEFAULT_BACKEND_URL))!;
+    const configuredBackend = backendOrigin(environment.url);
     const sameBackend = old?.backendUrl === configuredBackend;
     this.state =
       sameBackend && old?.version === 2
@@ -92,6 +98,7 @@ export class CatalogRuntime {
             message: 'Conecte sua conta para começar.',
           };
     this.state.backendUrl = configuredBackend;
+    this.state.environmentId = environment.id;
     if (old && !sameBackend) await this.headers.clear();
     await this.browser.alarms.create('worker', {
       periodInMinutes: 0.5,
@@ -126,11 +133,13 @@ export class CatalogRuntime {
     await this.save();
   }
   private async request(path: string, body?: unknown, token?: string) {
+    const origin = this.state.backendUrl, generation = this.generation;
     const delay = Math.max(0, this.nextRequestAt - Date.now());
     this.nextRequestAt = Math.max(Date.now(), this.nextRequestAt) + 300;
     if (delay) await sleep(delay);
+    if (generation !== this.generation) throw new Error('Operação interrompida.');
     const response = await fetch(
-      this.state.backendUrl + '/api/extension' + path,
+      origin + '/api/extension' + path,
       {
         method: body === undefined ? 'GET' : 'POST',
         headers: {
@@ -154,10 +163,8 @@ export class CatalogRuntime {
     } catch {
       throw new Error('Resposta inválida do backend.');
     }
-    return {
-      response,
-      data,
-    };
+    if (generation !== this.generation) throw new Error('Operação interrompida.');
+    return { response, data };
   }
   private async api<T = any>(
     path: string,
@@ -353,6 +360,37 @@ export class CatalogRuntime {
   }
   async handle(command: CatalogCommand) {
     await this.init();
+    if (this.changingEnvironment) throw new Error('Aguarde a troca de ambiente.');
+    if (command.environmentUrl !== undefined && command.environmentUrl !== this.state.backendUrl)
+      throw new Error('O ambiente mudou. Atualize o painel antes de continuar.');
+    if (command.type === 'ENVIRONMENT') return this.changeEnvironment(command.environmentId);
+    const mutation = command.type !== 'STATE';
+    if (mutation) this.operations++;
+    try { return await this.dispatch(command); }
+    finally { if (mutation) this.operations--; }
+  }
+  private async changeEnvironment(id?: string) {
+    const environment = this.environments.find(value => value.id === id);
+    if (!environment) throw new Error('Escolha um ambiente configurado.');
+    if (environment.url === this.state.backendUrl) return this.view();
+    if (this.operations || this.pumping || this.refreshing || this.state.run && !['completed', 'failed', 'cancelled'].includes(this.state.run.status))
+      throw new Error('Conclua ou cancele a execução e aguarde as operações antes de trocar de ambiente.');
+    this.changingEnvironment = true;
+    let revoked = true;
+    try {
+      if (this.state.auth) {
+        try { await this.api('/auth/logout', {}); }
+        catch { revoked = false; }
+      }
+      await this.disconnect();
+      this.state = { version: 2, backendUrl: environment.url, environmentId: environment.id, markets: [],
+        message: revoked ? 'Ambiente alterado. Entre novamente.' : 'Ambiente alterado. Sessão local encerrada; saída no servidor anterior não confirmada.' };
+      this.nextRequestAt = 0;
+      await this.save();
+      return this.view();
+    } finally { this.changingEnvironment = false; }
+  }
+  private async dispatch(command: CatalogCommand) {
     if (command.type !== 'STATE') delete this.state.error;
     if (
       command.hostWindowId !== undefined &&
@@ -501,6 +539,7 @@ export class CatalogRuntime {
   }
   private view() {
     return {
+      environments: this.environments, environmentId: this.state.environmentId,
       backendUrl: this.state.backendUrl,
       user: this.state.auth?.user,
       pairing: !!this.state.pair,
@@ -1080,7 +1119,7 @@ export class CatalogRuntime {
   }
   async pump() {
     await this.init();
-    if (this.pumping) return;
+    if (this.pumping || this.changingEnvironment) return;
     this.pumping = true;
     try {
       if (this.state.pair) await this.poll();

@@ -21,6 +21,7 @@ let aiProgress:
   | undefined;
 let lastBackgroundError = '',
   lastPollingError = '';
+let viewGeneration = 0;
 function hideNotification() {
   clearTimeout(notificationTimer);
   element('notification').hidden = true;
@@ -98,6 +99,7 @@ async function request(type: string, extra: Record<string, unknown> = {}) {
     : undefined;
   const reply = await chrome.runtime.sendMessage({
     type,
+    ...(type !== 'STATE' ? { environmentUrl: view?.backendUrl } : {}),
     ...extra,
     ...(current?.id !== undefined ? { hostWindowId: current.id } : {}),
   });
@@ -105,17 +107,32 @@ async function request(type: string, extra: Record<string, unknown> = {}) {
   return reply.value;
 }
 async function send(type: string, extra: Record<string, unknown> = {}) {
+  if (type === 'ENVIRONMENT') viewGeneration++;
+  const generation = viewGeneration;
   if (['START', 'ATTACH'].includes(type)) {
     aiProgress = undefined;
     aiProgressSuppressed = true;
   }
-  view = await request(type, extra);
+  const next = await request(type, extra);
+  if (generation !== viewGeneration) return;
+  const changed = view && view.backendUrl !== next.backendUrl;
+  view = next;
+  if (changed) {
+    page = 1; total = 0; aiProgress = undefined; aiProgressSuppressed = true;
+    element('runs').replaceChildren(); element('runs-page').textContent = '';
+    lastBackgroundError = ''; lastPollingError = '';
+    document.dispatchEvent(new window.Event('catalog-environment-changed'));
+  }
   render();
   if (type === 'REFRESH')
     document.dispatchEvent(new window.Event('catalog-config-updated'));
   if (type === 'REFRESH' && !view?.error && !view?.statsError)
     notify('Configurações atualizadas.', 'success');
 }
+element('environment').addEventListener('change', () => {
+  const environmentId = element<HTMLSelectElement>('environment').value;
+  void act(async () => { await send('ENVIRONMENT', { environmentId }); });
+});
 element('display-mode').addEventListener('click', () => {
   void act(async () => {
     const mode = isPanel ? 'popup' : 'panel';
