@@ -129,6 +129,7 @@ test(
           : undefined;
         backendTraffic.push({
           url: req.url,
+          host: req.headers.host,
           body,
           authorization: req.headers.authorization,
         });
@@ -279,6 +280,10 @@ test(
         res.end(JSON.stringify(data));
       });
       await new Promise((r) => server.listen(0, '127.0.0.1', r));
+      const testBackendUrl = 'http://localhost:' + server.address().port;
+      const alternateBackendUrl = 'http://127.0.0.1:' + server.address().port;
+      await writeFile(join(extension,'config.js'),
+        `export const DEFAULT_BACKEND_URL = ${JSON.stringify(testBackendUrl)};\nexport const BACKEND_ENVIRONMENTS = ${JSON.stringify([{id:'fixture',label:'Local de teste',url:testBackendUrl},{id:'alternate',label:'Outro ambiente de teste',url:alternateBackendUrl}])};\n`);
       const keyFile = join(directory, 'key.pem'),
         certFile = join(directory, 'cert.pem');
       const cert = spawnSync(
@@ -411,6 +416,7 @@ test(
             state: {
               version: 2,
               backendUrl,
+              environmentId: 'fixture',
               auth: {
                 token: 'TEST_ONLY',
                 refreshToken: 'TEST_ONLY',
@@ -1155,6 +1161,14 @@ test(
         async () => await chrome.storage.local.get('directAiSessionV1'),
       );
       assert.equal(cleared.directAiSessionV1.sealed, null);
+      const beforeSwitch = backendTraffic.length;
+      await direct.locator('#environment').selectOption('alternate');
+      await direct.waitForFunction(() => document.getElementById('account').textContent === 'Conta desconectada' && !document.getElementById('environment').disabled);
+      assert.equal(await direct.locator('#environment').inputValue(),'alternate');
+      assert.equal(backendTraffic.slice(beforeSwitch).some(request => request.authorization && request.host.startsWith('127.0.0.1:')),false);
+      await restart();
+      await direct.waitForFunction(() => document.getElementById('environment').value === 'alternate');
+      assert.equal(await direct.locator('#account').textContent(),'Conta desconectada');
       assert.doesNotMatch(
         JSON.stringify(backendTraffic),
         /DIRECT_NATIVE_PRIVATE|DIRECT_TEST_CODE|id_token|access_token|refresh_token/,

@@ -6,6 +6,8 @@ import type {
 import type { Account } from './contracts.js';
 export interface CatalogView {
   backendUrl: string;
+  environmentId?: string;
+  environments?: {id: string; label: string; url: string}[];
   user?: Account;
   pairing: boolean;
   markets: CatalogMarket[];
@@ -71,6 +73,18 @@ function renderQueue(view: CatalogView, marketplaceId: string) {
         : 'Concluídos / total de links descobertos não arquivados. Falhas não contam como conclusão. Independente do limite por execução.';
   }
 }
+function renderEnvironment(view: CatalogView, disabled: boolean) {
+  const select = el<HTMLSelectElement>('environment'), values = view.environments ?? [];
+  if (JSON.stringify([...select.options].map(option => [option.value, option.textContent])) !== JSON.stringify(values.map(value => [value.id, value.label])))
+    select.replaceChildren(...values.map(value => {
+      const option = document.createElement('option');
+      option.value = value.id; option.textContent = value.label; option.title = value.url;
+      return option;
+    }));
+  select.value = view.environmentId ?? '';
+  select.disabled = disabled;
+  select.title = 'A troca encerra a sessão do Espertinho. Conclua ou cancele execuções pendentes antes de trocar.';
+}
 export function renderCatalog(
   view: CatalogView,
   busy: boolean,
@@ -87,6 +101,7 @@ export function renderCatalog(
   const run = view.run,
     active =
       !!run && !['completed', 'failed', 'cancelled'].includes(run.status);
+  renderEnvironment(view, busy || active);
   renderRun(view, run);
   const aiShown = !!ai && ai.status !== 'idle',
     aiActive = aiShown && ai.status === 'running';
