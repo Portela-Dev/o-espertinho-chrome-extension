@@ -78,3 +78,7 @@ O card Contas reúne Google/Espertinho, ChatGPT e modelo. A interface compacta m
 Os cards Contas, Manter catálogo, Selecionar elementos e WhatsApp iniciam recolhidos. Clique no título (ou use Enter/Espaço no teclado) para expandir. Recolher não interrompe execuções nem descarta a sessão/modelo do painel.
 
 POC de grupos do WhatsApp: consulte docs/WHATSAPP_GROUP_POC.md. O card começa recolhido e oferece vinculação/validação local e envio manual de um texto, com prévia, confirmação única e revalidação do grupo. O grupo vinculado é aberto pelo identificador antes da prévia, sem mudar o foco da aba. Não há repetição automática.
+
+### Faixas de preço
+
+As regras `price` e `originalPrice` aceitam `priceSelection: "first_in_range"` para ler o valor à esquerda de uma faixa como `R$10,89 - R$31,59`. Preços únicos continuam aceitos. Sem essa opção, a leitura exige um preço único. A regra usa o elemento selecionado e valida ambos os valores da faixa; não procura números de parcelas, frete ou descontos em outros textos. A configuração é genérica por perfil, sem implementação por marketplace.

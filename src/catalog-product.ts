@@ -27,6 +27,13 @@ export async function extractCatalogProduct(input: {
         ? cents
         : null;
     },
+    selectedMoney(value: string, selection?: string): number | null {
+      if (selection !== 'first_in_range') return reader.money(value);
+      const range = /^\s*((?:R\$\s*)?\d[\d.,]*)\s*[-–—]\s*((?:R\$\s*)?\d[\d.,]*)\s*$/iu.exec(value);
+      if (!range) return reader.money(value);
+      if (reader.money(range[2]) === null) return null;
+      return reader.money(range[1]);
+    },
     reviewNumber(value: string, count: boolean): number | null {
       const clean = value.trim();
       if (/^[-−]/u.test(clean)) return null;
@@ -230,7 +237,7 @@ export async function extractCatalogProduct(input: {
         case 'price':
         case 'originalPrice': {
           const key = reader.fieldKey(rule.field);
-          if (data[key] === null) data[key] = reader.money(value);
+          if (data[key] === null) data[key] = reader.selectedMoney(value, rule.priceSelection);
           break;
         }
         case 'rating':
