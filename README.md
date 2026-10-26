@@ -8,7 +8,9 @@ Extensão Manifest V3/TypeScript para seis etapas manuais de manutenção do cat
 
 Node 24 e Chrome 120+. Execute `npm ci` e `npm run package`. Carregue dist em chrome://extensions ou extraia o ZIP de artifacts em pasta permanente e carregue a pasta com manifest.json. Após atualizar, recarregue a extensão. O pipeline gera ZIP, checksum e instruções, sem deploy/Web Store.
 
-BACKEND_URL no .env ou variable do build define a origem da API (padrão http://localhost:3000). A URL é definida somente no build; para trocar de servidor, altere BACKEND_URL e gere novamente o pacote. Ao mudar a origem, a sessão anterior é descartada. Não coloque segredos no .env da extensão. Produção usa HTTPS. Nenhuma credencial de marketplace é embutida no pacote.
+`BACKEND_URL` no `.env` ou na variável do build define o ambiente padrão (padrão `http://localhost:3000`). `BACKEND_ENVIRONMENTS` é uma lista JSON de `{id,label,url}` com os ambientes disponíveis no dropdown **Contas → O Espertinho → Ambiente**. O `.env.example` inclui Local e Produção. O build valida IDs e origens únicos, permite HTTPS ou HTTP somente para localhost/127.0.0.1 e gera as permissões de acesso apenas para essas origens. Sem a lista, mantém um único ambiente padrão. Não há campo para digitar uma URL arbitrária no painel.
+
+A seleção persiste após reiniciar o Chrome. Trocar o ambiente encerra a sessão do Espertinho, tenta revogá-la no servidor anterior e limpa configurações, contadores, pareamento, aba de processamento e referências de execução. Se o servidor anterior estiver offline, a sessão local é removida e a revogação não confirmada é informada. É necessário entrar novamente no ambiente escolhido; credenciais não são compartilhadas entre servidores. Conclua ou cancele execuções pendentes antes da troca. A conta ChatGPT e o modelo permanecem locais, mas o inventário e a revisão de catálogo são reiniciados. Não coloque segredos nas variáveis de build.
 
 O ícone da extensão abre o painel lateral por padrão. O botão de ícone no cabeçalho alterna entre painel lateral (janela com coluna lateral) e popup (janela com pequeno painel), com tooltip e nome acessível indicando o destino. A preferência é salva; o painel permanece aberto enquanto você usa a página. O seletor visual e sua composição continuam disponíveis, com edição e contagem de matches. Pause a coleta antes de inspecionar uma página.
 
@@ -76,3 +78,7 @@ O card Contas reúne Google/Espertinho, ChatGPT e modelo. A interface compacta m
 Os cards Contas, Manter catálogo, Selecionar elementos e WhatsApp iniciam recolhidos. Clique no título (ou use Enter/Espaço no teclado) para expandir. Recolher não interrompe execuções nem descarta a sessão/modelo do painel.
 
 POC de grupos do WhatsApp: consulte docs/WHATSAPP_GROUP_POC.md. O card começa recolhido e oferece vinculação/validação local e envio manual de um texto, com prévia, confirmação única e revalidação do grupo. O grupo vinculado é aberto pelo identificador antes da prévia, sem mudar o foco da aba. Não há repetição automática.
+
+### Faixas de preço
+
+As regras `price` e `originalPrice` aceitam `priceSelection: "first_in_range"` para ler o valor à esquerda de uma faixa como `R$10,89 - R$31,59`. Preços únicos continuam aceitos. Sem essa opção, a leitura exige um preço único. A regra usa o elemento selecionado e valida ambos os valores da faixa; não procura números de parcelas, frete ou descontos em outros textos. A configuração é genérica por perfil, sem implementação por marketplace.

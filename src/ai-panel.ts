@@ -47,6 +47,7 @@ export async function setupAiPanel(
     refreshedAt = 0,
     configError = '',
     lastAccountId = '';
+  let workflowOrigin = '';
   function renderWorkflow() {
     const view = hooks?.view(),
       marketplaceId = view?.marketplaceId || view?.markets[0]?.id || '',
@@ -132,7 +133,8 @@ export async function setupAiPanel(
   async function refreshWorkflow() {
     const view = hooks?.view(),
       marketplaceId = view?.marketplaceId || view?.markets[0]?.id;
-    if (!workflow || !marketplaceId || refreshing) return;
+    if (!workflow || !marketplaceId || refreshing || workflow.busy) return;
+    workflowOrigin = view?.backendUrl ?? '';
     refreshing = true;
     refreshedAt = Date.now();
     try {
@@ -255,6 +257,12 @@ export async function setupAiPanel(
     workflow?.cancel();
     app?.cancelAnalysis();
   };
+  const resetEnvironment = () => {
+    cancelWorkflow();
+    if (workflow) { workflow.config = undefined; workflow.marketplaceId = ''; }
+    refreshedAt = 0; configError = '';
+    hooks?.progress?.(undefined);
+  };
   const onHide = () => {
     workflow?.cancel();
     app?.dispose();
@@ -267,6 +275,7 @@ export async function setupAiPanel(
         async (operation, payload) => {
           const reply = await chrome.runtime.sendMessage({
             type: 'AI_REVIEW',
+            environmentUrl: workflowOrigin || hooks.view()?.backendUrl,
             operation,
             payload,
           });
@@ -289,6 +298,7 @@ export async function setupAiPanel(
                 throw new Error(
                   'Entre no Espertinho e no ChatGPT para continuar.',
                 );
+              workflowOrigin = view.backendUrl;
               await workflow!.run(
                 task,
                 el<HTMLSelectElement>('marketplace').value,
@@ -310,6 +320,7 @@ export async function setupAiPanel(
           })();
         });
       document.addEventListener('cancel-ai-review', cancelWorkflow);
+      document.addEventListener('catalog-environment-changed', resetEnvironment);
       el('logout').addEventListener('click', () => {
         workflow?.cancel();
         void app.logout();
@@ -332,6 +343,7 @@ export async function setupAiPanel(
   }, 700);
   return () => {
     document.removeEventListener('cancel-ai-review', cancelWorkflow);
+    document.removeEventListener('catalog-environment-changed', resetEnvironment);
     clearInterval(timer);
     window.removeEventListener('pagehide', onHide);
     app?.dispose();
