@@ -40,3 +40,20 @@ test('indicador configurado de indisponibilidade encerra a espera sem preço; lo
  const result=await extractCatalogProduct(input);assert.equal(result.outcome,'unavailable');assert.equal(result.data.priceCents,null);assert.equal(result.data.originalPriceCents,null);assert.equal(result.data.missing.includes('price'),false);
  document.body.insertAdjacentHTML('beforeend','<div id="login">Login</div>');assert.equal((await extractCatalogProduct(input)).blocked,'login');
 });
+
+
+test('configured range prices use the left value, preserve single prices and reject unrelated or malformed amounts',async()=>{
+ const win=new Window({url:'https://shop.example.com/product'});globalThis.document=win.document;globalThis.location=win.location;
+ const html='<h1>Tampa Traseira De Vidro</h1><section aria-live="polite"><div class="nt0EaI"><div class="pyzxvq pw3J3G">R$10,89 - R$31,59</div><div class="u_3JMT"></div></div></section><p>Frete R$8,39</p><p>3x R$3,63</p>';
+ document.body.innerHTML=html;
+ const rule={field:'price',selectors:['section[aria-live="polite"] .pyzxvq'],mode:'text',required:true};
+ const input={profile:{rules:[{field:'title',selectors:['h1']},rule]},settings,originalUrl:location.href,allowedOrigins:[location.origin]};
+ assert.equal((await extractCatalogProduct(input)).outcome,'technical_failure');
+ rule.priceSelection='first_in_range';
+ for(const [text,price] of [['R$10,89 - R$31,59',1089],['R$10,89–R$31,59',1089],['R$ 1.234,56 — R$ 2.345,67',123456],['R$31,59 - R$10,89',3159],['10,89 - 31,59',1089],['R$10,89',1089],['R$ 2.116,00',211600],['R$10,89 - R$31,599',null],['R$10,899 - R$31,59',null],['R$10,89 - R$0,00',null],['R$0,00 - R$31,59',null],['de R$31,59 por R$10,89',null],['3x R$10,89',null],['R$10,89 + frete R$31,59',null],['R$10,89 - R$31,59 - R$40,00',null]]){
+  document.querySelector('.pyzxvq').textContent=text;
+  const result=await extractCatalogProduct(input);assert.equal(result.outcome,price===null?'technical_failure':'success',text);if(price!==null)assert.equal(result.data.priceCents,price,text);
+ }
+ rule.mode='attribute';rule.attribute='data-price';document.querySelector('.pyzxvq').setAttribute('data-price','R$10,89 - R$31,59');assert.equal((await extractCatalogProduct(input)).data.priceCents,1089);
+ rule.priceSelection='single';assert.equal((await extractCatalogProduct(input)).outcome,'technical_failure');win.close();
+});
