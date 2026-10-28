@@ -82,3 +82,7 @@ POC de grupos do WhatsApp: consulte docs/WHATSAPP_GROUP_POC.md. O card começa r
 ### Faixas de preço
 
 As regras `price` e `originalPrice` aceitam `priceSelection: "first_in_range"` para ler o valor à esquerda de uma faixa como `R$10,89 - R$31,59`. Preços únicos continuam aceitos. Sem essa opção, a leitura exige um preço único. A regra usa o elemento selecionado e valida ambos os valores da faixa; não procura números de parcelas, frete ou descontos em outros textos. A configuração é genérica por perfil, sem implementação por marketplace.
+
+### Clique para revelar preço sem espera desnecessária
+
+Quando `priceReveal` está configurado, o extrator tenta os seletores de preço antes de qualquer interação. Sem preço válido e com botão visível e habilitado, solicita o clique imediatamente, sem consumir o timeout geral do marketplace. Se o botão ainda estiver carregando, mantém a espera normal. A segunda fase revalida a execução e o preço antes de clicar uma única vez; preços únicos, faixas, bloqueios, pausa e cancelamento mantêm prioridade. `priceReveal.waitTimeoutMs` continua controlando apenas a espera pelo preço depois do clique.
