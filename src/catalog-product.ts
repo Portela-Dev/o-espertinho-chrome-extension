@@ -80,18 +80,28 @@ export async function extractCatalogProduct(input: {
       const url = new URL(anchor.href, document.baseURI);
       return url.protocol === 'https:' && !url.username && !url.password && input.allowedOrigins.includes(url.origin);
     },
+    revealTarget(rule: any): HTMLElement | null {
+      try {
+        if (!rule?.priceReveal || !input.allowedOrigins.includes(location.origin)) return null;
+        const node = document.querySelector<HTMLElement>(rule.priceReveal.clickSelector);
+        if (!node || typeof node.click !== 'function' || node.closest('[hidden],[inert],:disabled,[aria-disabled="true"]')) return null;
+        if (!node.checkVisibility()) return null;
+        const control = node.closest<HTMLButtonElement | HTMLInputElement>('button,input');
+        if (control?.form && control.type === 'submit') return null;
+        if (!reader.revealLinkAllowed(node)) return null;
+        return node;
+      } catch { return null; }
+    },
     revealPrice(rule: any) {
       try {
-        if (!input.allowedOrigins.includes(location.origin)) return false;
-        const node = document.querySelector<HTMLElement>(rule.priceReveal.clickSelector);
-        if (!node || typeof node.click !== 'function' || node.closest('[hidden],[inert],:disabled,[aria-disabled="true"]')) return false;
-        if (!node.checkVisibility()) return false;
-        const control = node.closest<HTMLButtonElement | HTMLInputElement>('button,input');
-        if (control?.form && control.type === 'submit') return false;
-        if (!reader.revealLinkAllowed(node)) return false;
+        const node = reader.revealTarget(rule);
+        if (!node) return false;
         node.click();
         return true;
       } catch { return false; }
+    },
+    canRequestReveal(result: any, rule: any) {
+      return !input.revealPrice && result.data.priceCents === null && !!reader.revealTarget(rule);
     },
     stateResult(result: any) {
       const block = reader.state();
@@ -395,6 +405,7 @@ export async function extractCatalogProduct(input: {
   while (true) {
     const state = reader.stateResult(result);
     if (state) return state;
+    if (reader.canRequestReveal(result, revealRule)) return {needsPriceReveal: true};
     if (input.revealPrice && !revealed && result.data.priceCents === null) {
       if (!reader.revealPrice(revealRule)) return {outcome: 'technical_failure', reason: 'incomplete'};
       revealed = true;

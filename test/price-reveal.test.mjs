@@ -57,3 +57,18 @@ test('links internos configurados são aceitos e páginas fora do marketplace s�
  assert.equal((await f.reveal()).data.priceCents,5000);assert.equal(clicks,1);
  document.querySelector('.primary').remove();f.input.allowedOrigins=['https://other.example.com'];assert.equal((await f.reveal()).outcome,'technical_failure');assert.equal(clicks,1);
 });
+
+test('botão pronto antecipa o fallback sem consumir o timeout geral de 30 segundos',{timeout:3000},async t=>{
+ const f=fixture(t);let clicks=0;f.input.settings.timeoutMs=30000;document.querySelector('#show').onclick=()=>clicks++;
+ assert.deepEqual(await f.read(),{needsPriceReveal:true});assert.equal(clicks,0);
+});
+test('botão que chega durante hidratação dispara a solicitação assim que fica pronto',{timeout:3000},async t=>{
+ const f=fixture(t,'');f.input.settings.timeoutMs=30000;
+ const pending=f.read();setTimeout(()=>document.body.insertAdjacentHTML('beforeend','<button type="button" id="show">Opções</button>'),30);
+ assert.deepEqual(await pending,{needsPriceReveal:true});
+});
+test('botão oculto não antecipa a interação e permite que o preço normal termine de carregar',{timeout:3000},async t=>{
+ const f=fixture(t,'<button type="button" id="show" hidden>Opções</button>');f.input.settings.timeoutMs=30000;
+ const pending=f.read();setTimeout(()=>document.body.insertAdjacentHTML('beforeend','<div class="primary">R$ 506,58 - R$ 524,25</div>'),30);
+ const result=await pending;assert.equal(result.outcome,'success');assert.equal(result.data.priceCents,50658);
+});
