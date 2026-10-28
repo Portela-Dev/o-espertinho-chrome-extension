@@ -4,6 +4,7 @@ export async function extractCatalogProduct(input: {
   settings: any;
   originalUrl: string;
   allowedOrigins: string[];
+  revealPrice?: boolean;
 }): Promise<any> {
   const reader = {
     text(value: string, max: number) {
@@ -72,6 +73,39 @@ export async function extractCatalogProduct(input: {
         unavailable = true;
       }
       return unavailable ? 'unavailable' : null;
+    },
+    revealLinkAllowed(node: Element) {
+      const anchor = node.closest<HTMLAnchorElement>('a[href]');
+      if (!anchor) return true;
+      const url = new URL(anchor.href, document.baseURI);
+      return url.protocol === 'https:' && !url.username && !url.password && input.allowedOrigins.includes(url.origin);
+    },
+    revealPrice(rule: any) {
+      try {
+        if (!input.allowedOrigins.includes(location.origin)) return false;
+        const node = document.querySelector<HTMLElement>(rule.priceReveal.clickSelector);
+        if (!node || typeof node.click !== 'function' || node.closest('[hidden],[inert],:disabled,[aria-disabled="true"]')) return false;
+        if (!node.checkVisibility()) return false;
+        const control = node.closest<HTMLButtonElement | HTMLInputElement>('button,input');
+        if (control?.form && control.type === 'submit') return false;
+        if (!reader.revealLinkAllowed(node)) return false;
+        node.click();
+        return true;
+      } catch { return false; }
+    },
+    stateResult(result: any) {
+      const block = reader.state();
+      if (block && block !== 'unavailable') return {blocked: block};
+      if (block !== 'unavailable') return null;
+      result.data.priceCents = null;
+      result.data.originalPriceCents = null;
+      result.data.missing = result.data.missing.filter((field: string) => field !== 'price');
+      return {...result, outcome: 'unavailable'};
+    },
+    deadlineResult(result: any, revealRule: any) {
+      // The runtime rechecks pause/cancellation before authorizing the single click.
+      if (!input.revealPrice && result.data.priceCents === null && revealRule) return {needsPriceReveal: true};
+      return {outcome: 'technical_failure', reason: 'incomplete'};
     },
     value(node: Element, rule: any) {
       let value = (node as HTMLElement).innerText || node.textContent || '';
@@ -354,36 +388,27 @@ export async function extractCatalogProduct(input: {
       };
     },
   };
-  const end = Date.now() + input.settings.timeoutMs;
+  const revealRule = input.profile.rules.find((rule: any) => rule.field === 'price' && rule.priceReveal);
+  let revealed = false;
+  let end = Date.now() + input.settings.timeoutMs;
   let result = reader.read();
   while (true) {
-    const block = reader.state();
-    if (block && block !== 'unavailable')
-      return {
-        blocked: block,
-      };
-    if (block === 'unavailable') {
-      result.data.priceCents = null;
-      result.data.originalPriceCents = null;
-      result.data.missing = result.data.missing.filter(
-        (field: string) => field !== 'price',
-      );
-      return {
-        ...result,
-        outcome: 'unavailable',
-      };
+    const state = reader.stateResult(result);
+    if (state) return state;
+    if (input.revealPrice && !revealed && result.data.priceCents === null) {
+      if (!reader.revealPrice(revealRule)) return {outcome: 'technical_failure', reason: 'incomplete'};
+      revealed = true;
+      end = Date.now() + Math.min(15000, Math.max(100, Number(revealRule.priceReveal.waitTimeoutMs) || 8000));
+      result = reader.read();
+      continue;
     }
     if (!result.data.missing.length)
       return {
         ...result,
         outcome: 'success',
       };
-    if (Date.now() >= end)
-      return {
-        outcome: 'technical_failure',
-        reason: 'incomplete',
-      };
-    await new Promise((r) => setTimeout(r, 250));
+    if (Date.now() >= end) return reader.deadlineResult(result, revealRule);
+    await new Promise((r) => setTimeout(r, Math.min(250, Math.max(1, end - Date.now()))));
     result = reader.read();
   }
 }
