@@ -229,3 +229,28 @@ for(const step of ['convert','enrich','prices'])test('iniciar '+step+' recria ab
  const f=fixture();f.browser.storage.local.get=async()=>({state:{version:2,backendUrl:'https://old.example.com',auth,markets:[{id:'old'}],run:{id:'old-run'},pair:{id:'old-pair'}}});
  await f.runtime.init();assert.equal(f.saved().backendUrl,'http://localhost:3000');assert.equal(f.saved().auth,undefined);assert.equal(f.saved().run,undefined);assert.equal(f.saved().pair,undefined);assert.deepEqual(f.saved().markets,[]);
  });
+
+for(const step of ['enrich','prices'])test('interação de preço usa segunda fase isolada em '+step,async()=>{
+ const f=fixture(),original=globalThis.fetch,calls=[];globalThis.fetch=f.fetch;
+ f.browser.scripting.executeScript=async call=>{
+  if(call.func.name==='checkPageState')return [{result:null}];
+  calls.push(call);return [{result:call.args[0].revealPrice?{outcome:'success',data:{title:'Produto',priceCents:32100},sourceCategoryPath:[]}:{needsPriceReveal:true}}];
+ };
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step});await finished(f);
+  assert.equal(calls.length,2);assert.equal(calls[0].args[0].revealPrice,undefined);assert.equal(calls[1].args[0].revealPrice,true);assert.ok(calls.every(call=>call.world==='ISOLATED'));
+  assert.equal(f.calls.find(c=>c.path.endsWith('/results')).body.data.priceCents,32100);
+ }finally{globalThis.fetch=original;}
+});
+for(const action of ['PAUSE','CANCEL'])test(action+' durante espera impede o clique pendente',async()=>{
+ const f=fixture(),original=globalThis.fetch;globalThis.fetch=f.fetch;let release,reveals=0;
+ f.browser.scripting.executeScript=async call=>{
+  if(call.func.name==='checkPageState')return [{result:null}];
+  if(call.args[0].revealPrice){reveals++;return [{result:{outcome:'success'}}];}
+  return new Promise(resolve=>{release=()=>resolve([{result:{needsPriceReveal:true}}]);});
+ };
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'prices'});
+  for(let i=0;i<800&&!release;i++)await new Promise(r=>setTimeout(r,5));assert.equal(typeof release,'function');
+  await f.runtime.handle({type:action});release();await new Promise(r=>setTimeout(r,20));
+  assert.equal(reveals,0);assert.equal(f.calls.some(c=>c.path.endsWith('/results')),false);assert.equal(f.saved().run.status,action==='CANCEL'?'cancelled':'paused_by_user');
+ }finally{globalThis.fetch=original;}
+});

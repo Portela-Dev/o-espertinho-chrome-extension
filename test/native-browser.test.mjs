@@ -1183,3 +1183,18 @@ test(
     }
   },
 );
+
+test('Chromium revela preço sob demanda uma única vez e preserva preços por faixa', {skip:process.env.TEST_NATIVE_BROWSER!=='1'}, async()=>{
+ const {extractCatalogProduct}=await import('../dist/catalog-product.js');
+ const browser=await chromium.launch({headless:true,...(process.platform==='win32'?{channel:'msedge'}:{})});
+ try{
+  const page=await browser.newPage();
+  await page.route('https://shop.example.com/p',route=>route.fulfill({contentType:'text/html',body:'<h1>Produto</h1><div class="primary">R$ 506,58 - R$ 524,25</div><button type="button" id="show">Ver opções</button><script>window.clicks=0;document.querySelector("#show").onclick=()=>{window.clicks++;setTimeout(()=>{document.body.insertAdjacentHTML("beforeend",\'<div id="offers"><article><span class="price">R$ 321,90</span></article><article><span class="price">R$ 10,00</span></article></div>\')},50)}</script>'}));
+  await page.goto('https://shop.example.com/p');
+  const input={profile:{rules:[{field:'title',selectors:['h1']},{field:'price',selectors:['.primary'],priceSelection:'first_in_range'},{field:'price',selectors:['#offers > article:first-child .price'],priceReveal:{clickSelector:'#show',waitTimeoutMs:1000}}]},settings:{timeoutMs:1,blockRules:[],categorySeparator:'>'},originalUrl:page.url(),allowedOrigins:['https://shop.example.com']};
+  assert.equal((await page.evaluate(extractCatalogProduct,input)).data.priceCents,50658);assert.equal(await page.evaluate(()=>window.clicks),0);
+  await page.locator('.primary').evaluate(node=>node.remove());
+  assert.equal((await page.evaluate(extractCatalogProduct,input)).needsPriceReveal,true);assert.equal(await page.evaluate(()=>window.clicks),0);
+  const result=await page.evaluate(extractCatalogProduct,{...input,revealPrice:true});assert.equal(result.outcome,'success');assert.equal(result.data.priceCents,32190);assert.equal(await page.evaluate(()=>window.clicks),1);
+ }finally{await browser.close();}
+});
