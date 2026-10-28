@@ -686,14 +686,16 @@ export class CatalogRuntime {
     if (step === 'convert') return this.convert(claim, inject);
     if (step === 'discover')
       return this.discover(claim, inject, origins, sameTab);
-    return inject(extractCatalogProduct, [
-      {
-        profile: snapshot.profile,
-        settings,
-        originalUrl: item.payload.originalUrl,
-        allowedOrigins: origins,
-      },
-    ]);
+    const extractionInput = {
+      profile: snapshot.profile,
+      settings,
+      originalUrl: item.payload.originalUrl,
+      allowedOrigins: origins,
+    };
+    const extracted = await inject(extractCatalogProduct, [extractionInput]);
+    if (extracted.needsPriceReveal === true)
+      return inject(extractCatalogProduct, [{...extractionInput, revealPrice: true}]);
+    return extracted;
   }
   private async convert(
     claim: CatalogClaim,
