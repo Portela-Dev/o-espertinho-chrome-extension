@@ -1136,6 +1136,11 @@ export class CatalogRuntime {
   }
   private async handleAiReview(command: CatalogCommand) {
     const paths: Record<string, string> = {
+      prepare: '/catalog/resolver/prepare',
+      resolverStart: '/catalog/resolver/start',
+      resolverClaim: '/catalog/resolver/claim',
+      resolverComplete: '/catalog/resolver/complete',
+      resolverAction: '/catalog/resolver/action',
       config: '/catalog/ai/config',
       queue: '/catalog/ai/queue',
       context: '/catalog/ai/context',

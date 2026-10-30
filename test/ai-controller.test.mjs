@@ -58,3 +58,14 @@ test('encerrar painel invalida login e fecha somente a aba de autorização cria
  assert.equal(f.session.pending,null);assert.equal(f.session.active,null);assert.equal(f.listeners.request,undefined);assert.equal(f.listeners.removed,undefined);
  assert.deepEqual(f.updates.filter(v=>v.removed!==undefined),[{removed:77}]);assert.equal(await f.app.receive({tabId:77,frameId:0,url:callback}),false);
 });
+
+test('análises estruturadas limitam concorrência a dois, preservam credenciais locais e cancelam respostas tardias',async()=>{
+ const f=fixture();let release;const gate=new Promise(r=>release=r),original=f.session.fetcher;let active=0;
+ try{
+ const callback=await f.login();await f.app.receive({tabId:77,frameId:0,url:callback});
+ f.session.fetcher=async(url,options)=>{if(!url.endsWith('/responses'))return original(url,options);active++;await gate;const decision={policyId:'phone',facts:{model:{value:'X',evidence:'X'}},exclude:false,reason:''};return new Response('data: '+JSON.stringify({type:'response.completed',response:{status:'completed',usage:{total_tokens:10},output:[{content:[{type:'output_text',text:JSON.stringify(decision)}]}]}})+'\n\n');};
+ const body={task:'resolver',model:'fixture',context:{stage:'identity',policy:{id:'phone',attributes:[{key:'model'}]},offer:{title:'X'},enabled:true,prompt:''}};
+ const first=f.app.analyze(body),second=f.app.analyze(body);await new Promise(r=>setImmediate(r));assert.equal(active,2);await assert.rejects(()=>f.app.analyze(body),/simultâneas/);release();assert.equal((await first).decision.policyId,'phone');assert.equal((await second).metrics.tokens,10);assert.equal(f.app.status().phase,'connected');
+ assert.ok(f.messages.every(m=>m.type==='STATE'));assert.doesNotMatch(JSON.stringify(f.app.status()),/DIRECT_PRIVATE|access_token|refresh_token/);
+ }finally{release();f.app.dispose();}
+});
