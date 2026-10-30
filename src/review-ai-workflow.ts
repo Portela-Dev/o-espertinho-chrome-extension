@@ -299,7 +299,8 @@ export class ReviewAiWorkflow {
         tokens,
         elapsedMs: Date.now() - start,
       });
-    } catch (error) {
+    } catch {
+      // Provider/validation errors become bounded technical retries; never forward raw provider errors or credentials to the backend.
       current();
       await this.transport('resolverComplete', {
         runId,
