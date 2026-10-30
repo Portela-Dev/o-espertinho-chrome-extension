@@ -197,9 +197,34 @@ test('IA recebe política, evidências e prompt; credencial só vai ao provedor,
   const body = JSON.parse(request.body);
   assert.match(body.instructions, /Instrução de teste/);
   assert.match(body.instructions, /compatibilidade/);
+  assert.match(body.instructions, /needs_review ou invalid significam exclude=true/);
+  assert.match(body.instructions, /sem reformatar unidades/);
   assert.equal(body.store, false);
   assert.equal(JSON.parse(body.input[0].content).policy.id, 'phone');
   assert.ok(!JSON.stringify(result).includes('private'));
+});
+
+test('progresso informa preparação relacionada e distingue falha da IA de rejeição ao salvar', async () => {
+  const f = fixture();
+  const phases = [];
+  let rejected = false;
+  const flow = new ReviewAiWorkflow(async (op, payload) => {
+    if (op === 'resolverClaim') {
+      const result = await f.transport(op, payload);
+      if (result.item) result.item.context = { ...context, preparation: true };
+      return result;
+    }
+    if (op === 'resolverComplete' && !payload.error && !rejected) {
+      rejected = true;
+      throw Error('Rejected');
+    }
+    return f.transport(op, payload);
+  }, f.analyze, () => phases.push(flow.progress.title));
+  await flow.run('product', 'shop', 2, 'model');
+  assert.ok(phases.some(p => p.includes('Preparando candidato relacionado')));
+  assert.ok(phases.some(p => p.includes('Resultado recusado')));
+  assert.ok(f.sent.some(s => s.op === 'resolverComplete' && s.p.errorCode === 'result_rejected'));
+  assert.equal(flow.progress.completed, 2);
 });
 
 test('concorrência configurável fica limitada a dois links e mantém contagem por link',async()=>{
