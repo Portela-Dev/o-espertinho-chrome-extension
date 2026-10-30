@@ -7,7 +7,12 @@ export type ReviewTransport = (
     | 'context'
     | 'result'
     | 'release'
-    | 'inventory',
+    | 'inventory'
+    | 'prepare'
+    | 'resolverStart'
+    | 'resolverClaim'
+    | 'resolverComplete'
+    | 'resolverAction',
   payload: any,
 ) => Promise<any>;
 export class ReviewAiWorkflow {
@@ -21,10 +26,14 @@ export class ReviewAiWorkflow {
     failed: 0,
     pending: 0,
     invalid: 0,
+    excluded: 0,
     status: 'idle',
     title: '',
   };
   private sequence = 0;
+  private resolverRunId = '';
+  private requestKey = '';
+  private resolverScope = '';
   constructor(
     private readonly transport: ReviewTransport,
     private readonly analyze: (input: any) => Promise<any>,
@@ -39,6 +48,11 @@ export class ReviewAiWorkflow {
   }
   cancel() {
     this.sequence++;
+    if (this.resolverRunId)
+      void this.transport('resolverAction', {
+        runId: this.resolverRunId,
+        action: 'pause',
+      }).catch(() => {});
     if (this.busy) {
       this.progress.status = 'cancelled';
       this.changed();
@@ -52,7 +66,7 @@ export class ReviewAiWorkflow {
     retryReview = false,
   ) {
     if (this.busy) throw new Error('Já existe uma revisão de IA em andamento.');
-    if (!model) throw new Error('Escolha um modelo da conta ChatGPT.');
+
     if (!Number.isInteger(limit) || limit < 1 || limit > 10000)
       throw new Error('Informe um limite entre 1 e 10000.');
     this.busy = true;
@@ -64,6 +78,7 @@ export class ReviewAiWorkflow {
       failed: 0,
       pending: 0,
       invalid: 0,
+      excluded: 0,
       status: 'running',
       title: '',
     };
@@ -75,12 +90,19 @@ export class ReviewAiWorkflow {
     try {
       const config = await this.refresh(marketplaceId);
       current();
+      if (config.resolver && config.resolver.mode !== 'legacy') {
+        await this.runStructured(task, marketplaceId, limit, model, current);
+        this.progress.status = 'completed';
+        await this.refresh(marketplaceId);
+        return;
+      }
       if (
         !config.settings[
           task === 'category' ? 'categoryEnabled' : 'productEnabled'
         ]
       )
         throw new Error('Esta tarefa de IA está desativada no admin.');
+      if (!model) throw new Error('Escolha um modelo da conta ChatGPT.');
       const inventory = new ReviewAiInventory();
       this.progress.title = 'Carregando todo o inventário';
       this.changed();
@@ -116,6 +138,178 @@ export class ReviewAiWorkflow {
     } finally {
       this.busy = false;
       this.changed();
+    }
+  }
+  private async runStructured(
+    task: AiTask,
+    marketplaceId: string,
+    limit: number,
+    model: string,
+    current: () => void,
+  ) {
+    let cursor: string | null = null;
+    this.progress.title = 'Preparando identidades existentes';
+    this.changed();
+    do {
+      current();
+      const page = await this.transport('prepare', { cursor });
+      cursor = page.nextCursor;
+    } while (cursor);
+    const scope = marketplaceId + ':' + task;
+    if (scope !== this.resolverScope) {
+      this.requestKey = crypto.randomUUID();
+      this.resolverScope = scope;
+    }
+    if (!this.requestKey) this.requestKey = crypto.randomUUID();
+    const run = await this.transport('resolverStart', {
+      marketplaceId,
+      task,
+      limit,
+      requestKey: this.requestKey,
+    });
+    this.resolverRunId = run.id;
+    if (run.status === 'paused')
+      await this.transport('resolverAction', {
+        runId: run.id,
+        action: 'resume',
+      });
+    const count = Math.min(
+      2,
+      Math.max(1, this.config.resolver.concurrency ?? 1),
+    );
+    let failure: unknown;
+    const check = () => {
+      current();
+      if (failure) throw failure;
+    };
+    const workers = Array.from({ length: count }, async () => {
+      try {
+        await this.structuredWorker(run, model, check);
+      } catch (error) {
+        failure ??= error;
+      }
+    });
+    await Promise.all(workers);
+    if (failure) {
+      await this.transport('resolverAction', {
+        runId: run.id,
+        action: 'pause',
+      }).catch(() => {});
+      throw failure;
+    }
+  }
+  private async structuredWorker(run: any, model: string, current: () => void) {
+    while (true) {
+      current();
+      const response = await this.transport('resolverClaim', { runId: run.id });
+      current();
+      const stats = response.run.stats;
+      this.progress.total = stats.total;
+      this.progress.completed = Math.max(
+        this.progress.completed,
+        stats.accepted,
+      );
+      this.progress.excluded = Math.max(this.progress.excluded, stats.excluded);
+      this.progress.failed = Math.max(this.progress.failed, stats.failed);
+      this.progress.title =
+        run.mode === 'shadow'
+          ? 'Simulação — nenhuma decisão altera o catálogo'
+          : 'Resolução estruturada';
+      this.changed();
+      if (response.run.status === 'completed') {
+        this.requestKey = '';
+        this.resolverRunId = '';
+        break;
+      }
+      if (response.run.status !== 'running')
+        throw new Error('Execução pausada ou cancelada no admin.');
+      if (response.advance) continue;
+      if (!response.item) {
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+      await this.structuredItem(run.id, response.item, model, current);
+    }
+  }
+  private async structuredItem(
+    runId: string,
+    item: any,
+    model: string,
+    current: () => void,
+  ) {
+    if (
+      item.context.enabled &&
+      !item.deterministic &&
+      !item.context.defaultCategoryId &&
+      !model
+    )
+      throw new Error('Conecte a IA e selecione um modelo para continuar.');
+    const start = Date.now(),
+      context = item.context;
+    let decision = item.deterministic,
+      usedModel = '',
+      tokens = 0;
+    if (context.stage === 'category' && context.defaultCategoryId)
+      decision = {
+        categoryId: context.defaultCategoryId,
+        path: [],
+        exclude: false,
+        reason: 'Categoria definida na política.',
+      };
+    try {
+      if (!decision) {
+        if (!context.enabled)
+          decision =
+            context.stage === 'category'
+              ? {
+                  categoryId: null,
+                  path: [],
+                  exclude: true,
+                  reason: 'Sem regra determinística e IA da tarefa desativada.',
+                }
+              : {
+                  policyId: context.policy.id,
+                  facts: {},
+                  exclude: true,
+                  reason:
+                    'Sem identidade determinística e IA da tarefa desativada.',
+                };
+        else {
+          if (!model)
+            throw new Error(
+              'Conecte a IA e selecione um modelo para as tarefas sem regra determinística.',
+            );
+          usedModel = model;
+          const analysis = await this.analyze({
+            task: 'resolver',
+            context,
+            model,
+          });
+          decision = analysis.decision ?? analysis;
+          tokens = analysis.metrics?.tokens ?? 0;
+        }
+      }
+      current();
+      await this.transport('resolverComplete', {
+        runId,
+        itemId: item.id,
+        leaseId: item.leaseId,
+        decision,
+        model: usedModel,
+        tokens,
+        elapsedMs: Date.now() - start,
+      });
+    } catch {
+      // Provider/validation errors become bounded technical retries; never forward raw provider errors or credentials to the backend.
+      current();
+      await this.transport('resolverComplete', {
+        runId,
+        itemId: item.id,
+        leaseId: item.leaseId,
+        error: 'technical',
+        model: usedModel,
+        elapsedMs: Math.min(Date.now() - start, 300000),
+      });
     }
   }
   private async processLink(

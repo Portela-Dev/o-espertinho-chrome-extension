@@ -18,6 +18,7 @@ export class AiController {
   private processing = false;
   private controller?: AbortController;
   private operation = 0;
+  private readonly structuredControllers = new Set<AbortController>();
   private phase = 'idle';
   private error = '';
   private result: any = null;
@@ -310,6 +311,7 @@ export class AiController {
     }
   }
   async analyze(body: any) {
+    if (body?.task === 'resolver') return this.analyzeStructured(body);
     await this.admin();
     if (this.phase === 'analyzing' || this.session.pending || this.processing)
       throw new LocalError('Já existe uma operação em andamento.');
@@ -340,9 +342,42 @@ export class AiController {
       throw new LocalError('Análise cancelada.');
     }
   }
+  private async analyzeStructured(body: any) {
+    await this.admin();
+    if (
+      this.processing ||
+      this.session.pending ||
+      this.structuredControllers.size >= 2
+    )
+      throw new LocalError('Limite de análises simultâneas atingido.');
+    const generation = this.operation,
+      controller = new AbortController();
+    this.structuredControllers.add(controller);
+    this.phase = 'analyzing';
+    this.error = '';
+    try {
+      const result = await analyze(
+        this.session,
+        body,
+        AbortSignal.any([controller.signal, AbortSignal.timeout(120000)]),
+      );
+      if (generation !== this.operation)
+        throw new LocalError('Análise cancelada.');
+      await this.sync();
+      return result;
+    } catch (error) {
+      throw new LocalError(safeError(error));
+    } finally {
+      this.structuredControllers.delete(controller);
+      if (!this.structuredControllers.size && generation === this.operation)
+        this.phase = this.session.active ? 'connected' : 'idle';
+    }
+  }
   cancelAnalysis() {
     this.operation++;
     this.controller?.abort();
+    for (const controller of this.structuredControllers) controller.abort();
+    this.structuredControllers.clear();
     this.controller = undefined;
     if (this.phase === 'analyzing') {
       this.phase = this.session.active ? 'connected' : 'idle';

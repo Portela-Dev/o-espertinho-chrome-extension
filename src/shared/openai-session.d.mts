@@ -8,6 +8,6 @@ export class OpenAISession {
  status():any;
  begin(redirectUri:string,accountId?:string):Promise<string>;
  callback(params:URLSearchParams):Promise<void>;
- models():Promise<{id:string;name:string}[]>;
+ models(cached?:boolean):Promise<{id:string;name:string}[]>;
  signout():Promise<{revoked:boolean}>;
 }

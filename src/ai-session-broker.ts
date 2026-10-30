@@ -27,6 +27,7 @@ const publicRecord = (r: AiSavedSession) => ({
   models: r.models,
 });
 export class AiSessionBroker {
+  private modelCache: { sessionId: string; expires: number } | undefined;
   private tail: Promise<unknown> = Promise.resolve();
   constructor(
     private readonly authorize: () => Promise<void>,
@@ -48,7 +49,7 @@ export class AiSessionBroker {
       snapshot: [],
       install: ['revision', 'credentials'],
       token: ['sessionId'],
-      models: ['sessionId'],
+      models: ['sessionId', 'cached'],
       selectModel: ['sessionId', 'model'],
       disconnect: [],
     };
@@ -60,16 +61,27 @@ export class AiSessionBroker {
     const record = await this.vault.load();
     if (operation === 'snapshot') return publicRecord(record);
     if (operation === 'disconnect') {
+      this.modelCache = undefined;
       await this.vault.save(emptyAiSession());
       const session = this.session(record);
       return record.credentials ? session.signout() : { revoked: true };
     }
     await this.authorize();
-    if (operation === 'install') return this.installSession(p, record);
+    if (operation === 'install') {
+      this.modelCache = undefined;
+      return this.installSession(p, record);
+    }
     if (!record.credentials || p.sessionId !== record.sessionId)
       throw new LocalError(
         'Sessão ChatGPT encerrada ou alterada. Entre novamente.',
       );
+    if (
+      operation === 'models' &&
+      p.cached === true &&
+      this.modelCache?.sessionId === record.sessionId &&
+      this.modelCache.expires > this.now()
+    )
+      return publicRecord(record);
     const session = this.session(record);
     if (operation === 'selectModel') {
       if (
@@ -96,6 +108,10 @@ export class AiSessionBroker {
         });
       if (operation === 'token') return { accessToken: token };
       const models = await session.models();
+      this.modelCache = {
+        sessionId: record.sessionId,
+        expires: this.now() + 600000,
+      };
       const updated = {
         ...record,
         credentials: this.credentials(session.active),
