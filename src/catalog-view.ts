@@ -169,15 +169,15 @@ function renderAiProgress(
       failed: 'Interrompida',
     }[ai.status] ?? ai.status) +
     (ai.mode && ai.mode !== 'legacy' && ai.title ? ' · ' + ai.title : '');
+  let acceptedLabel = ai.task === 'category' ? ' categorizados' : ' catalogados';
+  if (ai.mode === 'shadow') acceptedLabel = ' simulados (sem salvar)';
   el('counts').textContent =
     processed +
     ' / ' +
     ai.total +
     ' links processados · ' +
     ai.completed +
-    (ai.mode === 'shadow'
-      ? ' simulados (sem salvar)'
-      : ai.task === 'category' ? ' categorizados' : ' catalogados') +
+    acceptedLabel +
     ' · ' +
     ai.pending +
     ' pendências · ' +

@@ -1,5 +1,16 @@
 import { ReviewAiInventory, decideReview } from './review-ai-inventory.js';
 export type AiTask = 'category' | 'product';
+type StructuredFailureCode = 'analysis_failed' | 'result_rejected';
+const structuredFailureMessages: Record<StructuredFailureCode, string> = {
+  result_rejected: 'Resultado recusado ao validar ou salvar; repetição limitada',
+  analysis_failed: 'Falha na análise de IA; repetição limitada',
+};
+function structuredPhase(context: any, mode: string) {
+  let phase = 'Identificando produto do link';
+  if (context.preparation) phase = 'Preparando candidato relacionado ao link';
+  else if (context.stage === 'category') phase = 'Definindo categoria do produto';
+  return (mode === 'shadow' ? 'Simulação · ' : '') + phase;
+}
 export type ReviewTransport = (
   operation:
     | 'config'
@@ -251,18 +262,12 @@ export class ReviewAiWorkflow {
       throw new Error('Conecte a IA e selecione um modelo para continuar.');
     const start = Date.now(),
       context = item.context;
-    this.progress.title =
-      (runId && this.config.resolver.mode === 'shadow' ? 'Simulação · ' : '') +
-      (context.preparation
-        ? 'Preparando candidato relacionado ao link'
-        : context.stage === 'category'
-          ? 'Definindo categoria do produto'
-          : 'Identificando produto do link');
+    this.progress.title = structuredPhase(context, this.config.resolver.mode);
     this.changed();
     let decision = item.deterministic,
       usedModel = '',
       tokens = 0;
-    let errorCode = 'analysis_failed';
+    let errorCode: StructuredFailureCode = 'analysis_failed';
     if (context.stage === 'category' && context.defaultCategoryId)
       decision = {
         categoryId: context.defaultCategoryId,
@@ -317,9 +322,7 @@ export class ReviewAiWorkflow {
     } catch {
       // Provider/validation errors become bounded technical retries; never forward raw provider errors or credentials to the backend.
       current();
-      this.progress.title = errorCode === 'result_rejected'
-        ? 'Resultado recusado ao validar ou salvar; repetição limitada'
-        : 'Falha na análise de IA; repetição limitada';
+      this.progress.title = structuredFailureMessages[errorCode];
       this.changed();
       await this.transport('resolverComplete', {
         runId,
