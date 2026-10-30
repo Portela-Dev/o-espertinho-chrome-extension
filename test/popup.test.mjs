@@ -61,3 +61,11 @@ test('uma única barra exibe todos os links processados, incluindo pendências d
  ai.status='running';renderCatalog(state,true,ai);assert.doesNotMatch(el('run-status').textContent,/Produto que não deve aparecer/);assert.equal(el('cancel').disabled,false);assert.equal(el('step-enrich').disabled,true);
  renderCatalog(state,false);assert.equal(el('pause').hidden,false);
 });
+
+test('simulação é identificada e mostra a etapa sem afirmar que salvou a catalogação',()=>{
+ const state=view();const ai={mode:'shadow',task:'product',status:'running',total:10,completed:2,pending:0,failed:0,title:'Simulação · Preparando candidato relacionado ao link'};
+ renderCatalog(state,true,ai);
+ assert.match(el('run-status').textContent,/Preparando candidato relacionado/);
+ assert.match(el('counts').textContent,/2 simulados \(sem salvar\)/);
+ assert.doesNotMatch(el('counts').textContent,/2 catalogados/);
+});

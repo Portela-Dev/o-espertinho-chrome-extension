@@ -28,6 +28,7 @@ export class ReviewAiWorkflow {
     invalid: 0,
     excluded: 0,
     status: 'idle',
+    mode: 'legacy',
     title: '',
   };
   private sequence = 0;
@@ -80,6 +81,7 @@ export class ReviewAiWorkflow {
       invalid: 0,
       excluded: 0,
       status: 'running',
+      mode: 'legacy',
       title: '',
     };
     this.changed();
@@ -89,6 +91,7 @@ export class ReviewAiWorkflow {
     };
     try {
       const config = await this.refresh(marketplaceId);
+      this.progress.mode = config.resolver?.mode ?? 'legacy';
       current();
       if (config.resolver && config.resolver.mode !== 'legacy') {
         await this.runStructured(task, marketplaceId, limit, model, current);
@@ -225,6 +228,8 @@ export class ReviewAiWorkflow {
         throw new Error('Execução pausada ou cancelada no admin.');
       if (response.advance) continue;
       if (!response.item) {
+        this.progress.title += ' · aguardando reserva disponível';
+        this.changed();
         await new Promise((r) => setTimeout(r, 1000));
         continue;
       }
@@ -246,9 +251,18 @@ export class ReviewAiWorkflow {
       throw new Error('Conecte a IA e selecione um modelo para continuar.');
     const start = Date.now(),
       context = item.context;
+    this.progress.title =
+      (runId && this.config.resolver.mode === 'shadow' ? 'Simulação · ' : '') +
+      (context.preparation
+        ? 'Preparando candidato relacionado ao link'
+        : context.stage === 'category'
+          ? 'Definindo categoria do produto'
+          : 'Identificando produto do link');
+    this.changed();
     let decision = item.deterministic,
       usedModel = '',
       tokens = 0;
+    let errorCode = 'analysis_failed';
     if (context.stage === 'category' && context.defaultCategoryId)
       decision = {
         categoryId: context.defaultCategoryId,
@@ -290,6 +304,7 @@ export class ReviewAiWorkflow {
         }
       }
       current();
+      errorCode = 'result_rejected';
       await this.transport('resolverComplete', {
         runId,
         itemId: item.id,
@@ -302,11 +317,16 @@ export class ReviewAiWorkflow {
     } catch {
       // Provider/validation errors become bounded technical retries; never forward raw provider errors or credentials to the backend.
       current();
+      this.progress.title = errorCode === 'result_rejected'
+        ? 'Resultado recusado ao validar ou salvar; repetição limitada'
+        : 'Falha na análise de IA; repetição limitada';
+      this.changed();
       await this.transport('resolverComplete', {
         runId,
         itemId: item.id,
         leaseId: item.leaseId,
         error: 'technical',
+        errorCode,
         model: usedModel,
         elapsedMs: Math.min(Date.now() - start, 300000),
       });
