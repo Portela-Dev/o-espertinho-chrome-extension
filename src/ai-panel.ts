@@ -80,17 +80,19 @@ export async function setupAiPanel(
         if (!config) {
           return 'atualize configurações';
         }
+        const structured = config.resolver && config.resolver.mode !== 'legacy';
         if (
+          !structured &&
           !config.settings[
             task === 'category' ? 'categoryEnabled' : 'productEnabled'
           ]
         ) {
           return 'desativado no admin';
         }
-        if (!state?.account?.planEnabled) {
+        if (!structured && !state?.account?.planEnabled) {
           return 'entre no ChatGPT';
         }
-        if (!el<HTMLSelectElement>('direct-model').value) {
+        if (!structured && !el<HTMLSelectElement>('direct-model').value) {
           return 'escolha um modelo';
         }
         if (active) {
@@ -259,8 +261,12 @@ export async function setupAiPanel(
   };
   const resetEnvironment = () => {
     cancelWorkflow();
-    if (workflow) { workflow.config = undefined; workflow.marketplaceId = ''; }
-    refreshedAt = 0; configError = '';
+    if (workflow) {
+      workflow.config = undefined;
+      workflow.marketplaceId = '';
+    }
+    refreshedAt = 0;
+    configError = '';
     hooks?.progress?.(undefined);
   };
   const onHide = () => {
@@ -294,7 +300,12 @@ export async function setupAiPanel(
           void (async () => {
             try {
               const view = hooks.view();
-              if (!view?.user || !app.status().account?.planEnabled)
+              if (
+                !view?.user ||
+                ((!workflow?.config?.resolver ||
+                  workflow.config.resolver.mode === 'legacy') &&
+                  !app.status().account?.planEnabled)
+              )
                 throw new Error(
                   'Entre no Espertinho e no ChatGPT para continuar.',
                 );
@@ -307,7 +318,9 @@ export async function setupAiPanel(
                 el<HTMLInputElement>('retry-ai-review').checked,
               );
               notify(
-                'Decisões válidas aplicadas. Revise as pendências e publique pelo admin.',
+                workflow?.config?.resolver?.mode === 'shadow'
+                  ? 'Simulação concluída. Confira os resultados no admin.'
+                  : 'Processamento concluído. Confira exclusões e publique pelo admin.',
                 'success',
               );
             } catch (e) {
@@ -320,7 +333,10 @@ export async function setupAiPanel(
           })();
         });
       document.addEventListener('cancel-ai-review', cancelWorkflow);
-      document.addEventListener('catalog-environment-changed', resetEnvironment);
+      document.addEventListener(
+        'catalog-environment-changed',
+        resetEnvironment,
+      );
       el('logout').addEventListener('click', () => {
         workflow?.cancel();
         void app.logout();
@@ -343,7 +359,10 @@ export async function setupAiPanel(
   }, 700);
   return () => {
     document.removeEventListener('cancel-ai-review', cancelWorkflow);
-    document.removeEventListener('catalog-environment-changed', resetEnvironment);
+    document.removeEventListener(
+      'catalog-environment-changed',
+      resetEnvironment,
+    );
     clearInterval(timer);
     window.removeEventListener('pagehide', onHide);
     app?.dispose();

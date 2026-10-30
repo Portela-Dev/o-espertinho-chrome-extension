@@ -69,8 +69,9 @@ export class PersistentAiSession extends OpenAISession {
     return (await this.call('token', { sessionId: this.saved.sessionId }))
       .accessToken;
   }
-  async models() {
+  async models(cached = false) {
     const record = await this.call('models', {
+      cached,
       sessionId: this.saved.sessionId,
     });
     this.saved = record;

@@ -7,7 +7,7 @@ import type { Account } from './contracts.js';
 export interface CatalogView {
   backendUrl: string;
   environmentId?: string;
-  environments?: {id: string; label: string; url: string}[];
+  environments?: { id: string; label: string; url: string }[];
   user?: Account;
   pairing: boolean;
   markets: CatalogMarket[];
@@ -74,16 +74,26 @@ function renderQueue(view: CatalogView, marketplaceId: string) {
   }
 }
 function renderEnvironment(view: CatalogView, disabled: boolean) {
-  const select = el<HTMLSelectElement>('environment'), values = view.environments ?? [];
-  if (JSON.stringify([...select.options].map(option => [option.value, option.textContent])) !== JSON.stringify(values.map(value => [value.id, value.label])))
-    select.replaceChildren(...values.map(value => {
-      const option = document.createElement('option');
-      option.value = value.id; option.textContent = value.label; option.title = value.url;
-      return option;
-    }));
+  const select = el<HTMLSelectElement>('environment'),
+    values = view.environments ?? [];
+  if (
+    JSON.stringify(
+      [...select.options].map((option) => [option.value, option.textContent]),
+    ) !== JSON.stringify(values.map((value) => [value.id, value.label]))
+  )
+    select.replaceChildren(
+      ...values.map((value) => {
+        const option = document.createElement('option');
+        option.value = value.id;
+        option.textContent = value.label;
+        option.title = value.url;
+        return option;
+      }),
+    );
   select.value = view.environmentId ?? '';
   select.disabled = disabled;
-  select.title = 'A troca encerra a sessão do Espertinho. Conclua ou cancele execuções pendentes antes de trocar.';
+  select.title =
+    'A troca encerra a sessão do Espertinho. Conclua ou cancele execuções pendentes antes de trocar.';
 }
 export function renderCatalog(
   view: CatalogView,
@@ -143,7 +153,11 @@ function renderAiProgress(
 ) {
   const processed = Math.min(
     ai.total,
-    ai.completed + ai.pending + ai.failed + (ai.invalid ?? 0),
+    ai.completed +
+      ai.pending +
+      ai.failed +
+      (ai.invalid ?? 0) +
+      (ai.excluded ?? 0),
   );
   el('run-status').textContent =
     (ai.task === 'category' ? 'Categorização' : 'Catalogação') +
@@ -158,9 +172,7 @@ function renderAiProgress(
     processed +
     ' / ' +
     ai.total +
-    (ai.task === 'product'
-      ? ' links processados · '
-      : ' produtos processados · ') +
+    ' links processados · ' +
     ai.completed +
     (ai.task === 'category' ? ' categorizados' : ' catalogados') +
     ' · ' +
@@ -169,7 +181,8 @@ function renderAiProgress(
     (ai.invalid ?? 0) +
     ' inválidos · ' +
     ai.failed +
-    ' falhas';
+    ' falhas' +
+    ((ai.excluded ?? 0) > 0 ? ' · ' + ai.excluded + ' excluídos' : '');
   el<HTMLProgressElement>('progress').max = Math.max(1, ai.total);
   el<HTMLProgressElement>('progress').value = processed;
 }
