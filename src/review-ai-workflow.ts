@@ -124,8 +124,7 @@ export class ReviewAiWorkflow {
     }
     current();
     const payload = { runId, itemId: item.id, leaseId: item.leaseId, model: usedModel, tokens, elapsedMs: Math.min(Date.now() - start, 300000) };
-    const result = await this.save({ ...payload, ...(diagnostic ? { error: 'technical', errorCode: 'analysis_failed', diagnostic } : { decision }) }, current);
-    if (result.fallback) this.progress.fallback++;
+    await this.save({ ...payload, ...(diagnostic ? { error: 'technical', errorCode: 'analysis_failed', diagnostic } : { decision }) }, current);
     this.changed();
   }
   private async save(payload: any, current: () => void) {

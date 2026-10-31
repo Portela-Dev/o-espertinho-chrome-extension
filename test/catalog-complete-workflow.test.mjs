@@ -9,7 +9,7 @@ function fixture({failure, lostSave=false, deterministic=false, stage='type'}={}
   sent.push({op,p});
   if(op==='config')return {resolver:{protocolVersion:3,mode:'active',concurrency:1},settings:{productEnabled:true,categoryEnabled:true}};
   if(op==='resolverStart')return {id:'run',mode:'active',status:'running'};
-  if(op==='resolverClaim')return {run:{status:done===6?'completed':'running',stats:{total:6,accepted:done,failed:0}},item:done===6?null:{id:String(done),leaseId:'lease',context:{stage,enabled:true,offer:{title:'Produto'}},deterministic:deterministic&&done>0?{facts:{},reason:''}:null}};
+  if(op==='resolverClaim')return {run:{status:done===6?'completed':'running',stats:{total:6,accepted:done,failed:0,fallback:[...receipts.values()].filter(r=>r.fallback).length}},item:done===6?null:{id:String(done),leaseId:'lease',context:{stage,enabled:true,offer:{title:'Produto'}},deterministic:deterministic&&done>0?{facts:{},reason:''}:null}};
   if(op==='resolverComplete'){
    const key=JSON.stringify(p);if(receipts.has(key))return receipts.get(key);
    done++;const result=p.error?{outcome:'drafted',fallback:{diagnostic:p.diagnostic}}:{outcome:'drafted'};receipts.set(key,result);
@@ -22,7 +22,7 @@ function fixture({failure, lostSave=false, deterministic=false, stage='type'}={}
 }
 test('falha permanente da IA conclui 100% sem três chamadas por item nem enviar o erro bruto',async()=>{
  const f=fixture({failure:Error('Bearer PRIVATE_TOKEN secret@example.test')});await f.flow.run('product','shop',6,'model');
- assert.equal(f.flow.progress.completed,6);assert.equal(f.flow.progress.total,6);assert.equal(f.flow.progress.failed,0);assert.equal(f.flow.progress.status,'completed');assert.equal(f.calls(),2);
+ assert.equal(f.flow.progress.completed,6);assert.equal(f.flow.progress.total,6);assert.equal(f.flow.progress.fallback,6);assert.equal(f.flow.progress.failed,0);assert.equal(f.flow.progress.status,'completed');assert.equal(f.calls(),2);
  assert.ok(f.sent.filter(s=>s.op==='resolverComplete').every(s=>s.p.diagnostic==='unknown'));
  assert.doesNotMatch(JSON.stringify(f.sent),/PRIVATE_TOKEN|secret@example/);
 });
