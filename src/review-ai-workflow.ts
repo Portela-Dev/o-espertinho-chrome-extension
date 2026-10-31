@@ -9,6 +9,8 @@ function structuredPhase(context: any, mode: string) {
   let phase = 'Identificando produto do link';
   if (context.preparation) phase = 'Preparando candidato relacionado ao link';
   else if (context.stage === 'category') phase = 'Definindo categoria do produto';
+  else if (context.stage === 'type') phase = 'Identificando o tipo do produto';
+  else if (context.stage === 'match') phase = 'Comparando produtos relacionados';
   return (mode === 'shadow' ? 'Simulação · ' : '') + phase;
 }
 export type ReviewTransport = (
@@ -38,6 +40,7 @@ export class ReviewAiWorkflow {
     pending: 0,
     invalid: 0,
     excluded: 0,
+    skipped: 0,
     status: 'idle',
     mode: 'legacy',
     title: '',
@@ -91,6 +94,7 @@ export class ReviewAiWorkflow {
       pending: 0,
       invalid: 0,
       excluded: 0,
+      skipped: 0,
       status: 'running',
       mode: 'legacy',
       title: '',
@@ -161,6 +165,8 @@ export class ReviewAiWorkflow {
     model: string,
     current: () => void,
   ) {
+    if (this.config.resolver.protocolVersion !== 2)
+      throw new Error('O backend precisa da atualização de tipos por IA. Atualize o backend e recarregue as configurações.');
     let cursor: string | null = null;
     this.progress.title = 'Preparando identidades existentes';
     this.changed();
@@ -224,6 +230,7 @@ export class ReviewAiWorkflow {
         stats.accepted,
       );
       this.progress.excluded = Math.max(this.progress.excluded, stats.excluded);
+      this.progress.skipped = Math.max(this.progress.skipped, stats.skipped ?? 0);
       this.progress.failed = Math.max(this.progress.failed, stats.failed);
       this.progress.title =
         run.mode === 'shadow'
@@ -272,28 +279,12 @@ export class ReviewAiWorkflow {
       decision = {
         categoryId: context.defaultCategoryId,
         path: [],
-        exclude: false,
         reason: 'Categoria definida na política.',
       };
+    if (!decision && !context.enabled)
+      throw new Error('Ative esta tarefa de IA no admin para continuar o processamento.');
     try {
       if (!decision) {
-        if (!context.enabled)
-          decision =
-            context.stage === 'category'
-              ? {
-                  categoryId: null,
-                  path: [],
-                  exclude: true,
-                  reason: 'Sem regra determinística e IA da tarefa desativada.',
-                }
-              : {
-                  policyId: context.policy.id,
-                  facts: {},
-                  exclude: true,
-                  reason:
-                    'Sem identidade determinística e IA da tarefa desativada.',
-                };
-        else {
           if (!model)
             throw new Error(
               'Conecte a IA e selecione um modelo para as tarefas sem regra determinística.',
@@ -306,7 +297,6 @@ export class ReviewAiWorkflow {
           });
           decision = analysis.decision ?? analysis;
           tokens = analysis.metrics?.tokens ?? 0;
-        }
       }
       current();
       errorCode = 'result_rejected';
