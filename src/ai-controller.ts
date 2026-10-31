@@ -13,15 +13,21 @@ const safeError = (error: unknown) =>
   error instanceof LocalError
     ? error.message
     : 'Não foi possível concluir a chamada direta à OpenAI. Confira sua conexão e tente novamente.';
+async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  signal.throwIfAborted();
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+    void work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
 export class AiController {
   private loginTab?: number;
   private processing = false;
-  private controller?: AbortController;
   private operation = 0;
   private readonly structuredControllers = new Set<AbortController>();
   private phase = 'idle';
   private error = '';
-  private result: any = null;
   private modelsList: { id: string; name: string }[] = [];
   private callbackObserved = false;
   private selectedModel = '';
@@ -138,7 +144,6 @@ export class AiController {
       models: this.modelsList,
       selectedModel: this.selectedModel,
       activeAccountId: this.session.active?.clientId ?? '',
-      result: this.result,
       callbackObserved: this.callbackObserved,
     };
   }
@@ -156,7 +161,6 @@ export class AiController {
       if (this.syncedSessionId !== record.sessionId) {
         if (this.phase === 'analyzing') this.cancelAnalysis();
         this.modelsList = [];
-        this.result = null;
         this.error = '';
         this.selectedModel = '';
         this.syncedSessionId = record.sessionId;
@@ -189,7 +193,6 @@ export class AiController {
     await this.admin();
     await this.cancelLogin();
     this.error = '';
-    this.result = null;
     this.callbackObserved = false;
     this.modelsList = [];
     this.selectedModel = '';
@@ -311,38 +314,6 @@ export class AiController {
     }
   }
   async analyze(body: any) {
-    if (body?.task === 'resolver') return this.analyzeStructured(body);
-    await this.admin();
-    if (this.phase === 'analyzing' || this.session.pending || this.processing)
-      throw new LocalError('Já existe uma operação em andamento.');
-    this.phase = 'analyzing';
-    this.error = '';
-    this.result = null;
-    const operation = ++this.operation;
-    this.controller = new AbortController();
-    try {
-      const result = await analyze(
-        this.session,
-        body,
-        AbortSignal.any([this.controller.signal, AbortSignal.timeout(120000)]),
-      );
-      await this.sync();
-      if (operation === this.operation) {
-        this.result = result;
-        this.phase = 'completed';
-        return result;
-      }
-      throw new LocalError('Análise cancelada.');
-    } catch (error) {
-      if (operation === this.operation) {
-        this.phase = 'failed';
-        this.error = safeError(error);
-        throw new LocalError(this.error);
-      }
-      throw new LocalError('Análise cancelada.');
-    }
-  }
-  private async analyzeStructured(body: any) {
     await this.admin();
     if (
       this.processing ||
@@ -355,18 +326,22 @@ export class AiController {
     this.structuredControllers.add(controller);
     this.phase = 'analyzing';
     this.error = '';
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]);
     try {
-      const result = await analyze(
+      const result = await abortable(analyze(
         this.session,
         body,
-        AbortSignal.any([controller.signal, AbortSignal.timeout(120000)]),
-      );
+        signal,
+      ), signal);
       if (generation !== this.operation)
         throw new LocalError('Análise cancelada.');
       await this.sync();
       return result;
     } catch (error) {
-      throw new LocalError(safeError(error));
+      if (error instanceof LocalError) throw error;
+      if (error instanceof DOMException && error.name === 'TimeoutError')
+        throw new LocalError('O tempo de resposta da IA esgotou.', 408, 'timeout');
+      throw new LocalError(safeError(error), 503, 'connection');
     } finally {
       this.structuredControllers.delete(controller);
       if (!this.structuredControllers.size && generation === this.operation)
@@ -375,10 +350,8 @@ export class AiController {
   }
   cancelAnalysis() {
     this.operation++;
-    this.controller?.abort();
     for (const controller of this.structuredControllers) controller.abort();
     this.structuredControllers.clear();
-    this.controller = undefined;
     if (this.phase === 'analyzing') {
       this.phase = this.session.active ? 'connected' : 'idle';
       this.error = 'Análise cancelada.';
@@ -390,7 +363,6 @@ export class AiController {
     this.modelsList = [];
     this.selectedModel = '';
     this.syncedSessionId = '';
-    this.result = null;
     this.error = '';
     this.phase = 'idle';
     (this.session as any).usage = undefined;

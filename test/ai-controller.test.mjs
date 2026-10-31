@@ -19,7 +19,7 @@ function fixture(){
   }
   if(url.endsWith('/models'))return Response.json({models:[{visibility:'list',slug:'fixture',display_name:'Fixture'}]});
   if(url.endsWith('/revoke'))return new Response('',{status:200});
-  if(url.endsWith('/responses'))return new Response('data: '+JSON.stringify({type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({action:'needs_review',category:'Áudio',productId:null,product:null,reason:'Confira o modelo.'})}]}]}})+'\n\n');
+  if(url.endsWith('/responses'))return new Response('data: '+JSON.stringify({type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({policyId:'phone',facts:{},reason:''})}]}]}})+'\n\n');
   throw Error('Unexpected URL');
  };
  session=new OpenAISession({hostId:'urn:uuid:test',fetcher,saveRegistrations:async registrations=>{saved.registrations=registrations;}});
@@ -34,7 +34,7 @@ test('login direto aceita somente aba, frame, callback e state próprios; nenhum
   for(const details of [{tabId:88,frameId:0,url:callback},{tabId:77,frameId:2,url:callback},{tabId:77,frameId:0,url:callback.replace('18766','18765')},{tabId:77,frameId:0,url:callback.replace('/auth/callback','/wrong')},{tabId:77,frameId:0,url:callback+'&state=duplicate'}])assert.equal(await f.app.receive(details),false);
   assert.equal(f.calls.length,0);assert.equal(await f.app.receive({tabId:77,frameId:0,url:callback}),true);assert.equal(f.app.status().connected,true);assert.equal(f.app.status().callbackObserved,true);assert.ok(f.updates.some(v=>v.removed===77));
   assert.equal(await f.app.receive({tabId:77,frameId:0,url:callback}),false);assert.equal((await f.app.models())[0].id,'fixture');
-  await f.app.analyze({model:'fixture',offer:{title:'Produto'}});assert.equal(f.app.status().phase,'completed');assert.equal(f.app.status().result.action,'needs_review');
+  assert.equal((await f.app.analyze({task:'resolver',model:'fixture',context:{stage:'identity',policy:{id:'phone',attributes:[]},offer:{title:'Produto'}}})).decision.policyId,'phone');assert.equal(f.app.status().phase,'connected');
   assert.ok(f.calls.every(c=>/^https:\/\/(auth|api)\.openai\.com\//.test(c.url)));assert.ok(f.messages.every(m=>m.type==='STATE'));
   assert.doesNotMatch(JSON.stringify(f.saved)+JSON.stringify(f.app.status())+JSON.stringify(f.updates),/DIRECT_PRIVATE|access_token|refresh_token|id_token|test-only-code/);
   assert.equal((await f.app.logout()).revoked,true);assert.equal(f.app.status().connected,false);
