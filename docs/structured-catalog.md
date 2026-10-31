@@ -1,13 +1,9 @@
-# Resolução estruturada na extensão
+# IA do catálogo: tipos genéricos e processamento completo
 
-Correção: a preparação por IA é restrita aos candidatos relacionados ao link atual; não existe uma preparação global obrigatória antes do primeiro link. A interface informa a etapa, distingue falha de análise de rejeição ao salvar e identifica resultados de simulação como "simulados (sem salvar)". As regras de negócio dos prompts antigos são preservadas, mas suas ações legadas são explicitamente traduzidas para o contrato estruturado na instrução enviada ao modelo.
+No fluxo ativo, todos os itens com link de afiliado devem ser catalogados e categorizados. O título tem prioridade; descrições e fichas técnicas complementam apenas os dados compatíveis. Ausências não inventam atributos e não geram revisão, invalidação ou exclusão.
 
-Os botões 4/5 usam o modo configurado no backend: anterior, simulação (inicial) ou ativo. No modo novo não baixam todo o inventário nem comparam cada oferta com todos os produtos. O backend fornece políticas/evidências e candidatos limitados. Identidades completas, decisões reaproveitáveis e categorias pré-configuradas dispensam IA; demais casos fazem uma chamada curta por etapa. Produtos antigos são preparados uma vez, sem alterar seus IDs ou vínculos.
+Sem uma política correspondente, a etapa type identifica o tipo e seus atributos em uma chamada. A IA reutiliza uma política oferecida ou cria uma política reutilizável validada pelo backend. Identidades conhecidas podem dispensar IA. Uma comparação match usa até 20 candidatos, escolhendo um produto existente ou criando um novo. A etapa category sempre escolhe ou cria a categoria; publicação continua manual.
 
-A IA retorna atributos com citações literais ou categoria; o backend valida e aplica transacionalmente. Ambiguidades são excluídas com motivo, sem novos invalid/needs_review. Falhas técnicas têm repetição limitada. Publicação permanece manual. Sem credenciais de IA no backend; a conexão e o modelo existentes continuam persistidos e desconectar continua revogando a sessão.
+O painel mostra a etapa atual e conta links. No modo estruturado não exibe contadores de excluídos, inválidos ou revisão. Credenciais, login e modelo continuam apenas na extensão. A análise não depende de cookies enviados ao backend e não há implementação por marketplace.
 
-A barra única conta links. Preparação do inventário é contabilizada separadamente no admin. Reservas e progresso ficam persistidos no backend. Ao fechar/trocar ambiente/cancelar localmente, a execução é pausada; ao iniciar novamente, retoma a pendente. Cancelamento definitivo está no menu da execução no admin.
-
-Concorrência é limitada a 1 ou 2 conforme configuração do admin. O cache de modelos é usado somente durante análise; recarregar modelos manualmente consulta o provedor. Não usa Batch API ou parâmetros não confirmados para assinatura/OAuth. Os tokens reportados são métricas do provedor, não uma medição da cota do plano.
-
-Requer backend com migration 043. O modo de simulação não modifica o catálogo. Antes de ativar, valide amostra real e calibre políticas. Evidência literal não garante interpretação semântica perfeita. Testes automatizados usam respostas fictícias e não gastam a conta do usuário. Sem deploy nesta entrega.
+Requer protocolo 2 do backend e migration 044; a extensão recusa iniciar contra um backend anterior. Publicar backend primeiro e recarregar a extensão/configurações. Falhas técnicas mantêm métricas e repetição limitada; tarefas desativadas ou falta de modelo/conexão interrompem com mensagem, sem veto de negócio sobre o anúncio. A simulação não grava políticas, produtos ou categorias. Testes usam respostas de IA fictícias, sem consumo da conta real.
