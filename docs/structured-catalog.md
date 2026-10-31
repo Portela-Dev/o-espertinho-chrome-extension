@@ -1,5 +1,7 @@
 # Resolução estruturada na extensão
 
+Correção: a preparação por IA é restrita aos candidatos relacionados ao link atual; não existe uma preparação global obrigatória antes do primeiro link. A interface informa a etapa, distingue falha de análise de rejeição ao salvar e identifica resultados de simulação como "simulados (sem salvar)". As regras de negócio dos prompts antigos são preservadas, mas suas ações legadas são explicitamente traduzidas para o contrato estruturado na instrução enviada ao modelo.
+
 Os botões 4/5 usam o modo configurado no backend: anterior, simulação (inicial) ou ativo. No modo novo não baixam todo o inventário nem comparam cada oferta com todos os produtos. O backend fornece políticas/evidências e candidatos limitados. Identidades completas, decisões reaproveitáveis e categorias pré-configuradas dispensam IA; demais casos fazem uma chamada curta por etapa. Produtos antigos são preparados uma vez, sem alterar seus IDs ou vínculos.
 
 A IA retorna atributos com citações literais ou categoria; o backend valida e aplica transacionalmente. Ambiguidades são excluídas com motivo, sem novos invalid/needs_review. Falhas técnicas têm repetição limitada. Publicação permanece manual. Sem credenciais de IA no backend; a conexão e o modelo existentes continuam persistidos e desconectar continua revogando a sessão.
