@@ -5,6 +5,12 @@ const input={task:'resolver',stage:'match',offer:{title:'Headset Modelo X',descr
 const suggestion={productId:'p1',reason:'Mesmo modelo e marca. Cor não distingue o produto.'};
 function stream(events){const text=events.map(e=>'data: '+JSON.stringify(e)+'\r\n\r\n').join(''),bytes=new TextEncoder().encode(text);return new Response(new ReadableStream({start(controller){for(const byte of bytes)controller.enqueue(Uint8Array.of(byte));controller.close();}}));}
 const complete=text=>stream([{type:'response.output_text.delta',delta:text},{type:'response.completed',response:{status:'completed'}}]);
+test('resposta concluída encerra a leitura mesmo quando o provedor mantém o stream aberto',{timeout:1000},async()=>{
+ let cancelled=false;
+ const event={type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(suggestion)}]}]}};
+ const response=new Response(new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('data: '+JSON.stringify(event)+'\n\n'));},cancel(){cancelled=true;}}));
+ assert.deepEqual(await readSuggestion(response,input),suggestion);assert.equal(cancelled,true);
+});
 test('análise usa modelo da conta e Responses oficial, sem ferramentas ou armazenamento',async()=>{
  const calls=[],session={models:async()=>[{id:'fixture'}],token:async()=>'local-secret',fetcher:async(url,options)=>{calls.push({url,options});return complete(JSON.stringify(suggestion));}};
  const result=await analyze(session,{task:'resolver',context:input,model:'fixture'},new AbortController().signal);assert.equal(result.decision.productId,'p1');assert.equal(calls[0].url,'https://api.openai.com/v1/responses');

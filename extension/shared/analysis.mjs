@@ -6,47 +6,65 @@ export function analysisInput(body) {
 }
 export const validateSuggestion = (value, input) => resolverResult(value, input);
 const invalid = () => new LocalError('Resposta da IA fora do formato de catalogação.', 422, 'invalid_response');
-export async function readSuggestion(response, input, onUsage = () => {}) {
-  if (!response.ok) {
-    await response.body?.cancel();
-    const status = response.status;
-    const code = status === 429 ? 'usage_limit' : [401,403].includes(status) ? 'authentication' : status >= 500 ? 'provider_unavailable' : 'invalid_response';
-    throw new LocalError('A análise foi recusada pelo provedor (HTTP ' + status + ').', status, code);
+async function checkResponse(response) {
+  if (response.ok && response.body) return;
+  await response.body?.cancel();
+  const status = response.status;
+  let code = 'invalid_response';
+  if (status === 429) code = 'usage_limit';
+  else if ([401,403].includes(status)) code = 'authentication';
+  else if (status >= 500 || !response.body) code = 'provider_unavailable';
+  throw new LocalError('A análise foi recusada ou não retornou conteúdo (HTTP ' + status + ').', status, code);
+}
+function parseFrame(frame) {
+  const data = frame.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
+  if (!data || data === '[DONE]') return null;
+  try {
+    const item = JSON.parse(data);
+    if (!item || typeof item !== 'object') throw invalid();
+    return item;
+  } catch { throw invalid(); }
+}
+function applyFrame(frame, state, onUsage) {
+  const item = parseFrame(frame);
+  if (!item) return false;
+  if (item.type === 'response.output_text.delta' && typeof item.delta === 'string') state.output += item.delta;
+  if (['error','response.failed','response.incomplete'].includes(item.type)) throw new LocalError('A IA não concluiu a resposta.', 503, 'provider_unavailable');
+  if (item.type === 'response.completed') {
+    if (item.response?.status !== 'completed') throw invalid();
+    state.completed = true;
+    onUsage(item.response.usage);
+    if (!state.output) state.output = (item.response.output ?? []).flatMap(o => o.content ?? []).filter(c => c.type === 'output_text').map(c => c.text).join('');
   }
-  if (!response.body) throw new LocalError('A IA não retornou uma resposta.', 503, 'provider_unavailable');
-  let pending = '', output = '', completed = false, total = 0;
-  const decoder = new TextDecoder();
-  const event = frame => {
-    const data = frame.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
-    if (!data || data === '[DONE]') return;
-    let item;
-    try { item = JSON.parse(data); } catch { throw invalid(); }
-    if (item.type === 'response.output_text.delta') output += typeof item.delta === 'string' ? item.delta : '';
-    if (['error','response.failed','response.incomplete'].includes(item.type)) throw new LocalError('A IA não concluiu a resposta.', 503, 'provider_unavailable');
-    if (item.type === 'response.completed') {
-      if (item.response?.status !== 'completed') throw invalid();
-      completed = true;
-      onUsage(item.response.usage);
-      if (!output) output = (item.response.output ?? []).flatMap(o => o.content ?? []).filter(c => c.type === 'output_text').map(c => c.text).join('');
-    }
-    if (output.length > 24000) throw invalid();
-  };
-  const reader = response.body.getReader();
+  if (state.output.length > 24000) throw invalid();
+  return state.completed;
+}
+async function readFrames(response, consume) {
+  let pending = '', total = 0;
+  const decoder = new TextDecoder(), reader = response.body.getReader();
   try {
     while (true) {
-      const { value, done } = await reader.read();
+      const {value,done} = await reader.read();
       if (done) break;
       total += value.length;
       if (total > 2 * 1024 * 1024) throw invalid();
-      pending = (pending + decoder.decode(value, { stream: true })).replaceAll('\r\n','\n');
+      pending = (pending + decoder.decode(value, {stream:true})).replaceAll('\r\n','\n');
       let index;
-      while ((index = pending.indexOf('\n\n')) >= 0) { event(pending.slice(0,index)); pending = pending.slice(index+2); }
+      while ((index = pending.indexOf('\n\n')) >= 0) {
+        if (consume(pending.slice(0,index))) return;
+        pending = pending.slice(index+2);
+      }
     }
+    pending += decoder.decode();
+    if (pending.trim()) consume(pending);
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
-  pending += decoder.decode();
-  if (pending.trim()) event(pending);
-  if (!completed) throw new LocalError('Conexão encerrada antes da conclusão.', 503, 'connection');
-  try { return validateSuggestion(JSON.parse(output.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'')),input); }
+}
+export async function readSuggestion(response, input, onUsage = () => {}) {
+  await checkResponse(response);
+  const state = {output:'',completed:false};
+  await readFrames(response, frame => applyFrame(frame,state,onUsage));
+  if (!state.completed) throw new LocalError('Conexão encerrada antes da conclusão.', 503, 'connection');
+  try { return validateSuggestion(JSON.parse(state.output.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'')),input); }
   catch { throw invalid(); }
 }
 export async function analyze(session, body, signal) {
