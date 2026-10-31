@@ -1,7 +1,7 @@
 import { resolverInput, resolverResult, resolverInstructions } from './resolver.mjs';
 import { LocalError } from './openai-session.mjs';
 export function analysisInput(body) {
-  if (!body || body.task !== 'resolver') throw new LocalError('Atualize para o fluxo de catalogação completa.', 400, 'invalid_response');
+  if (body?.task !== 'resolver') throw new LocalError('Atualize para o fluxo de catalogação completa.', 400, 'invalid_response');
   return resolverInput(body);
 }
 export const validateSuggestion = (value, input) => resolverResult(value, input);
@@ -64,8 +64,18 @@ export async function readSuggestion(response, input, onUsage = () => {}) {
   const state = {output:'',completed:false};
   await readFrames(response, frame => applyFrame(frame,state,onUsage));
   if (!state.completed) throw new LocalError('Conexão encerrada antes da conclusão.', 503, 'connection');
-  try { return validateSuggestion(JSON.parse(state.output.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'')),input); }
+  try { return validateSuggestion(parseOutput(state.output),input); }
   catch { throw invalid(); }
+}
+function parseOutput(output) {
+  let text = output.trim();
+  if (text.startsWith('```')) {
+    text = text.slice(3).trimStart();
+    if (text.slice(0,4).toLowerCase() === 'json') text = text.slice(4).trimStart();
+    if (!text.endsWith('```')) throw invalid();
+    text = text.slice(0,-3).trimEnd();
+  }
+  return JSON.parse(text);
 }
 export async function analyze(session, body, signal) {
   const input = analysisInput(body), models = await session.models(true);

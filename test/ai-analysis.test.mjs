@@ -18,6 +18,8 @@ test('análise usa modelo da conta e Responses oficial, sem ferramentas ou armaz
  await assert.rejects(()=>analyze(session,{task:'resolver',context:input,model:'other'}),/indisponível/);
 });
 test('resposta incompleta, limite, JSON inválido e produto inventado não geram sugestão válida',async()=>{
+ assert.deepEqual(await readSuggestion(complete('```json\n'+JSON.stringify(suggestion)+'\n```'),input),suggestion);
+ await assert.rejects(()=>readSuggestion(complete('```json\n'+JSON.stringify(suggestion)),input),e=>e.code==='invalid_response');
  for(const events of [[{type:'response.output_text.delta',delta:'{}'}],[{type:'response.failed',response:{error:{code:'subscription_sharing_usage_limit_exceeded'}}}],[{type:'response.incomplete'}]])await assert.rejects(()=>readSuggestion(stream(events),input));
  await assert.rejects(()=>readSuggestion(complete('not JSON'),input),e=>e.code==='invalid_response');
  await assert.rejects(()=>readSuggestion(complete(JSON.stringify({...suggestion,productId:'invented'})),input),e=>e.code==='invalid_response');
