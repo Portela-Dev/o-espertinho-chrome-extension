@@ -82,7 +82,6 @@ export async function setupAiPanel(
         }
         const structured = config.resolver && config.resolver.mode !== 'legacy';
         if (
-          !structured &&
           !config.settings[
             task === 'category' ? 'categoryEnabled' : 'productEnabled'
           ]
