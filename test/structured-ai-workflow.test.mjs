@@ -26,7 +26,7 @@ function fixture({
     sent.push({ op, p });
     if (op === 'config')
       return {
-        resolver: { mode, protocolVersion: 2 },
+        resolver: { mode, protocolVersion: 3 },
         settings: { productEnabled: true, categoryEnabled: true },
       };
     if (op === 'prepare') return { nextCursor: null };
@@ -94,7 +94,7 @@ test('resolvedor não baixa inventário global: uma chamada por link, métricas 
 test('identidade determinística dispensa IA e modelo; modo simulação fica explícito', async () => {
   const f = fixture({ mode: 'shadow', deterministic: true }),
     flow = new ReviewAiWorkflow(f.transport, f.analyze);
-  await flow.run('product', 'shop', 2, '');
+  await flow.run('product', 'shop', 2, 'model');
   assert.equal(f.calls(), 0);
   assert.match(flow.progress.title, /Simulação/);
   assert.equal(flow.progress.completed, 2);
@@ -119,7 +119,7 @@ test('cancelamento pausa execução persistente e não salva resposta atrasada',
   });
   await assert.rejects(
     () => flow.run('product', 'shop', 2, 'model'),
-    /cancelada/,
+    /interrompido/,
   );
   assert.ok(
     f.sent.some((s) => s.op === 'resolverAction' && s.p.action === 'pause'),
@@ -221,15 +221,15 @@ test('progresso informa preparação relacionada e distingue falha da IA de reje
     return f.transport(op, payload);
   }, f.analyze, () => phases.push(flow.progress.title));
   await flow.run('product', 'shop', 2, 'model');
-  assert.ok(phases.some(p => p.includes('Preparando candidato relacionado')));
-  assert.ok(phases.some(p => p.includes('Resultado recusado')));
-  assert.ok(f.sent.some(s => s.op === 'resolverComplete' && s.p.errorCode === 'result_rejected'));
+  assert.ok(phases.some(p => p.includes('Identificando produto')));
+  assert.ok(rejected);
+  assert.ok(!f.sent.some(s => s.op === 'resolverComplete' && s.p.errorCode === 'result_rejected'));
   assert.equal(flow.progress.completed, 2);
 });
 
 test('concorrência configurável fica limitada a dois links e mantém contagem por link',async()=>{
  let claimed=0,done=0,active=0,peak=0;const transport=async(op,p)=>{
- if(op==='config')return {resolver:{mode:'active',concurrency:2,protocolVersion:2},settings:{productEnabled:true,categoryEnabled:true}};
+ if(op==='config')return {resolver:{mode:'active',concurrency:2,protocolVersion:3},settings:{productEnabled:true,categoryEnabled:true}};
  if(op==='prepare')return {nextCursor:null};if(op==='resolverStart')return {id:'run',mode:'active',status:'running'};
  if(op==='resolverClaim'){const item=claimed<4?{id:'i'+claimed++,leaseId:'l',context}:null;return {run:{status:done===4?'completed':'running',stats:{total:4,accepted:done,excluded:0,failed:0}},item};}
  if(op==='resolverComplete'){done++;return {outcome:'drafted'};}return {};};
@@ -265,11 +265,11 @@ test('faltas e contradições não produzem veto de negócio; categoria deve ser
 });
 test('backend anterior não inicia execução incompatível e tarefa desativada não exclui itens',async()=>{
  const f=fixture(),flow=new ReviewAiWorkflow(async(op,p)=>op==='config'?{resolver:{mode:'active'},settings:{productEnabled:true}}:f.transport(op,p),f.analyze);
- await assert.rejects(()=>flow.run('product','shop',2,'model'),/backend precisa da atualização/);
+ await assert.rejects(()=>flow.run('product','shop',2,'model'),/Atualize o backend/);
  assert.ok(!f.sent.some(s=>s.op==='resolverStart'));
  const f2=fixture(),flow2=new ReviewAiWorkflow(async(op,p)=>{
   const result=await f2.transport(op,p);if(op==='resolverClaim'&&result.item)result.item.context={...context,enabled:false};return result;
  },f2.analyze);
- await assert.rejects(()=>flow2.run('product','shop',2,'model'),/Ative esta tarefa/);
+ await assert.rejects(()=>flow2.run('product','shop',2,'model'),/desativada/);
  assert.ok(!f2.sent.some(s=>s.op==='resolverComplete'));
 });

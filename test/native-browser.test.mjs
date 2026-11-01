@@ -24,9 +24,8 @@ test(
       visited = [],
       backendTraffic = [],
       aiSuggestions = [];
-    let run, item, nativeDraft;
-    const categoryId = '65278c77-deee-463e-9ed2-d24362461234',
-      draftId = '65278c77-deee-463e-9ed2-d24362461235';
+    let run, item, aiRun, aiDone = false;
+    const categoryId = '65278c77-deee-463e-9ed2-d24362461234';
     const discovery = {
       rendering: {
         frameSelector: '',
@@ -162,6 +161,7 @@ test(
           };
         else if (path === '/catalog/ai/config')
           data = {
+            resolver: {protocolVersion:3,mode:'active',concurrency:1},
             settings: {
               version: 1,
               categoryEnabled: true,
@@ -170,60 +170,15 @@ test(
             category: { completed: 0, total: 1 },
             product: { completed: 0, total: 1 },
           };
-        else if (path === '/catalog/ai/inventory') {
-          const kind = new URL(req.url, 'http://localhost').searchParams.get(
-            'kind',
-          );
-          data = {
-            revision: '1',
-            nextCursor: null,
-            items:
-              kind === 'categories'
-                ? [{ id: categoryId, path: ['Áudio'] }]
-                : kind === 'drafts' && nativeDraft
-                  ? [nativeDraft]
-                  : [],
-          };
-        } else if (path === '/catalog/ai/queue')
-          data = {
-            items: [{ id: 'test-link', title: 'Oferta aguardando revisão' }],
-          };
-        else if (path === '/catalog/ai/context')
-          data = {
-            requestId: crypto.randomUUID(),
-            task: body.task,
-            instructions: 'Use a categoria Áudio',
-            offer: {
-              title: 'Produto controlado',
-              description: 'Descrição',
-              brand: 'Marca',
-              sourceCategory: 'Áudio',
-            },
-            categories: ['Áudio'],
-            products: [],
-          };
-        else if (path === '/catalog/ai/suggestions') {
+        else if (path === '/catalog/resolver/start') {
+          aiDone=false;aiRun={id:crypto.randomUUID(),status:'running',task:body.task};data=aiRun;
+        } else if (path === '/catalog/resolver/claim') {
+          data={run:{...aiRun,status:aiDone?'completed':'running',stats:{total:1,accepted:aiDone?1:0,failed:0}},
+            item:aiDone?null:{id:crypto.randomUUID(),leaseId:crypto.randomUUID(),context:{stage:aiRun.task==='category'?'category':'match',enabled:true,prompt:'Use a categoria Áudio',offer:{title:'Produto controlado',brand:'Marca'},categories:[{id:categoryId,path:['Áudio']}],candidates:[]}}};
+        } else if (path === '/catalog/resolver/complete') {
           aiSuggestions.push(body);
-          const category = body.suggestion.action === 'use_category';
-          nativeDraft = {
-            id: draftId,
-            name: 'Produto controlado',
-            brand: 'Marca',
-            description: 'Descrição',
-            kind: 'draft',
-          };
-          data = {
-            applied: true,
-            outcome: category ? 'categorized' : 'drafted',
-            inventory: {
-              revision: '1',
-              categories: [],
-              products: [],
-              drafts: category ? [] : [nativeDraft],
-              removeDraftIds: category ? [draftId] : [],
-            },
-          };
-        } else if (path === '/catalog/ai/release') data = { ok: true };
+          aiDone=true;data={applied:true,outcome:aiRun.task==='category'?'categorized':'drafted'};
+        } else if (path === '/catalog/resolver/action') data={...aiRun,status:body.action==='resume'?'running':'paused'};
         else if (path === '/catalog/runs' && req.method === 'POST') {
           run = {
             id: crypto.randomUUID(),
@@ -942,37 +897,18 @@ test(
             const input = route.request().postDataJSON();
             assert.equal(input.store, false);
             assert.equal(input.stream, true);
-            const task = JSON.parse(input.input[0].content).task;
+            const task = JSON.parse(input.input[0].content).stage;
+            assert.ok(['category','match'].includes(task));
             const decision =
               task === 'category'
                 ? {
-                    action: 'use_category',
                     categoryId,
-                    category: 'Áudio',
-                    productId: null,
-                    product: null,
+                    path: [],
                     reason: 'Categoria existente',
                   }
-                : task === 'product'
-                  ? {
-                      action: 'create_new',
-                      category: '',
-                      categoryId: null,
+                : {
                       productId: null,
-                      product: {
-                        name: 'Produto controlado',
-                        brand: 'Marca',
-                        description: 'Descrição',
-                      },
                       reason: 'Nova identidade',
-                    }
-                  : {
-                      action: 'needs_review',
-                      category: 'Áudio',
-                      categoryId: null,
-                      productId: null,
-                      product: null,
-                      reason: 'Análise direta simulada sem auxiliar.',
                     };
             await route.fulfill({
               contentType: 'text/event-stream',
@@ -1041,7 +977,7 @@ test(
           .textContent.includes('Catalogação por IA · Concluída'),
       );
       assert.equal(aiSuggestions.length, 1);
-      assert.equal(aiSuggestions[0].suggestion.action, 'create_new');
+      assert.equal(aiSuggestions[0].decision.productId, null);
       await direct.locator('#workspace > details > summary').click();
       await direct.locator('#step-category').click();
       await direct.waitForFunction(() =>
