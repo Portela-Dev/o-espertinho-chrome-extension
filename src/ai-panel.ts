@@ -54,12 +54,6 @@ export async function setupAiPanel(
       state = app?.status(),
       config =
         workflow?.marketplaceId === marketplaceId ? workflow.config : undefined;
-    if (
-      workflow?.busy &&
-      !state?.account &&
-      workflow.progress.status === 'running'
-    )
-      workflow.cancel();
     const active =
         !!view?.run &&
         !['completed', 'failed', 'cancelled'].includes(view.run.status),
@@ -80,7 +74,6 @@ export async function setupAiPanel(
         if (!config) {
           return 'atualize configurações';
         }
-        const structured = config.resolver && config.resolver.mode !== 'legacy';
         if (
           !config.settings[
             task === 'category' ? 'categoryEnabled' : 'productEnabled'
@@ -88,10 +81,10 @@ export async function setupAiPanel(
         ) {
           return 'desativado no admin';
         }
-        if (!structured && !state?.account?.planEnabled) {
+        if (!state?.account?.planEnabled) {
           return 'entre no ChatGPT';
         }
-        if (!structured && !el<HTMLSelectElement>('direct-model').value) {
+        if (!el<HTMLSelectElement>('direct-model').value) {
           return 'escolha um modelo';
         }
         if (active) {
@@ -223,6 +216,7 @@ export async function setupAiPanel(
     });
   on('direct-login', async () => {
     if (app.status().account) {
+      workflow?.cancel();
       const result = await app.logout();
       el<HTMLSelectElement>('direct-model').replaceChildren();
       notify(
@@ -301,9 +295,7 @@ export async function setupAiPanel(
               const view = hooks.view();
               if (
                 !view?.user ||
-                ((!workflow?.config?.resolver ||
-                  workflow.config.resolver.mode === 'legacy') &&
-                  !app.status().account?.planEnabled)
+                !app.status().account?.planEnabled
               )
                 throw new Error(
                   'Entre no Espertinho e no ChatGPT para continuar.',
@@ -314,12 +306,11 @@ export async function setupAiPanel(
                 el<HTMLSelectElement>('marketplace').value,
                 Number(el<HTMLInputElement>('limit').value),
                 el<HTMLSelectElement>('direct-model').value,
-                el<HTMLInputElement>('retry-ai-review').checked,
               );
               notify(
                 workflow?.config?.resolver?.mode === 'shadow'
                   ? 'Simulação concluída. Confira os resultados no admin.'
-                  : 'Processamento concluído. Confira exclusões e publique pelo admin.',
+                  : 'Processamento concluído. Os itens estão disponíveis para publicação no admin.',
                 'success',
               );
             } catch (e) {

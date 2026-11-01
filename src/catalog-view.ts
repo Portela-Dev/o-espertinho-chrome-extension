@@ -151,13 +151,7 @@ function renderAiProgress(
     import('./review-ai-workflow.js').ReviewAiWorkflow['progress']
   >,
 ) {
-  const structured = ai.mode === 'active' || ai.mode === 'shadow';
-  let legacyCount = ai.pending + (ai.invalid ?? 0) + (ai.excluded ?? 0);
-  if (structured) legacyCount = 0;
-  const processed = Math.min(
-    ai.total,
-    ai.completed + ai.failed + (ai.skipped ?? 0) + legacyCount,
-  );
+  const processed = Math.min(ai.total, ai.completed + (ai.skipped ?? 0));
   el('run-status').textContent =
     (ai.task === 'category' ? 'Categorização' : 'Catalogação') +
     ' por IA · ' +
@@ -166,8 +160,9 @@ function renderAiProgress(
       completed: 'Concluída',
       cancelled: 'Cancelada',
       failed: 'Interrompida',
+      paused: 'Pausada para retomada',
     }[ai.status] ?? ai.status) +
-    (ai.mode && ai.mode !== 'legacy' && ai.title ? ' · ' + ai.title : '');
+    (['active','shadow'].includes(ai.mode) && ai.title ? ' · ' + ai.title : '');
   let acceptedLabel = ai.task === 'category' ? ' categorizados' : ' catalogados';
   if (ai.mode === 'shadow') acceptedLabel = ' simulados (sem salvar)';
   el('counts').textContent =
@@ -177,10 +172,7 @@ function renderAiProgress(
     ' links processados · ' +
     ai.completed +
     acceptedLabel +
-    (structured ? '' : ' · ' + ai.pending + ' pendências · ' + (ai.invalid ?? 0) + ' inválidos') +
-    ' · ' +
-    ai.failed +
-    ' falhas técnicas' +
+    (ai.fallback ? ' · ' + ai.fallback + ' pelos dados da oferta' : '') +
     ((ai.skipped ?? 0) > 0 ? ' · ' + ai.skipped + ' já tratados' : '');
   el<HTMLProgressElement>('progress').max = Math.max(1, ai.total);
   el<HTMLProgressElement>('progress').value = processed;
