@@ -5,6 +5,24 @@ const input={task:'resolver',stage:'match',offer:{title:'Headset Modelo X',descr
 const suggestion={productId:'p1',reason:'Mesmo modelo e marca. Cor não distingue o produto.'};
 function stream(events){const text=events.map(e=>'data: '+JSON.stringify(e)+'\r\n\r\n').join(''),bytes=new TextEncoder().encode(text);return new Response(new ReadableStream({start(controller){for(const byte of bytes)controller.enqueue(Uint8Array.of(byte));controller.close();}}));}
 const complete=text=>stream([{type:'response.output_text.delta',delta:text},{type:'response.completed',response:{status:'completed'}}]);
+
+test('tipo com atributos opcionais ou duplicatas idênticas usa identidade por título sem inventar especificações',async()=>{
+ const attribute={key:'material',label:'Material',required:false,aliases:[],unit:'text',values:{}};
+ const context={...input,stage:'type',policies:[]};
+ const decision={policyId:null,policy:{name:'Acessório',terms:['Acessório'],attributes:[attribute,{...attribute}]},facts:{},name:'Acessório',reason:''};
+ const result=await readSuggestion(complete(JSON.stringify(decision)),context);
+ assert.deepEqual(result.facts,{});assert.equal(result.policy.attributes.length,2);
+ assert.equal(result.policy.attributes[0].key,'material');assert.equal(result.policy.attributes[0].required,false);
+ assert.deepEqual(result.policy.attributes[1],{key:'title',label:'Título do produto',required:true,aliases:[],unit:'text',values:{}});
+ for(const attributes of [[],[{...attribute,key:'title'}]]){
+   const accepted=validateSuggestion({...decision,policy:{...decision.policy,attributes}},context);
+   assert.equal(accepted.policy.attributes.length,1);assert.equal(accepted.policy.attributes[0].key,'title');assert.equal(accepted.policy.attributes[0].required,true);
+ }
+ assert.throws(()=>validateSuggestion({...decision,policy:{...decision.policy,attributes:[attribute,{...attribute,unit:'number'}]}},context),/definições conflitantes/);
+ assert.throws(()=>validateSuggestion({...decision,policy:{...decision.policy,attributes:[{...attribute,key:'title',unit:'number'}]}},context),/precisa ser textual/);
+ assert.throws(()=>validateSuggestion({...decision,policy:{...decision.policy,attributes:Array.from({length:8},(_,i)=>({...attribute,key:'field'+i}))}},context),/não reservou espaço/);
+ assert.deepEqual(decision.policy.attributes,[attribute,attribute]);
+});
 test('resposta concluída encerra a leitura mesmo quando o provedor mantém o stream aberto',{timeout:1000},async()=>{
  let cancelled=false;
  const event={type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(suggestion)}]}]}};

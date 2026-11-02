@@ -4,6 +4,8 @@ const safeDetails = new Set([
   'Identidade fora da política.', 'Atributo fora da política.', 'Nome de produto inválido.',
   'Política de tipo fora do formato.', 'Atributo da nova política inválido.',
   'A política precisa de atributos distintos e uma identidade.', 'Tipo fora das políticas oferecidas.',
+  'Atributos repetidos com definições conflitantes.', 'O identificador por título precisa ser textual.',
+  'A política não reservou espaço para identificar pelo título.',
   'Árvore inválida.', 'Categoria fora dos candidatos.', 'A IA precisa escolher ou criar uma categoria.',
   'Produto fora dos candidatos.', 'Modelo indisponível nesta conta.',
 ]);

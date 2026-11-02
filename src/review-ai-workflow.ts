@@ -119,7 +119,8 @@ export class ReviewAiWorkflow {
         this.progress.diagnostic = phase(context) + ': ' + failure.label + (analysisDetail(error) ? ' — ' + analysisDetail(error) : '');
         diagnostic = failure.code;
         this.progress.title = failure.label + '; concluindo pelos dados da oferta';
-        if (++this.consecutiveFailures >= 2 || ['authentication', 'usage_limit'].includes(diagnostic)) this.providerFailure = diagnostic;
+        if (diagnostic === 'invalid_response') this.consecutiveFailures = 0;
+        else if (++this.consecutiveFailures >= 2 || ['authentication', 'usage_limit'].includes(diagnostic)) this.providerFailure = diagnostic;
         this.changed();
       }
     }
