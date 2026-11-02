@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ReviewAiWorkflow} from '../dist/review-ai-workflow.js';
 import {LocalError} from '../dist/shared/openai-session.mjs';
-import {analysisFailure} from '../dist/analysis-failure.js';
+import {analysisFailure,analysisDetail} from '../dist/analysis-failure.js';
 function fixture({failure, lostSave=false, deterministic=false, stage='type'}={}) {
  let done=0,calls=0,lost=false;const sent=[],receipts=new Map();
  const transport=async(op,p)=>{
@@ -18,13 +18,36 @@ function fixture({failure, lostSave=false, deterministic=false, stage='type'}={}
   return {};
  };
  const flow=new ReviewAiWorkflow(transport,async()=>{calls++;if(failure)throw failure;return {decision:{facts:{},reason:''}};});
- return {flow,sent,calls:()=>calls};
+ return {flow,transport,sent,calls:()=>calls};
 }
 test('falha permanente da IA conclui 100% sem três chamadas por item nem enviar o erro bruto',async()=>{
  const f=fixture({failure:Error('Bearer PRIVATE_TOKEN secret@example.test')});await f.flow.run('product','shop',6,'model');
  assert.equal(f.flow.progress.completed,6);assert.equal(f.flow.progress.total,6);assert.equal(f.flow.progress.fallback,6);assert.equal(f.flow.progress.failed,0);assert.equal(f.flow.progress.status,'completed');assert.equal(f.calls(),2);
  assert.ok(f.sent.filter(s=>s.op==='resolverComplete').every(s=>s.p.diagnostic==='unknown'));
  assert.doesNotMatch(JSON.stringify(f.sent),/PRIVATE_TOKEN|secret@example/);
+ assert.doesNotMatch(JSON.stringify(f.flow.progress),/PRIVATE_TOKEN|secret@example/);
+});
+
+test('diagnóstico seguro permanece no painel após concluir sem enviar detalhes ao backend',async()=>{
+ const error=new LocalError('Identidade fora da política.',422,'invalid_response');
+ const f=fixture({failure:error,stage:'identity'});await f.flow.run('product','shop',6,'model');
+ assert.match(f.flow.progress.diagnostic,/Identificando produto: Resposta da IA não utilizável — Identidade fora da política/);
+ assert.equal(f.flow.progress.status,'completed');assert.doesNotMatch(JSON.stringify(f.sent),/Identidade fora da política/);
+ assert.equal(analysisDetail(new LocalError('Bearer PRIVATE_TOKEN',500,'invalid_response')),'HTTP 500');
+ assert.equal(analysisDetail(Error('PRIVATE_TOKEN')),'');
+ assert.equal(analysisDetail(new LocalError('PRIVATE_TOKEN')), '');
+});
+
+test('duas respostas inválidas não desativam a IA para os demais produtos do lote',async()=>{
+ const f=fixture();let calls=0;
+ const flow=new ReviewAiWorkflow(f.transport,async()=>{
+   if (++calls<=2) throw new LocalError('Identidade fora da política.',422,'invalid_response');
+   return {decision:{facts:{},reason:''}};
+ });
+ await flow.run('product','shop',6,'model');
+ assert.equal(calls,6);assert.equal(flow.progress.completed,6);assert.equal(flow.progress.fallback,2);
+ assert.equal(f.sent.filter(s=>s.op==='resolverComplete'&&s.p.error).length,2);
+ assert.equal(f.sent.filter(s=>s.op==='resolverComplete'&&s.p.decision).length,4);
 });
 test('sessão ou limite do provedor suspende novas chamadas e mantém a catalogação pela alternativa',async()=>{
  for(const code of ['authentication','usage_limit']){
