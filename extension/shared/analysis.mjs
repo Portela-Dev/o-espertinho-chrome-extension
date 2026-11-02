@@ -64,8 +64,15 @@ export async function readSuggestion(response, input, onUsage = () => {}) {
   const state = {output:'',completed:false};
   await readFrames(response, frame => applyFrame(frame,state,onUsage));
   if (!state.completed) throw new LocalError('Conexão encerrada antes da conclusão.', 503, 'connection');
-  try { return validateSuggestion(parseOutput(state.output),input); }
-  catch { throw invalid(); }
+  let value;
+  try { value = parseOutput(state.output); }
+  catch { throw new LocalError('A resposta da IA não contém JSON válido.', 422, 'invalid_response'); }
+  try { return validateSuggestion(value,input); }
+  catch (error) {
+    // Validator messages are fixed local strings; never include the model output.
+    if (error instanceof LocalError) throw new LocalError(error.message, 422, 'invalid_response');
+    throw invalid();
+  }
 }
 function parseOutput(output) {
   let text = output.trim();

@@ -1,4 +1,4 @@
-import { analysisFailure } from './analysis-failure.js';
+import { analysisFailure, analysisDetail } from './analysis-failure.js';
 export type AiTask = 'category' | 'product';
 export type ReviewTransport = (operation: 'config' | 'resolverStart' | 'resolverClaim' | 'resolverComplete' | 'resolverAction', payload: any) => Promise<any>;
 const phase = (context: any) => ({ type: 'Identificando o tipo', identity: 'Identificando produto', match: 'Comparando produtos', category: 'Definindo categoria' }[context.stage as string] ?? 'Processando oferta');
@@ -6,7 +6,7 @@ export class ReviewAiWorkflow {
   config: any;
   marketplaceId = '';
   busy = false;
-  progress = { task: 'product' as AiTask, completed: 0, total: 0, failed: 0, skipped: 0, fallback: 0, status: 'idle', mode: 'active', title: '' };
+  progress = { task: 'product' as AiTask, completed: 0, total: 0, failed: 0, skipped: 0, fallback: 0, status: 'idle', mode: 'active', title: '', diagnostic: '' };
   private sequence = 0;
   private resolverRunId = '';
   private requestKey = '';
@@ -30,7 +30,7 @@ export class ReviewAiWorkflow {
     if (!Number.isInteger(limit) || limit < 1 || limit > 10000) throw new Error('Informe um limite entre 1 e 10000.');
     this.busy = true;
     const generation = ++this.sequence;
-    this.progress = { task, completed: 0, total: 0, failed: 0, skipped: 0, fallback: 0, status: 'running', mode: 'active', title: '' };
+    this.progress = { task, completed: 0, total: 0, failed: 0, skipped: 0, fallback: 0, status: 'running', mode: 'active', title: '', diagnostic: '' };
     this.consecutiveFailures = 0;
     this.providerFailure = '';
     const current = () => { if (generation !== this.sequence) throw new Error('Processamento interrompido pelo usuário.'); };
@@ -116,6 +116,7 @@ export class ReviewAiWorkflow {
       } catch (error) {
         current();
         const failure = analysisFailure(error);
+        this.progress.diagnostic = phase(context) + ': ' + failure.label + (analysisDetail(error) ? ' — ' + analysisDetail(error) : '');
         diagnostic = failure.code;
         this.progress.title = failure.label + '; concluindo pelos dados da oferta';
         if (++this.consecutiveFailures >= 2 || ['authentication', 'usage_limit'].includes(diagnostic)) this.providerFailure = diagnostic;

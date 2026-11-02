@@ -22,6 +22,9 @@ test('resposta incompleta, limite, JSON inválido e produto inventado não geram
  await assert.rejects(()=>readSuggestion(complete('```json\n'+JSON.stringify(suggestion)),input),e=>e.code==='invalid_response');
  for(const events of [[{type:'response.output_text.delta',delta:'{}'}],[{type:'response.failed',response:{error:{code:'subscription_sharing_usage_limit_exceeded'}}}],[{type:'response.incomplete'}]])await assert.rejects(()=>readSuggestion(stream(events),input));
  await assert.rejects(()=>readSuggestion(complete('not JSON'),input),e=>e.code==='invalid_response');
+ await assert.rejects(()=>readSuggestion(complete('Bearer PRIVATE_TOKEN'),input),e=>e.code==='invalid_response'&&e.message==='A resposta da IA não contém JSON válido.');
+ await assert.rejects(()=>readSuggestion(complete(JSON.stringify({facts:{},reason:'',policyId:'wrong'})),{...input,stage:'identity',policy:{id:'smartphone',attributes:[]}}),e=>e.code==='invalid_response'&&e.message==='Identidade fora da política.');
+ await assert.rejects(()=>readSuggestion(complete(JSON.stringify({facts:{brand:{value:'Marca',evidence:'Marca'}},reason:'',policyId:'smartphone'})),{...input,stage:'identity',policy:{id:'smartphone',attributes:[]}}),e=>e.code==='invalid_response'&&e.message==='Atributo fora da política.');
  await assert.rejects(()=>readSuggestion(complete(JSON.stringify({...suggestion,productId:'invented'})),input),e=>e.code==='invalid_response');
  for(const [status,code] of [[400,'invalid_response'],[401,'authentication'],[403,'authentication'],[429,'usage_limit'],[500,'provider_unavailable']])
   await assert.rejects(()=>readSuggestion(new Response('',{status}),input),e=>e.status===status&&e.code===code);

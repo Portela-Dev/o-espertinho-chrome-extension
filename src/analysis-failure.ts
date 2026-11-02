@@ -1,4 +1,17 @@
 import { LocalError } from './shared/openai-session.mjs';
+const safeDetails = new Set([
+  'A resposta da IA não contém JSON válido.', 'Decisão estruturada inválida.',
+  'Identidade fora da política.', 'Atributo fora da política.', 'Nome de produto inválido.',
+  'Política de tipo fora do formato.', 'Atributo da nova política inválido.',
+  'A política precisa de atributos distintos e uma identidade.', 'Tipo fora das políticas oferecidas.',
+  'Árvore inválida.', 'Categoria fora dos candidatos.', 'A IA precisa escolher ou criar uma categoria.',
+  'Produto fora dos candidatos.', 'Modelo indisponível nesta conta.',
+]);
+export function analysisDetail(error: unknown): string {
+  if (!(error instanceof LocalError)) return '';
+  if (safeDetails.has(error.message)) return error.message;
+  return error.status >= 400 && error.status <= 599 ? 'HTTP ' + error.status : '';
+}
 // Fixed diagnostics only: never forward provider bodies, tokens or raw exception messages.
 export function analysisFailure(error: unknown) {
   const code = error instanceof LocalError ? error.code : '';
