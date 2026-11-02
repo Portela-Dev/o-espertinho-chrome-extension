@@ -173,7 +173,8 @@ function renderAiProgress(
     ai.completed +
     acceptedLabel +
     (ai.fallback ? ' · ' + ai.fallback + ' pelos dados da oferta' : '') +
-    ((ai.skipped ?? 0) > 0 ? ' · ' + ai.skipped + ' já tratados' : '');
+    ((ai.skipped ?? 0) > 0 ? ' · ' + ai.skipped + ' já tratados' : '') +
+    (ai.diagnostic ? ' · Último diagnóstico: ' + ai.diagnostic : '');
   el<HTMLProgressElement>('progress').max = Math.max(1, ai.total);
   el<HTMLProgressElement>('progress').value = processed;
 }
