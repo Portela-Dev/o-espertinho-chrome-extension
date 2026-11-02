@@ -15,6 +15,12 @@ test('interface mostra permissões, progresso e texto externo sem HTML',()=>{
  state.run={step:'enrich',marketplace_id:'fixture',status:'waiting_for_human',reason:'challenge',total:5,completed:2,failed:1};renderCatalog(state,false);assert.equal(el('step-prices').disabled,true);assert.equal(el('resume').disabled,false);assert.equal(el('progress').value,3);
  state.user=undefined;renderCatalog(state,false);assert.equal(el('workspace').hidden,true);
 });
+
+test('pular registro só é habilitado quando disponível e entra na contagem de progresso',()=>{
+ const state={...view(),canSkip:true,skipSupported:true,run:{step:'prices',marketplace_id:'fixture',status:'paused_technical',total:3,completed:1,failed:0,skipped:1}};
+ renderCatalog(state,false);assert.equal(el('skip-item').disabled,false);assert.equal(el('progress').value,2);assert.match(el('counts').textContent,/1 pulados/);
+ renderCatalog({...state,canSkip:false,skipSupported:false},false);assert.equal(el('skip-item').disabled,true);assert.match(el('skip-item').title,/backend atualizado/);
+});
 test('tipo da execução e pendências por marketplace são exibidos sem confundir contagem com limite',()=>{
  const state={...view(),marketplaceId:'fixture',retryFailed:true,stats:{marketplaceId:'fixture',retryFailed:true,convert:{pending:7,completed:93,total:100},enrich:{pending:3,completed:80,total:100},prices:{pending:2,total:40}},run:{step:'prices',marketplace_id:'fixture',status:'running',total:5,completed:1,failed:0}};
  renderCatalog(state,false);assert.match(el('run-status').textContent,/6 — Analisar Preços · Loja · Em execução/);assert.match(el('step-convert').textContent,/Gerados: 93 \/ 100/);assert.match(el('step-enrich').textContent,/Extraídos: 80 \/ 100/);assert.match(el('step-prices').textContent,/2 \/ 40/);assert.equal(el('retry-failed').checked,true);
@@ -36,6 +42,11 @@ test('ações dos quatro passos, permissão, seletor e ícone usam mensagens int
   state.error=undefined;state.statsError='Contadores indisponíveis.';poll();await tick();assert.equal(el('error').textContent,state.statsError);assert.equal(el('queue-counts'),null);state.statsError=undefined;
   offline=true;poll();await tick();assert.equal(el('error').textContent,'Backend indisponível.');el('dismiss-notification').click();poll();await tick();assert.equal(el('notification').hidden,true);offline=false;poll();await tick();
   for(const step of ['discover','convert','enrich','prices']){el('step-'+step).click();await tick();assert.ok(messages.some(m=>m.type==='START'&&m.step===step),JSON.stringify({step,messages,error:el('error').textContent,market:el('marketplace').value,limit:el('limit').value}));}
+  state={...state,canSkip:true,skipSupported:true,run:{step:'prices',marketplace_id:'fixture',status:'paused_technical',total:2,completed:0,failed:0}};poll();await tick();
+  el('skip-item').click();await tick();assert.ok(messages.some(m=>m.type==='SKIP'));
+  allowed=false;const resumes=messages.filter(m=>m.type==='RESUME').length;el('resume').click();await tick();assert.equal(messages.filter(m=>m.type==='RESUME').length,resumes);
+  allowed=true;el('resume').click();await tick();assert.equal(messages.filter(m=>m.type==='RESUME').length,resumes+1);
+  state={...state,run:undefined,canSkip:false};poll();await tick();
   assert.ok(messages.some(m=>m.type==='START'&&m.hostWindowId===42));
   el('retry-failed').checked=true;el('retry-failed').dispatchEvent(new page.Event('change'));await tick();assert.ok(messages.some(m=>m.type==='FILTER'&&m.retryFailed));
   allowed=false;el('step-discover').click();await tick();assert.equal(el('error').hidden,false);allowed=true;

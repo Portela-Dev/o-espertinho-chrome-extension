@@ -5,6 +5,8 @@ import type {
 } from './catalog-types.js';
 import type { Account } from './contracts.js';
 export interface CatalogView {
+  canSkip?: boolean;
+  skipSupported?: boolean;
   backendUrl: string;
   environmentId?: string;
   environments?: { id: string; label: string; url: string }[];
@@ -142,6 +144,8 @@ export function renderCatalog(
   el<HTMLButtonElement>('cancel').disabled = aiShown
     ? !aiActive
     : busy || !active;
+  el<HTMLButtonElement>('skip-item').disabled=busy || aiShown || !view.canSkip;
+  el('skip-item').title=view.skipSupported?'Deixa o registro pendente e continua a execução.':'Requer backend atualizado e Atualizar configurações.';
   el<HTMLButtonElement>('pick-elements').disabled =
     busy || (!!run && ['queued', 'running'].includes(run.status));
 }
@@ -225,9 +229,9 @@ function renderRun(view: CatalogView, run: CatalogRun | undefined) {
   }
   el('run-status').textContent = status;
   el('counts').textContent = run
-    ? `${run.completed} concluídos · ${run.failed} falhas · ${run.total} itens`
+    ? `${run.completed} concluídos · ${run.failed} falhas · ${run.skipped ?? 0} pulados · ${run.total} itens`
     : '';
   el<HTMLProgressElement>('progress').max = Math.max(1, run?.total ?? 1);
   el<HTMLProgressElement>('progress').value =
-    (run?.completed ?? 0) + (run?.failed ?? 0);
+    (run?.completed ?? 0) + (run?.failed ?? 0) + (run?.skipped ?? 0);
 }
