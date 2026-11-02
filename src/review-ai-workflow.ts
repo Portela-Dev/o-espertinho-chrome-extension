@@ -119,8 +119,7 @@ export class ReviewAiWorkflow {
         this.progress.diagnostic = phase(context) + ': ' + failure.label + (analysisDetail(error) ? ' — ' + analysisDetail(error) : '');
         diagnostic = failure.code;
         this.progress.title = failure.label + '; concluindo pelos dados da oferta';
-        if (diagnostic === 'invalid_response') this.consecutiveFailures = 0;
-        else if (++this.consecutiveFailures >= 2 || ['authentication', 'usage_limit'].includes(diagnostic)) this.providerFailure = diagnostic;
+        this.updateProviderFailure(diagnostic);
         this.changed();
       }
     }
@@ -128,6 +127,10 @@ export class ReviewAiWorkflow {
     const payload = { runId, itemId: item.id, leaseId: item.leaseId, model: usedModel, tokens, elapsedMs: Math.min(Date.now() - start, 300000) };
     await this.save({ ...payload, ...(diagnostic ? { error: 'technical', errorCode: 'analysis_failed', diagnostic } : { decision }) }, current);
     this.changed();
+  }
+  private updateProviderFailure(diagnostic: string) {
+    if (diagnostic === 'invalid_response') this.consecutiveFailures = 0;
+    else if (++this.consecutiveFailures >= 2 || ['authentication', 'usage_limit'].includes(diagnostic)) this.providerFailure = diagnostic;
   }
   private async save(payload: any, current: () => void) {
     // A lost response retries the same decision; never infer again or substitute a different payload.
