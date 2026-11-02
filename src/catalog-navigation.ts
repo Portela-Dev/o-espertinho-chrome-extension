@@ -1,5 +1,6 @@
 import type { BlockRule } from './catalog-types.js';
 export function checkPageState(rules: BlockRule[]): string | null {
+  let unavailable=false;
   for (const rule of rules) {
     let found = false;
     if (rule.match === 'url_contains')
@@ -9,11 +10,13 @@ export function checkPageState(rules: BlockRule[]): string | null {
       found = (document.body?.innerText ?? '')
         .slice(0, 500000)
         .includes(rule.value);
-    if (found) return rule.kind;
+    if (found && rule.kind!=='unavailable') return rule.kind;
+    if (found) unavailable=true;
   }
-  return null;
+  return unavailable?'unavailable':null;
 }
 export class CatalogNavigation {
+  private navigation?: {previous?: string; target: string; started: boolean};
   constructor(
     private readonly browser: typeof chrome,
     private readonly state: () => {
@@ -58,6 +61,7 @@ export class CatalogNavigation {
       }
       if (win.id === undefined || (win.type && win.type !== 'normal'))
         throw new Error('tab_closed');
+      this.navigation = {target: target.href, started: false};
       tab = await this.browser.tabs.create({
         windowId: win.id,
         url: target.href,
@@ -69,10 +73,13 @@ export class CatalogNavigation {
       await this.save();
     } else {
       await this.moveToHost(tab);
-      if (navigate)
-        await this.browser.tabs.update(tab.id!, {
+      if (navigate) {
+        this.navigation = {previous: tab.url, target: target.href, started: false};
+        const updated = await this.browser.tabs.update(tab.id!, {
           url: target.href,
         });
+        this.navigation.started = updated?.status === 'loading';
+      }
     }
     return tab.id!;
   }
@@ -113,12 +120,56 @@ export class CatalogNavigation {
     while (Date.now() < end) {
       const tab = await this.browser.tabs.get(this.state().tabId!);
       if (tab.windowId !== this.state().windowId) throw new Error('tab_closed');
-      if (tab.url && !origins.includes(new URL(tab.url).origin))
-        throw new Error('access_denied');
-      if (tab.status === 'complete') return;
+      if (!(await this.browser.permissions.contains({origins: origins.map(o=>o+'/*')}))) throw new Error('permission');
+      if (this.ready(tab,origins)) return;
       await new Promise((r) => setTimeout(r, 250));
     }
     throw new Error('incomplete');
+  }
+  private ready(tab: chrome.tabs.Tab, origins: string[]) {
+    if (tab.pendingUrl) {
+      this.allowed(tab.pendingUrl,origins);
+      if (this.navigation) this.navigation.started=true;
+      return false;
+    }
+    if (tab.status !== 'complete') {
+      if (this.navigation) this.navigation.started=true;
+      return false;
+    }
+    if (!tab.url || tab.url.startsWith('chrome-error:')) throw new Error('page_unreadable');
+    this.allowed(tab.url,origins);
+    const nav=this.navigation;
+    if (nav && !nav.started && tab.url===nav.previous && tab.url!==nav.target) return false;
+    this.navigation=undefined;
+    return true;
+  }
+  private allowed(value: string, origins: string[]) {
+    const url=new URL(value);
+    if (url.protocol!=='https:' || url.username || url.password || !origins.includes(url.origin)) throw new Error('access_denied');
+  }
+  async inject(func: any, args: any[], origins: string[], timeoutMs: number, world: 'ISOLATED'|'MAIN'='ISOLATED', active: ()=>void=()=>{}) {
+    const deadline=Date.now()+timeoutMs;
+    for (let attempt=0;attempt<3;attempt++) {
+      active();
+      await this.wait(origins,Math.max(1,deadline-Date.now()));
+      active();
+      try {
+        const results=await this.browser.scripting.executeScript({target:{tabId:this.state().tabId!},world,func,args});
+        active();
+        return results[0]?.result;
+      } catch (error) {
+        active();
+        await this.retryAccess(error,attempt,deadline,origins);
+      }
+    }
+    throw new Error('page_unreadable');
+  }
+  private async retryAccess(error: unknown, attempt: number, deadline: number, origins: string[]) {
+    const message=error instanceof Error?error.message:'';
+    if (!/Cannot access contents of (?:the page|url)|Missing host permission for the tab/i.test(message)) throw error;
+    if (!(await this.browser.permissions.contains({origins:origins.map(o=>o+'/*')}))) throw new Error('permission');
+    if (attempt===2 || Date.now()>=deadline) throw new Error('page_unreadable');
+    await new Promise(resolve=>setTimeout(resolve,250));
   }
   async focus() {
     const state = this.state();
@@ -137,15 +188,7 @@ export class CatalogNavigation {
       throw new Error('tab_closed');
     }
   }
-  async inspect(rules: BlockRule[]) {
-    const results = await this.browser.scripting.executeScript({
-      target: {
-        tabId: this.state().tabId!,
-      },
-      world: 'ISOLATED',
-      func: checkPageState,
-      args: [rules],
-    });
-    return results[0]?.result ?? null;
+  async inspect(rules: BlockRule[], origins: string[], timeoutMs: number, active: ()=>void=()=>{}) {
+    return await this.inject(checkPageState,[rules],origins,timeoutMs,'ISOLATED',active) ?? null;
   }
 }

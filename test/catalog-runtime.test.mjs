@@ -3,17 +3,18 @@ import assert from 'node:assert/strict';
 import {CatalogRuntime} from '../dist/catalog-runtime.js';
 import {recipe,auth} from './fixtures.mjs';
 function fixture(options={}){
- let saved={backendUrl:'http://localhost:3000',auth,proofTest:{secret:'obsolete'},progress:{status:'running'}};let run;
+ let saved={backendUrl:'http://localhost:3000',auth,proofTest:{secret:'obsolete'},progress:{status:'running'}};let run;let tabUrl='https://shop.example.com';let processed=0;
  const calls=[],navigations=[],settings={intervalMs:100,timeoutMs:1000,humanTimeoutMs:60000,blockRules:[],recipe:{...recipe,allowedOrigins:['https://shop.example.com'],affiliateOrigins:['https://shop.example.com'],loginUrl:'https://shop.example.com'}},market={id:'shop',name:'Shop',catalog_executor:'extension',website_url:'https://shop.example.com',allowedOrigins:['https://shop.example.com'],config:settings};
- const browser={runtime:{id:'a'.repeat(32),getManifest:()=>({version:'0.2.0'})},storage:{local:{setAccessLevel:async()=>{},get:async()=>({state:saved}),set:async({state})=>{saved=structuredClone(state);}},session:{get:async()=>({}),setAccessLevel:async()=>{},set:async()=>{},remove:async()=>{}}},alarms:{create:async()=>{}},permissions:{contains:async()=>true},windows:{getLastFocused:async()=>({id:9,type:'normal'}),get:async id=>({id,type:'normal'}),update:async()=>{}},tabs:{get:async()=>({id:4,windowId:9,url:'https://shop.example.com',status:'complete'}),update:async(id,options)=>{if(options.url)navigations.push(options.url);},create:async options=>{navigations.push(options.url);return {id:4,windowId:9};}},scripting:{executeScript:async call=>[{result:call.func.name==='checkPageState'?(options.blocked?.()??null):(options.result??{affiliateUrl:'https://shop.example.com/p?affiliate=1'})}]}};
+ const browser={runtime:{id:'a'.repeat(32),getManifest:()=>({version:'0.2.0'})},storage:{local:{setAccessLevel:async()=>{},get:async()=>({state:saved}),set:async({state})=>{saved=structuredClone(state);}},session:{get:async()=>({}),setAccessLevel:async()=>{},set:async()=>{},remove:async()=>{}}},alarms:{create:async()=>{}},permissions:{contains:async()=>true},windows:{getLastFocused:async()=>({id:9,type:'normal'}),get:async id=>({id,type:'normal'}),update:async()=>{}},tabs:{get:async()=>({id:4,windowId:9,url:tabUrl,status:'complete'}),update:async(id,options)=>{if(options.url){navigations.push(options.url);tabUrl=options.url;}},create:async options=>{navigations.push(options.url);tabUrl=options.url;return {id:4,windowId:9};}},scripting:{executeScript:async call=>[{result:call.func.name==='checkPageState'?(options.blocked?.()??null):(options.result??{affiliateUrl:'https://shop.example.com/p?affiliate=1'})}]}};
  const fetch=async(url,requestOptions)=>{const path=new URL(url).pathname.replace('/api/extension','');const body=requestOptions.body?JSON.parse(requestOptions.body):undefined;calls.push({path,body});
   if(path==='/catalog/stats')return Response.json({marketplaceId:new URL(url).searchParams.get('marketplaceId'),retryFailed:new URL(url).searchParams.get('retryFailed')==='true',convert:{pending:3,completed:2,total:5},enrich:{pending:2,completed:1,total:5},prices:{pending:1,total:4},observedAt:new Date().toISOString()});
-  if(path==='/catalog/config')return Response.json({marketplaces:[market]});
-  if(path==='/catalog/runs'){run={id:'run',marketplace_id:'shop',status:'queued',step:body.step,total:1,completed:0,failed:0,snapshot:{market:{allowedHosts:['shop.example.com']},settings,profile:null}};return Response.json(run);}
-  if(path.endsWith('/claim'))return Response.json({item:{id:'item',lease_token:'lease',payload:{url:'https://shop.example.com/p',originalUrl:'https://shop.example.com/p',...options.payload}},snapshot:run.snapshot,step:run.step});
+  if(path==='/catalog/config')return Response.json({capabilities:{skipItem:true},marketplaces:[market]});
+  if(path==='/catalog/runs'){run={id:'run',marketplace_id:'shop',status:'queued',step:body.step,total:options.items??1,completed:0,failed:0,snapshot:{market:{allowedHosts:['shop.example.com']},settings,profile:null}};return Response.json(run);}
+  if(path.endsWith('/claim'))return Response.json({item:{id:processed?'next':'item',lease_token:'lease',payload:{url:'https://shop.example.com/'+(processed?'next':'p'),originalUrl:'https://shop.example.com/'+(processed?'next':'p'),...options.payload}},snapshot:run.snapshot,step:run.step});
+  if(path.endsWith('/skip')){processed++;run.status=processed===run.total?'completed':'running';run.skipped=(run.skipped??0)+1;return Response.json(run);}
   if(path.endsWith('/heartbeat'))return Response.json({ok:true});
-  if(path.endsWith('/results')){run.status='completed';run.completed=1;return Response.json({accepted:true});}
-  if(path.endsWith('/action')){run.status=body.action==='resume'?'running':body.action==='human'?'waiting_for_human':body.action==='cancel'?'cancelled':'paused_by_user';return Response.json(run);}
+  if(path.endsWith('/results')){processed++;run.status=processed===run.total?'completed':'running';if(body.outcome==='technical_failure')run.failed++;else run.completed++;return Response.json({accepted:true});}
+  if(path.endsWith('/action')){run.status=body.action==='resume'?'running':body.action==='human'?'waiting_for_human':body.action==='cancel'?'cancelled':body.action==='technical'?'paused_technical':'paused_by_user';return Response.json(run);}
   if(path==='/catalog/runs/run')return Response.json(run);
   if(path==='/auth/logout')return Response.json({ok:true});
   throw Error('unexpected '+path);
@@ -154,6 +155,66 @@ test('falha de rede pausa localmente sem repetição e logout limpa a execução
   await f.runtime.pump();assert.equal(f.saved().locallyPaused,true);assert.equal(f.saved().run.status,'paused_technical');
   const count=requests;await f.runtime.pump();assert.equal(requests,count);
   globalThis.fetch=f.fetch;await f.runtime.handle({type:'LOGOUT'});assert.equal(f.saved().run,undefined);assert.equal(f.saved().auth,undefined);assert.equal(f.saved().locallyPaused,undefined);
+ }finally{globalThis.fetch=original;}
+});
+
+test('página inacessível deixa preço pendente e atualiza o próximo item sem reiniciar',async()=>{
+ const f=fixture({items:2}),original=globalThis.fetch;globalThis.fetch=f.fetch;let failures=0;
+ f.browser.scripting.executeScript=async call=>{
+  if(failures++<3)throw Error('Cannot access contents of the page. Extension manifest must request permission to access the respective host.');
+  return [{result:call.func.name==='checkPageState'?null:{outcome:'success',data:{title:'Produto seguinte',priceCents:32100},sourceCategoryPath:[]}}];
+ };
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'prices'});await finished(f);
+  const results=f.calls.filter(c=>c.path.endsWith('/results'));assert.equal(results.length,2);assert.equal(results[0].body.outcome,'technical_failure');assert.equal(results[1].body.outcome,'success');assert.equal(f.saved().run.failed,1);assert.equal(f.saved().run.completed,1);assert.equal(f.calls.filter(c=>c.path==='/catalog/runs').length,1);
+ }finally{globalThis.fetch=original;}
+});
+
+test('permissão revogada pausa como permission e pode retomar o mesmo ciclo',async()=>{
+ const f=fixture({result:{outcome:'success',data:{priceCents:100}}}),original=globalThis.fetch;globalThis.fetch=f.fetch;
+ f.browser.permissions.contains=async()=>false;
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'prices'});
+  for(let i=0;i<1000&&f.saved().run?.status!=='paused_technical';i++)await new Promise(r=>setTimeout(r,5));
+  assert.equal(f.calls.find(c=>c.path.endsWith('/action')).body.reason,'permission');assert.match(f.saved().error,/Autorize/);
+  f.browser.permissions.contains=async()=>true;await f.runtime.handle({type:'RESUME'});await finished(f);assert.equal(f.calls.filter(c=>c.path==='/catalog/runs').length,1);
+ }finally{globalThis.fetch=original;}
+});
+
+test('pular item em erro mantém execução e segue para o próximo, sem reenviar resultado pendente',async()=>{
+ const f=fixture({items:2}),original=globalThis.fetch;globalThis.fetch=f.fetch;let blocked=true;
+ f.browser.scripting.executeScript=async call=>{if(blocked)throw Error('erro inesperado de página');return [{result:call.func.name==='checkPageState'?null:{outcome:'success',data:{priceCents:100}}}];};
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'prices'});
+  for(let i=0;i<1000&&f.saved().run?.status!=='paused_technical';i++)await new Promise(r=>setTimeout(r,5));
+  assert.equal((await f.runtime.handle({type:'STATE'})).canSkip,true);blocked=false;await f.runtime.handle({type:'SKIP'});await finished(f);
+  assert.equal(f.saved().run.skipped,1);assert.equal(f.saved().run.completed,1);assert.equal(f.calls.filter(c=>c.path.endsWith('/skip')).length,1);assert.equal(f.calls.filter(c=>c.path==='/catalog/runs').length,1);
+  await assert.rejects(()=>f.runtime.handle({type:'SKIP'}),/Não há registro/);
+ }finally{globalThis.fetch=original;}
+});
+
+test('resposta antiga após pausar e pular não pausa de novo nem grava o item pulado',async()=>{
+ const f=fixture({items:2}),original=globalThis.fetch;globalThis.fetch=f.fetch;let release;
+ f.browser.scripting.executeScript=async call=>{
+  if(call.func.name==='checkPageState')return [{result:null}];
+  if(!release)return new Promise(resolve=>{release=()=>resolve([{result:{outcome:'success',data:{priceCents:999}}}]);});
+  return [{result:{outcome:'success',data:{priceCents:100}}}];
+ };
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'prices'});
+  for(let i=0;i<1000&&!release;i++)await new Promise(r=>setTimeout(r,5));assert.equal(typeof release,'function');
+  await f.runtime.handle({type:'PAUSE'});await f.runtime.handle({type:'SKIP'});release();await finished(f);
+  assert.equal(f.saved().run.skipped,1);assert.equal(f.saved().run.completed,1);assert.equal(f.calls.filter(c=>c.path.endsWith('/results')).length,1);assert.equal(f.calls.some(c=>c.path.endsWith('/action')&&c.body.action==='technical'),false);
+ }finally{globalThis.fetch=original;}
+});
+
+test('retomar página ilegível continua o ciclo existente e avança o registro ruim',async()=>{
+ const f=fixture({items:2}),original=globalThis.fetch;globalThis.fetch=f.fetch;let mode='pause',attempts=0;
+ f.browser.scripting.executeScript=async call=>{
+  if(mode==='pause')throw Error('falha inicial de página');
+  if(++attempts<=6)throw Error('Cannot access contents of the page.');
+  return [{result:call.func.name==='checkPageState'?null:{outcome:'success',data:{priceCents:100}}}];
+ };
+ try{await f.runtime.init();await f.runtime.handle({type:'REFRESH'});await f.runtime.handle({type:'START',marketplaceId:'shop',step:'prices'});
+  for(let i=0;i<1000&&f.saved().run?.status!=='paused_technical';i++)await new Promise(r=>setTimeout(r,5));
+  mode='resume';await f.runtime.handle({type:'RESUME'});await finished(f);
+  assert.equal(f.saved().run.completed,1);assert.equal(f.saved().run.failed,1);assert.equal(f.calls.filter(c=>c.path==='/catalog/runs').length,1);
  }finally{globalThis.fetch=original;}
 });
 

@@ -25,3 +25,34 @@ test('detector distingue login, desafio e indisponibilidade sem interagir com a 
  document.body.innerHTML='<div class="challenge">Verificação</div>';assert.equal(checkPageState([{kind:'challenge',match:'selector',value:'.challenge'}]),'challenge');
  assert.equal(checkPageState([{kind:'unavailable',match:'text',value:'Esgotado'}]),null);
 });
+
+function accessFixture(){
+ const state={tabId:4,windowId:9},browser={permissions:{contains:async()=>true},tabs:{get:async()=>({id:4,windowId:9,status:'complete',url:'https://shop.example.com/p'}),update:async()=>{}},scripting:{executeScript:async()=>[{result:'ok'}]}};
+ return {browser,nav:new CatalogNavigation(browser,()=>state,async()=>{})};
+}
+test('acesso transitório repete somente a injeção recusada e respeita permissão revogada',async()=>{
+ const f=accessFixture();let attempts=0;
+ f.browser.scripting.executeScript=async()=>{if(++attempts<3)throw Error('Cannot access contents of the page. Extension manifest must request permission to access the respective host.');return [{result:'ok'}];};
+ assert.equal(await f.nav.inject(()=>{},[],['https://shop.example.com'],1500),'ok');assert.equal(attempts,3);
+ f.browser.permissions.contains=async()=>false;
+ await assert.rejects(()=>f.nav.inject(()=>{},[],['https://shop.example.com'],100),/permission/);assert.equal(attempts,3);
+});
+test('página de erro é limitada a três tentativas e domínio externo nunca recebe injeção',async()=>{
+ const f=accessFixture();let attempts=0;
+ f.browser.scripting.executeScript=async()=>{attempts++;throw Error('Cannot access contents of the page.');};
+ await assert.rejects(()=>f.nav.inject(()=>{},[],['https://shop.example.com'],1500),/page_unreadable/);assert.equal(attempts,3);
+ f.browser.tabs.get=async()=>({id:4,windowId:9,status:'loading',pendingUrl:'https://unconfigured.example/p',url:'https://shop.example.com/p'});
+ await assert.rejects(()=>f.nav.inject(()=>{},[],['https://shop.example.com'],100),/access_denied/);assert.equal(attempts,3);
+});
+test('wait não confunde documento anterior complete com a nova página e não aceita frame em trânsito',async()=>{
+ const f=accessFixture();let reads=0;
+ await f.nav.ensure('https://shop.example.com/new',['https://shop.example.com']);
+ f.browser.tabs.get=async()=>{reads++;return {id:4,windowId:9,status:'complete',url:reads<3?'https://shop.example.com/p':'https://shop.example.com/new'};};
+ await f.nav.wait(['https://shop.example.com'],1500);assert.equal(reads,3);
+});
+test('erro da operação não repete conversão e cancelamento impede nova injeção',async()=>{
+ const f=accessFixture();let attempts=0;
+ f.browser.scripting.executeScript=async()=>{attempts++;throw Error('operation failed');};
+ await assert.rejects(()=>f.nav.inject(()=>{},[],['https://shop.example.com'],500),/operation failed/);assert.equal(attempts,1);
+ await assert.rejects(()=>f.nav.inject(()=>{},[],['https://shop.example.com'],500,'ISOLATED',()=>{throw Error('interrupted');}),/interrupted/);assert.equal(attempts,1);
+});

@@ -43,6 +43,7 @@ type CatalogCommand = {
   environmentUrl?: string;
 };
 export class CatalogRuntime {
+  private skipSupported=false;
   state!: CatalogState;
   private initialization?: Promise<void>;
   private refreshing?: Promise<boolean>;
@@ -218,6 +219,7 @@ export class CatalogRuntime {
   }
   private async refresh() {
     const config = await this.api('/catalog/config');
+    this.skipSupported=config.capabilities?.skipItem===true;
     this.state.markets = config.marketplaces;
     if (!this.state.markets.some((m) => m.id === this.state.marketplaceId))
       this.state.marketplaceId = this.state.markets[0]?.id;
@@ -457,6 +459,9 @@ export class CatalogRuntime {
       case 'RESUME':
         await this.resume();
         break;
+      case 'SKIP':
+        await this.skip();
+        break;
       default:
         throw new Error('Operação desconhecida.');
     }
@@ -520,11 +525,8 @@ export class CatalogRuntime {
       market.allowedOrigins,
       false,
     );
-    await this.navigation.wait(market.allowedOrigins, market.config.timeoutMs);
     if (this.state.tabId) {
-      const blocked = await this.navigation.inspect(
-        run.snapshot.settings.blockRules,
-      );
+      const blocked = await this.inspectForResume(run,market);
       if (blocked && blocked !== 'unavailable')
         throw new Error('A página ainda exige intervenção: ' + blocked);
     }
@@ -534,6 +536,30 @@ export class CatalogRuntime {
     this.state.locallyPaused = false;
     delete this.state.claim;
     delete this.state.pendingResult;
+    await this.save();
+    void this.pump();
+  }
+  private async inspectForResume(run: CatalogRun, market: CatalogMarket) {
+    try { return await this.navigation.inspect(run.snapshot.settings.blockRules,market.allowedOrigins,market.config.timeoutMs); }
+    catch (error) {
+      if (error instanceof Error && error.message==='page_unreadable' && ['prices','enrich'].includes(run.step)) return null;
+      throw error;
+    }
+  }
+  private canSkip() {
+    const run=this.state.run;
+    return !!(this.skipSupported && run && ['prices','enrich'].includes(run.step) && ['paused_technical','paused_by_user','waiting_for_human'].includes(run.status) && this.state.claim?.item && !this.state.pendingResult);
+  }
+  private async skip() {
+    if (!this.canSkip()) throw new Error('Não há registro com erro disponível para pular.');
+    const item=this.state.claim!.item!;
+    this.state.run=await this.api('/catalog/runs/'+this.state.run!.id+'/skip',{itemId:item.id,leaseToken:item.lease_token});
+    this.generation++;
+    delete this.state.claim;
+    delete this.state.error;
+    this.state.locallyPaused=false;
+    this.state.nextAt=0;
+    this.state.message='Registro pulado. Continuando para o próximo.';
     await this.save();
     void this.pump();
   }
@@ -548,6 +574,8 @@ export class CatalogRuntime {
       retryFailed: this.state.retryFailed ?? false,
       stats: this.stats,
       statsError: this.statsError,
+      canSkip: this.canSkip(),
+      skipSupported: this.skipSupported,
       error: this.state.error,
       run: this.state.run,
       message: this.state.message,
@@ -660,7 +688,7 @@ export class CatalogRuntime {
     await this.navigation.ensure(url, origins, !this.remainOnPage(claim));
     await this.navigation.wait(origins, settings.timeoutMs);
     assertActive();
-    const block = await this.navigation.inspect(settings.blockRules);
+    const block = await this.navigation.inspect(settings.blockRules,origins,settings.timeoutMs,assertActive);
     if (block && block !== 'unavailable')
       return {
         blocked: block,
@@ -671,15 +699,7 @@ export class CatalogRuntime {
       world: 'ISOLATED' | 'MAIN' = 'ISOLATED',
     ) => {
       assertActive();
-      const values = await this.browser.scripting.executeScript({
-        target: {
-          tabId: this.state.tabId!,
-        },
-        world,
-        func,
-        args,
-      });
-      const value = values[0]?.result;
+      const value = await this.navigation.inject(func,args,origins,settings.timeoutMs,world,assertActive);
       if (value === undefined) throw new Error('incomplete');
       return value as any;
     };
@@ -957,7 +977,7 @@ export class CatalogRuntime {
     };
   }
   private async executeWithPolicy(claim: CatalogClaim): Promise<any> {
-    if (claim.step !== 'discover') return this.execute(claim);
+    if (claim.step !== 'discover') return this.executeItem(claim);
     const deadline = this.discoveryDeadline(claim);
     if (deadline) return deadline;
     const generation = this.generation;
@@ -972,6 +992,15 @@ export class CatalogRuntime {
       }
     }
     throw new Error('incomplete');
+  }
+  private async executeItem(claim: CatalogClaim) {
+    try { return await this.execute(claim); }
+    catch (error) {
+      const reason=error instanceof Error?error.message:'';
+      if (['prices','enrich'].includes(claim.step) && ['page_unreadable','incomplete'].includes(reason))
+        return {outcome:'technical_failure',reason:'incomplete'};
+      throw error;
+    }
   }
   private async consumeClaim(
     run: CatalogRun,
@@ -1083,7 +1112,7 @@ export class CatalogRuntime {
   }
   private async pauseOnFailure(error: unknown) {
     const reason = error instanceof Error ? error.message : '';
-    this.state.error = reason || 'Não foi possível continuar o processamento.';
+    this.state.error = ({permission:'Autorize os domínios deste marketplace clicando em Continuar.',access_denied:'A página redirecionou para um domínio não autorizado. Confira a aba ou pule o registro.',page_unreadable:'Não foi possível ler esta página. Você pode pular o registro e continuar.'} as Record<string,string>)[reason] ?? (reason || 'Não foi possível continuar o processamento.');
     this.state.message =
       'O processamento encontrou um erro. Confira a notificação e tente novamente.';
     if (
@@ -1091,7 +1120,7 @@ export class CatalogRuntime {
       this.state.run &&
       ['queued', 'running'].includes(this.state.run.status)
     ) {
-      const code = ['permission', 'tab_closed', 'incomplete'].includes(reason)
+      const code = ['permission', 'tab_closed', 'incomplete','access_denied'].includes(reason)
         ? reason
         : 'network';
       try {
@@ -1123,13 +1152,14 @@ export class CatalogRuntime {
     await this.init();
     if (this.pumping || this.changingEnvironment) return;
     this.pumping = true;
+    const generation=this.generation;
     try {
       if (this.state.pair) await this.poll();
       const run = this.state.run;
       if (!this.state.auth || !run || this.state.locallyPaused) return;
       await this.pumpRun(run);
     } catch (error) {
-      await this.pauseOnFailure(error);
+      if (generation===this.generation) await this.pauseOnFailure(error);
     } finally {
       this.schedulePump();
     }
