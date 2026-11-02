@@ -159,12 +159,15 @@ for (const [id, type] of Object.entries({
   logout: 'LOGOUT',
   refresh: 'REFRESH',
   pause: 'PAUSE',
-  resume: 'RESUME',
   focus: 'FOCUS',
 }))
   element(id).addEventListener('click', () => {
     void act(() => send(type));
   });
+element('resume').addEventListener('click',()=>{
+  void act(async()=>{await grant(view?.run?.marketplace_id);await send('RESUME');});
+});
+element('skip-item').addEventListener('click',()=>{void act(()=>send('SKIP'));});
 element('cancel').addEventListener('click', () => {
   if (aiBusy) document.dispatchEvent(new Event('cancel-ai-review'));
   else void act(() => send('CANCEL'));
@@ -176,8 +179,8 @@ for (const id of ['marketplace', 'retry-failed'])
       retryFailed = element<HTMLInputElement>('retry-failed').checked;
     void act(() => send('FILTER', { marketplaceId, retryFailed }));
   });
-async function grant() {
-  const market = view?.markets.find((m) => m.id === marketplace());
+async function grant(marketplaceId=marketplace()) {
+  const market = view?.markets.find((m) => m.id === marketplaceId);
   if (!market) throw new Error('Escolha um marketplace.');
   if (
     !(await chrome.permissions.request({
